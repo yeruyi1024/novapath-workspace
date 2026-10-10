@@ -46,7 +46,9 @@ const startupSource = pluginSource.replace(
 
 const roots: string[] = [];
 function createRoot(): string {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-nsp-compat-'));
+  // Node resolves ESM imports through macOS /var -> /private/var. Match the
+  // real module path while still exercising decoded names such as # and %.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lobsterai-nsp-compat-')));
   roots.push(root);
   return root;
 }

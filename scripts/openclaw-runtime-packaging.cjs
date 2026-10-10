@@ -14,6 +14,25 @@ const DIST_DIFFS_EXTENSION_DIR = path.join(DIST_EXTENSIONS_DIR, 'diffs');
 
 const BARE_DIST_TOP_LEVEL_TO_KEEP = new Set(['control-ui', 'extensions']);
 
+// Optional preinstalls may be unavailable outside their registry/network. Keep
+// them distinct from required plugins while still validating any installed copy.
+function classifyPreinstalledPlugins(plugins, isInstalled) {
+  const installed = [];
+  const missingRequired = [];
+  const missingOptional = [];
+  for (const plugin of plugins) {
+    if (!plugin.id) continue;
+    if (isInstalled(plugin)) {
+      installed.push(plugin);
+    } else if (plugin.optional === true) {
+      missingOptional.push(plugin.id);
+    } else {
+      missingRequired.push(plugin.id);
+    }
+  }
+  return { installed, missingRequired, missingOptional };
+}
+
 // Only explicitly reviewed official packages may use OpenClaw's trusted bundled
 // root. Other preinstalls remain config-origin plugins in third-party-extensions.
 function resolvePreinstalledPluginDir(runtimeRoot, plugin) {
@@ -106,6 +125,7 @@ module.exports = {
   DIST_ENTRY_MJS,
   DIST_EXTENSIONS_DIR,
   OPENCLAW_ENTRY,
+  classifyPreinstalledPlugins,
   pruneBareDistAfterGatewayPack,
   pruneGatewayAsarStage,
   resolvePreinstalledPluginDir,

@@ -34,7 +34,6 @@ SKILLs/**/.server.log
 SKILLs/**/.server.pid
 SKILLs/**/.venv/
 
-package-lock.json
 
 nul
 .work.env
@@ -56,3 +55,9 @@ sandbox/
 openspec/
 .superpowers/
 .diagram/
+
+# Local CI workspaces and generated artifacts
+.ci-openclaw/
+.ci-artifacts/
+artifacts/
+logs/

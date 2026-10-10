@@ -7,6 +7,7 @@ import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const {
+  classifyPreinstalledPlugins,
   pruneBareDistAfterGatewayPack,
   pruneGatewayAsarStage,
   resolvePreinstalledPluginDir,
@@ -17,6 +18,27 @@ const { openclaw } = require('../package.json');
 const { shouldKeepBundledExtension } = require('../scripts/prune-openclaw-runtime.cjs');
 
 const tempDirs: string[] = [];
+
+test('optional unavailable preinstalls do not weaken required plugin checks', () => {
+  const required = { id: 'qwen' };
+  const optional = { id: 'moltbot-popo', optional: true };
+  const explicitRequired = { id: 'discord', optional: false };
+  expect(classifyPreinstalledPlugins([required, optional, explicitRequired], () => false)).toEqual({
+    installed: [],
+    missingRequired: ['qwen', 'discord'],
+    missingOptional: ['moltbot-popo'],
+  });
+});
+
+test('installed optional preinstalls remain in the verification set', () => {
+  const optional = { id: 'moltbot-popo', optional: true };
+  const required = { id: 'qwen' };
+  expect(classifyPreinstalledPlugins([optional, required], () => true)).toEqual({
+    installed: [optional, required],
+    missingRequired: [],
+    missingOptional: [],
+  });
+});
 
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {

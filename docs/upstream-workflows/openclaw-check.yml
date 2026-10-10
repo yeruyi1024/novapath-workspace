@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24.x'
-      
+
       - name: Check OpenClaw Version Format
         run: |
           VERSION=$(node -p "require('./package.json').openclaw.version")
@@ -31,7 +31,7 @@ jobs:
             exit 1
           fi
           echo "✓ OpenClaw version format valid: $VERSION"
-      
+
       - name: Validate OpenClaw Repository
         run: |
           REPO=$(node -p "require('./package.json').openclaw.repo")
@@ -40,20 +40,20 @@ jobs:
             exit 1
           fi
           echo "✓ OpenClaw repository URL valid: $REPO"
-      
+
       - name: Validate OpenClaw Plugins
         run: |
           node -e "
             const pkg = require('./package.json');
-            
+
             if (!pkg.openclaw.plugins || !Array.isArray(pkg.openclaw.plugins)) {
               console.error('❌ Invalid openclaw.plugins configuration: must be an array');
               process.exit(1);
             }
-            
+
             console.log('✓ OpenClaw plugins configuration valid');
             console.log('  Total plugins:', pkg.openclaw.plugins.length);
-            
+
             // Validate each plugin
             let hasError = false;
             pkg.openclaw.plugins.forEach((plugin, index) => {
@@ -70,14 +70,14 @@ jobs:
                 hasError = true;
               }
             });
-            
+
             if (hasError) {
               process.exit(1);
             }
-            
+
             console.log('✓ All plugins have required fields');
           "
-      
+
       - name: Check OpenClaw Scripts Exist
         run: |
           SCRIPTS=(
@@ -91,7 +91,7 @@ jobs:
             "scripts/run-build-openclaw-runtime.cjs"
             "scripts/sync-openclaw-runtime-current.cjs"
           )
-          
+
           MISSING=0
           for script in "${SCRIPTS[@]}"; do
             if [ -f "$script" ]; then
@@ -101,7 +101,7 @@ jobs:
               MISSING=$((MISSING + 1))
             fi
           done
-          
+
           if [ $MISSING -gt 0 ]; then
             echo "⚠ $MISSING OpenClaw scripts missing (this may be expected for new projects)"
           fi

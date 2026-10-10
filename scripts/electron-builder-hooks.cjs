@@ -12,6 +12,7 @@ const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const {
   DIST_DIFFS_EXTENSION_DIR,
   DIST_EXTENSIONS_DIR,
+  classifyPreinstalledPlugins,
   resolvePreinstalledPluginDir,
   summarizeGatewayAsarEntries,
   verifyRuntimeBundledPlugin,
@@ -116,33 +117,33 @@ function verifyPreinstalledPlugins(runtimeRoot, buildHint) {
   }
 
   const extensionsDir = path.join(runtimeRoot, 'third-party-extensions');
-  const missing = [];
+  const { installed, missingRequired, missingOptional } = classifyPreinstalledPlugins(
+    plugins,
+    plugin => existsSync(resolvePreinstalledPluginDir(runtimeRoot, plugin)),
+  );
 
-  for (const plugin of plugins) {
-    if (!plugin.id) continue;
-    const pluginDir = resolvePreinstalledPluginDir(runtimeRoot, plugin);
-    if (!existsSync(pluginDir)) {
-      missing.push(plugin.id);
-    } else {
-      verifyRuntimeBundledPlugin(runtimeRoot, plugin);
-    }
-  }
+  for (const plugin of installed) verifyRuntimeBundledPlugin(runtimeRoot, plugin);
 
-  if (missing.length > 0) {
+  if (missingRequired.length > 0) {
     throw new Error(
       '[electron-builder-hooks] Preinstalled OpenClaw plugins missing from runtime: '
-      + missing.join(', ')
+      + missingRequired.join(', ')
       + `. Run \`${buildHint}\` (which includes openclaw:plugins) before packaging.`,
     );
   }
 
-  verifyNoHostPeerLeftovers(extensionsDir, plugins.filter(plugin => plugin.runtimeBundled !== true));
+  if (missingOptional.length > 0) {
+    console.warn('[electron-builder-hooks] Optional OpenClaw plugins unavailable in this build: '
+      + missingOptional.join(', '));
+  }
+
+  verifyNoHostPeerLeftovers(extensionsDir, installed.filter(plugin => plugin.runtimeBundled !== true));
   verifyNoHostPeerLeftovers(
     path.join(runtimeRoot, DIST_EXTENSIONS_DIR),
-    plugins.filter(plugin => plugin.runtimeBundled === true),
+    installed.filter(plugin => plugin.runtimeBundled === true),
   );
 
-  console.log(`[electron-builder-hooks] Verified ${plugins.length} preinstalled OpenClaw plugin(s).`);
+  console.log(`[electron-builder-hooks] Verified ${installed.length} preinstalled OpenClaw plugin(s).`);
 }
 
 // A plugin whose node_modules still carries the openclaw peer dependency tree
@@ -572,7 +573,8 @@ function installSkillDependencies() {
     console.log(`[electron-builder-hooks]   ${entry}: installing dependencies...`);
     // On Windows, use shell: true so cmd.exe resolves npm.cmd correctly
     const isWin = process.platform === 'win32';
-    const result = spawnSync('npm', ['install'], {
+    const installCommand = existsSync(path.join(skillPath, 'package-lock.json')) ? 'ci' : 'install';
+    const result = spawnSync('npm', [installCommand], {
       cwd: skillPath,
       encoding: 'utf-8',
       stdio: 'pipe',

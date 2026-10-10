@@ -15,7 +15,9 @@ const databases: DatabaseSync[] = [];
 const id = NSP_CLAWGUARD.Id;
 
 function fixture(release: typeof NSP_CLAWGUARD.Releases[number] = NSP_CLAWGUARD.Releases[0]) {
-  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'nsp-install-repair-'));
+  // macOS /var is a symlink; use the owned directory's real path so the
+  // production repair's deliberate alias rejection does not skip this fixture.
+  const userData = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'nsp-install-repair-')));
   roots.push(userData);
   const stateDir = path.join(userData, 'openclaw', 'state');
   const configPath = path.join(stateDir, 'openclaw.json');

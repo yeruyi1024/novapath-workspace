@@ -3,161 +3,170 @@ name: Build Platforms
 on:
   workflow_dispatch:
     inputs:
-      build_macos:
-        description: 'Build macOS'
+      platform:
+        description: Platforms to package on GitHub hosted runners
         required: true
-        default: true
-        type: boolean
-      build_windows:
-        description: 'Build Windows'
+        default: all
+        type: choice
+        options: [all, macos, mac-arm64, mac-x64, windows, linux]
+      publish_draft:
+        description: Upload successful selected platforms to a draft release
         required: true
-        default: true
+        default: false
         type: boolean
-      build_linux:
-        description: 'Build Linux'
-        required: true
-        default: true
-        type: boolean
+      release_tag:
+        description: 'Optional draft tag; default v<version>-ci.<run_id>'
+        required: false
+        type: string
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packages-${{ github.ref }}-${{ inputs.platform || 'all' }}
+  cancel-in-progress: false
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  HUSKY: '0'
+  NPM_CONFIG_AUDIT: 'false'
+  NPM_CONFIG_FUND: 'false'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+  CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+  NODE_OPTIONS: --max-old-space-size=6144
 
 jobs:
-  # ========== macOS 构建 ==========
-  build-macos:
-    if: ${{ github.event_name == 'push' || inputs.build_macos }}
-    runs-on: macos-latest
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      targets: ${{ steps.matrix.outputs.targets }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          node-version: '24.x'
-      - uses: actions/cache@v4
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      
-      - run: npm install
-      
-      # 设置 OpenClaw runtime (如果需要)
-      - name: Setup OpenClaw Runtime
+          node-version: '24.15.0'
+          package-manager-cache: false
+      - name: Select native build hosts
+        id: matrix
+        run: node scripts/ci-build-matrix.cjs
+        env:
+          CI_BUILD_PLATFORM: ${{ inputs.platform || 'all' }}
+
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: Package ${{ matrix.target }}
+    needs: [plan, validate]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      OPENCLAW_SRC: ${{ github.workspace }}/.ci-openclaw
+      CI_BUILD_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24.15.0'
+          architecture: ${{ matrix.arch }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            SKILLs/*/package-lock.json
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+      - name: Install pinned package managers
         run: |
-          if [ -d "vendor/openclaw-runtime/current" ]; then
-            echo "✓ OpenClaw runtime found"
-          else
-            echo "⚠ OpenClaw runtime not found, build may fail"
-          fi
-      
-      - name: Build macOS
-        run: npm run dist:mac
-        env:
-          # 签名环境变量 (如果有证书)
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-build
-          path: release/*.dmg
-          retention-days: 7
-
-  # ========== Windows 构建 ==========
-  build-windows:
-    if: ${{ github.event_name == 'push' || inputs.build_windows }}
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-      - uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\npm-cache
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      
-      - run: npm install
-      
-      # Windows 需要 Python 运行时
-      - name: Setup Python Runtime
-        run: npm run setup:python-runtime
-        env:
-          LOBSTERAI_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
-      
-      - name: Build Windows
-        run: npm run dist:win
-        env:
-          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: release/*.exe
-          retention-days: 7
-
-  # ========== Linux 构建 ==========
-  build-linux:
-    if: ${{ github.event_name == 'push' || inputs.build_linux }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.x'
-      - uses: actions/cache@v4
-        with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
-          restore-keys: npm-${{ runner.os }}-
-      
-      - name: Install Dependencies
+          npm install --global npm@11.17.0 --no-audit --no-fund
+          npm install --global pnpm@12.1.0 --no-audit --no-fund
+          node scripts/ci-toolchain.cjs
+      - name: Install Linux Electron libraries
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
-      
-      - run: npm install
-      
-      - name: Build Linux
-        run: npm run dist:linux
-      
-      - uses: actions/upload-artifact@v4
+          sudo apt-get install -y libgtk-3-0t64 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0t64 libuuid1 libsecret-1-0 libasound2t64
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Prepare Electron binary
+        run: node node_modules/electron/install.js
+      - name: Prepare Windows portable Git and Python before resource packing
+        if: runner.os == 'Windows'
+        run: |
+          node scripts/setup-mingit.js --required
+          node scripts/setup-python-runtime.js --required
+          npm run verify:installer-patches
+      - name: Check out the pinned OpenClaw source
+        run: npm run openclaw:ensure
+      - name: Check OpenClaw pnpm pin and locate store
+        id: pnpm
+        run: node scripts/ci-toolchain.cjs --openclaw
+      - name: Cache OpenClaw downloads by upstream lock
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          name: linux-build
-          path: |
-            release/*.AppImage
-            release/*.deb
+          path: ${{ steps.pnpm.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ matrix.arch }}-12.1.0-${{ hashFiles('.ci-openclaw/pnpm-lock.yaml') }}
+      - name: Build application and bundled skills
+        run: |
+          npm run build
+          npm run compile:electron
+          node scripts/ci-prepare-skills.cjs
+          node scripts/ci-verify-output.cjs
+      - name: Build complete OpenClaw runtime for the native target
+        run: npm run openclaw:runtime:${{ matrix.target }}
+      - name: Smoke test Electron native database and OpenClaw gateway
+        run: node scripts/ci-runtime-smoke.cjs
+      - name: Create unsigned installer with the official resource hooks
+        run: node scripts/ci-package.cjs
+      - name: Require installers and collect checksums and build metadata
+        run: node scripts/ci-collect-artifacts.cjs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: lobsterai-${{ matrix.target }}
+          path: .ci-artifacts/${{ matrix.target }}/
+          if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
-  # ========== 创建 Release ==========
-  create-release:
-    needs: [build-macos, build-windows, build-linux]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  release:
+    name: Publish draft after all selected platforms succeed
+    needs: [plan, validate, package]
+    if: ${{ needs.package.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || inputs.publish_draft) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download All Artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '24.15.0'
+          package-manager-cache: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          pattern: lobsterai-*
           path: artifacts
-      
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            artifacts/macos-build/*.dmg
-            artifacts/windows-build/*.exe
-            artifacts/linux-build/*
-          draft: true
-          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
-          generate_release_notes: true
+      - name: Verify every selected target and create a draft release
+        run: node scripts/ci-draft-release.cjs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          CI_BUILD_TARGETS: ${{ needs.plan.outputs.targets }}
+          CI_RELEASE_TAG: ${{ inputs.release_tag }}

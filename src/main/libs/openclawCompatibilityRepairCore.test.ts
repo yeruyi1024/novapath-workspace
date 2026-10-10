@@ -17,7 +17,8 @@ import {
 
 const directories: string[] = [];
 function fixture(phase: OpenClawRepairPhase = OpenClawRepairPhase.Snapshot): CompatibilityRepairOptions {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'lobster-repair-'));
+  // macOS /var is a symlink; fixtures must not look like aliased installations.
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lobster-repair-')));
   directories.push(root);
   const stateDir = path.join(root, 'state');
   const backupDir = path.join(root, 'backup');

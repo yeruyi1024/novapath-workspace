@@ -25,6 +25,9 @@ function repo() {
   const git = (...args: string[]) => execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: 'pipe' });
   const write = (name: string, content: string | Buffer) => writeFileSync(path.join(cwd, name), content);
   git('init', '-b', 'main'); git('config', 'user.email', 'qa@example.invalid'); git('config', 'user.name', 'QA');
+  // Preserve the fixture's exact blob bytes regardless of the user's global
+  // line-ending conversion setting (including Windows runner defaults).
+  git('config', 'core.autocrlf', 'false');
   const commit = () => { git('add', '.'); git('commit', '-m', 'fixture'); };
   const request = async (name: string) => {
     const snapshot = await readEnvironmentSnapshot(cwd);
