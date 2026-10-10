@@ -85,9 +85,13 @@ async function main() {
     + 'These installers are not code signed or Apple notarized. Review and test before publishing this draft.\n\n'
     + 'The bundled OpenClaw gateway passed the startup readiness smoke gate with channel plugins disabled; live channel credentials are not tested.\n\n'
     + (selected.includes('linux-x64') ? 'Linux packaging is experimental: upstream does not configure a Linux dsh runtime download.\n' : ''));
-  const view = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft'], { cwd: rootDir, encoding: 'utf8' });
+  const view = spawnSync('gh', ['release', 'view', tag, '--json', 'isDraft,targetCommitish'], { cwd: rootDir, encoding: 'utf8' });
   if (view.status === 0) {
-    if (!JSON.parse(view.stdout).isDraft) throw new Error('Refusing to replace files on a published release.');
+    const existingRelease = JSON.parse(view.stdout);
+    if (!existingRelease.isDraft) throw new Error('Refusing to replace files on a published release.');
+    if (existingRelease.targetCommitish !== sourceCommit) {
+      throw new Error(`Draft release ${tag} targets another commit; refusing to attach these packages.`);
+    }
     run('gh', ['release', 'upload', tag, ...files, '--clobber']);
     run('gh', ['release', 'edit', tag, '--notes-file', notes]);
   } else {
