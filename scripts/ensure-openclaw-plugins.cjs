@@ -44,6 +44,7 @@ const { pruneHostPeerLeftovers } = require('./openclaw-plugin-host-peer-leftover
 const { resolvePreinstalledPluginDir, verifyRuntimeBundledPlugin } = require('./openclaw-runtime-packaging.cjs');
 
 const OPENCLAW_PLUGIN_INSTALL_TIMEOUT_MS = process.platform === 'win32'
+  || (process.platform === 'darwin' && process.arch === 'x64')
   ? 20 * 60 * 1000
   : 5 * 60 * 1000;
 
@@ -767,7 +768,7 @@ function main() {
             },
             stdio: 'inherit',
             // OpenClaw scans and extracts large signed plugin archives before
-            // dependency installation; keep the Windows wrapper above the
+            // dependency installation; keep the Windows/Intel macOS wrapper above the
             // runtime's extended archive budget so cleanup is not interrupted.
             timeout: OPENCLAW_PLUGIN_INSTALL_TIMEOUT_MS,
           }

@@ -121,7 +121,7 @@ describe('OpenClaw v2026.8.1 upgrade decisions', () => {
     ]);
     expectPatchContains('openclaw-plugin-archive-windows-timeout.patch', [
       'DEFAULT_PLUGIN_ARCHIVE_TIMEOUT_MS',
-      'process.platform === "win32" ? 900_000 : 120_000',
+      'process.platform === "win32" || (process.platform === "darwin" && process.arch === "x64") ? 900_000 : 120_000',
       'params.timeoutMs ?? DEFAULT_PLUGIN_ARCHIVE_TIMEOUT_MS',
     ]);
     expectPatchContains('openclaw-project-memory-negative-probe.patch', [

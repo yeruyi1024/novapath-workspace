@@ -5,7 +5,7 @@ const { spawnSync } = require('node:child_process');
 const { readJson, rootDir, setOutput, targetFromEnv } = require('./ci-common.cjs');
 
 targetFromEnv(true);
-if (process.versions.node !== '24.15.0') throw new Error(`Expected Node 24.15.0, got ${process.versions.node}.`);
+if (process.versions.node !== '24.20.0') throw new Error(`Expected Node 24.20.0, got ${process.versions.node}.`);
 function output(command, args, cwd = rootDir) {
   const result = spawnSync(command, args, { cwd, encoding: 'utf8', shell: process.platform === 'win32' });
   if (result.error || result.status !== 0) throw result.error || new Error(`${command} failed: ${result.stderr}`);
