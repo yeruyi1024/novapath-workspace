@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 
 const {
   buildOpenClawPluginInstallArgs,
@@ -171,6 +171,47 @@ describe('ensure-openclaw-plugins', () => {
     expect(invocation.args.filter((arg: string) => arg === outputDir)).toHaveLength(1);
     expect(invocation.args[0]).toMatch(/npm-cli\.js$/);
     expect(invocation.args).toContain('--registry=https://registry.example.test');
+    expect(invocation.timeout).toBe(180000);
+  });
+
+  test.each([
+    { ci: 'true', optional: true, registry: 'https://npm.nie.netease.com', timeout: 30000 },
+    { ci: 'true', optional: false, registry: 'https://npm.nie.netease.com', timeout: 180000 },
+    { ci: 'true', optional: undefined, registry: 'https://npm.nie.netease.com', timeout: 180000 },
+    { ci: 'true', optional: true, registry: undefined, timeout: 180000 },
+    { ci: 'true', optional: true, registry: '', timeout: 180000 },
+    { ci: undefined, optional: true, registry: 'https://npm.nie.netease.com', timeout: 180000 },
+    { ci: 'false', optional: true, registry: 'https://npm.nie.netease.com', timeout: 180000 },
+    { ci: '1', optional: true, registry: 'https://npm.nie.netease.com', timeout: 180000 },
+  ])('bounds optional custom-registry packs only for CI=true: $ci/$optional/$registry', ({ ci, optional, registry, timeout }) => {
+    vi.stubEnv('CI', ci);
+    try {
+      const invocation = buildNpmPackInvocation('moltbot-popo@2.1.13', registry, '/tmp/plugin-pack', { optional });
+      expect(invocation.timeout).toBe(timeout);
+      expect(invocation.args.includes('--fetch-timeout=25000')).toBe(timeout === 30000);
+      expect(invocation.args.includes('--fetch-retries=0')).toBe(timeout === 30000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test('keeps the optional NIM git source outside the custom-registry pack budget', () => {
+    vi.stubEnv('CI', 'true');
+    try {
+      const source = resolvePluginInstallSource({
+        id: 'openclaw-nim-channel',
+        npm: 'git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1',
+        version: '1.1.1',
+        optional: true,
+      });
+      expect(source.kind).toBe('git');
+      const invocation = buildNpmPackInvocation('/tmp/cloned-nim-package', null, '/tmp/plugin-pack');
+      expect(invocation.timeout).toBe(180000);
+      expect(invocation.args).not.toContain('--fetch-timeout=25000');
+      expect(invocation.args).not.toContain('--fetch-retries=0');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   test('disables interactive git prompts for clone', () => {

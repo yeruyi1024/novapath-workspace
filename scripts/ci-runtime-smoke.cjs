@@ -4,11 +4,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const net = require('node:net');
-const http = require('node:http');
 const { randomBytes } = require('node:crypto');
 const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 const { readJson, rootDir, run, targetFromEnv } = require('./ci-common.cjs');
+const { started } = require('./ci-readiness-probe.cjs');
 
 function freePort() {
   return new Promise((resolve, reject) => {
@@ -19,32 +19,6 @@ function freePort() {
       server.close(error => error ? reject(error) : resolve(port));
     });
   });
-}
-
-function probe(port, probePath) {
-  return new Promise(resolve => {
-    const request = http.get({ host: '127.0.0.1', port, path: probePath, timeout: 1500 }, response => {
-      let body = '';
-      response.on('data', chunk => { body += chunk; });
-      response.once('end', () => {
-        let payload = null;
-        try { payload = JSON.parse(body); } catch { /* Malformed JSON is not ready. */ }
-        resolve({ status: response.statusCode, payload });
-      });
-    });
-    request.once('error', () => resolve({ status: 0, payload: null }));
-    request.once('timeout', () => request.destroy());
-  });
-}
-
-async function started(port) {
-  const startup = await probe(port, '/startupz');
-  if (startup.status !== 404) {
-    return startup.status >= 200 && startup.status < 300
-      && startup.payload?.ok === true && startup.payload?.status === 'started';
-  }
-  const legacy = await probe(port, '/ready');
-  return legacy.status >= 200 && legacy.status < 300 && legacy.payload?.ready === true;
 }
 
 async function main() {

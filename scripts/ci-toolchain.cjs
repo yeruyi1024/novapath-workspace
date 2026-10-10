@@ -19,5 +19,6 @@ if (process.argv.includes('--openclaw')) {
   if (!/^pnpm@12\.1\.0(?:\+|$)/.test(manager)) throw new Error(`Unreviewed OpenClaw packageManager: ${manager}`);
   if (output('pnpm', ['--version'], source) !== '12.1.0') throw new Error('OpenClaw did not use the pinned pnpm.');
   setOutput('store', output('pnpm', ['store', 'path'], source));
+  setOutput('commit', output('git', ['rev-parse', 'HEAD'], source));
 }
 console.log(`[ci-toolchain] Node ${process.versions.node}, npm 11.17.0, pnpm 12.1.0 on ${process.platform}/${process.arch}.`);

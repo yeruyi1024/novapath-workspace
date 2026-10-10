@@ -396,7 +396,8 @@ function resolveNpmCliPath() {
   return npmCliPath;
 }
 
-function buildNpmPackInvocation(packSpec, registry, outputDir) {
+function buildNpmPackInvocation(packSpec, registry, outputDir, options = {}) {
+  const optionalCiRegistry = process.env.CI === 'true' && options.optional === true && Boolean(registry);
   const args = [
     resolveNpmCliPath(),
     'pack',
@@ -407,14 +408,20 @@ function buildNpmPackInvocation(packSpec, registry, outputDir) {
   if (registry) {
     args.push(`--registry=${registry}`);
   }
+  if (optionalCiRegistry) {
+    // An unavailable private registry must not stall every hosted build.
+    // Keep the outer budget absolute even when npm's request timeout is exceeded.
+    args.push('--fetch-timeout=25000', '--fetch-retries=0');
+  }
   return {
     command: process.execPath,
     args,
+    timeout: optionalCiRegistry ? 30 * 1000 : 3 * 60 * 1000,
   };
 }
 
-function npmPack(packSpec, registry, outputDir) {
-  const invocation = buildNpmPackInvocation(packSpec, registry, outputDir);
+function npmPack(packSpec, registry, outputDir, options = {}) {
+  const invocation = buildNpmPackInvocation(packSpec, registry, outputDir, options);
 
   // Invoke npm's JS entry directly. Using `npm.cmd` with `shell: true` makes
   // Node concatenate arguments into a command string on Windows, so profile
@@ -424,7 +431,7 @@ function npmPack(packSpec, registry, outputDir) {
     stdio: ['ignore', 'pipe', 'pipe'],
     cwd: outputDir,
     env: buildNpmPackEnv(),
-    timeout: 3 * 60 * 1000,
+    timeout: invocation.timeout,
   });
 
   if (result.error) {
@@ -723,7 +730,7 @@ function main() {
           } else {
             log('  Packing pinned npm package before OpenClaw installation.');
           }
-          installSpec = npmPack(source.packSpec, source.registry, stagingDir);
+          installSpec = npmPack(source.packSpec, source.registry, stagingDir, { optional });
         } else {
           installSpec = source.installSpec;
         }

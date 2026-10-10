@@ -23,6 +23,11 @@
 - 将 `.github/workflows/build-platforms.yml` 改为四个原生宿主上的安装包流水线：macOS arm64、macOS x64、Windows x64、Linux x64。固定 Node.js、npm、pnpm，构建完整 OpenClaw runtime，执行基础 runtime smoke，输出安装包、SHA-256 清单及构建元数据。
 - `.nvmrc` 与 CI 固定 Node `24.20.0`，包含上游确认的 Windows libuv 退出竞态修复；npm `11.17.0`、pnpm `12.1.0` 保持固定，上游最低 Node engine 不变。旧 Windows CI 的 npm 子进程曾退出 `0xC0000409`；采用含修复的版本，最终仍以实际安装和 runtime smoke 结果为准。
 - 新增 `scripts/ci-*.cjs` 支持矩阵选择、工具链检查、技能准备、输出校验、runtime smoke、打包、产物收集及可选 GitHub Release draft。
+- 增加 `vendor/openclaw-plugins` 的精确输入缓存：键覆盖原生 OS / 目标架构、Node/npm/pnpm/Electron、OpenClaw source commit、应用与上游锁文件、全部构建脚本及本地扩展。无 fallback key，不缓存完整 runtime；恢复后仍执行必需插件、原生 smoke 和官方资源 hook 门槛，未声称云端加速已验证。
+- runtime / installer 增加 30 秒阶段心跳，报告 elapsed、距最后输出的时间与 PID，保留真实退出码和取消状态。心跳仅反映进程存活，不代表完成比例；不增加总构建超时、重试或跳过检查。POSIX 进程组取消已用真实子进程验证，Windows 进程树取消尚未在本机实际验证。
+- CI 设置 `DEBUG_DMG=true`，显示 macOS hdiutil 的 DMG 生成与压缩输出，便于定位打包等待；不改变产物格式及校验门槛。
+- 为 CI 中可选且使用自定义 registry 的插件 pack 限定 30 秒外层时限、25 秒 fetch 时限和零 fetch 重试；当前对应 POPO，其余 pack 路径保持 180 秒。可选下载失败不保证对应功能，必需插件门槛保持不变。
+- readiness HTTP 探测增加 1.5 秒绝对时限和 64 KiB（65,536 字节）响应上限，覆盖响应中止、滴流、超时与异常关闭；保留 `/startupz` 的成功 JSON 合同及仅 404 回退。子进程 / HTTP 的 13 项新增 Node CI 合同已本机通过，质量工作流显式执行这些测试。
 - 修正打包阶段对可选 OpenClaw 插件的处理：只有显式标记 `optional: true` 的缺失插件可以警告后继续；必需插件缺失仍会失败，已安装的可选插件仍接受完整校验，并增加对应测试。
 - 修正 Windows 安装资源：便携 Git、Bash、Python 和必要空目录随合并归档分发；归档、解包完成标记及中断安装恢复均检查资源完整性，并增加实际归档/解包测试。
 - 延长 Mac Intel 的大插件解包预算为 15 分钟、外层 CLI 为 20 分钟，处理真实 CI 中 Discord 解包在原两分钟上限触发的超时/并发清理失败；Windows 保留已有长预算，Mac ARM 与 Linux 保留原预算。必需插件安装或校验失败仍阻止打包。
@@ -34,6 +39,8 @@
 应用品牌、应用 ID、默认数据目录、官方服务入口和上游自动更新渠道仍保留上游行为。本次构建方案没有将有道账号、套餐、商城、云发布或 IM 平台服务转换为本地服务，也没有为 GitHub Releases 配置应用内自动更新。
 
 锁定范围为应用和技能的 `npm ci`，以及 OpenClaw 源码构建的 `pnpm install --frozen-lockfile`。上游 `scripts/build-openclaw-runtime.sh` 仍在生产 runtime 组装时删除旧 npm 锁文件，再执行 `npm install`；插件的传递依赖也没有全部纳入本仓库锁文件。因此本次保证所记录源码、工具链与应用/技能锁文件可追溯，不宣称所有依赖或最终安装包可逐字节复现。后续可继续扩展生产 runtime 与插件的完整依赖锁定及资产哈希验证。
+
+固定 npm `11.17.0` 指全局及顶层 CLI，应用依赖仍由根锁文件固定 npm `11.21.0`。npm scripts 将 `node_modules/.bin` 前置，因此 runtime 内嵌套 npm 命令以及解析应用依赖 CLI 的插件 pack 会使用嵌入版；心跳 wrapper 严格选择全局 `11.17.0` 作为顶层 runtime 入口，不将 `11.21.0` 当作 fallback。metadata 的 `toolchain.npm` 记录全局 / 顶层版本，不表示所有子进程都用同一 npm；插件缓存键中的根锁文件覆盖嵌入版变动。本次没有修改该上游 npm 依赖。
 
 ## 许可证与第三方组件
 

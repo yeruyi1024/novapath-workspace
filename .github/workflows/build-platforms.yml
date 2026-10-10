@@ -74,6 +74,7 @@ jobs:
     env:
       OPENCLAW_SRC: ${{ github.workspace }}/.ci-openclaw
       CI_BUILD_TARGET: ${{ matrix.target }}
+      DEBUG_DMG: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -127,12 +128,18 @@ jobs:
           npm run compile:electron
           node scripts/ci-prepare-skills.cjs
           node scripts/ci-verify-output.cjs
+      - name: Cache reviewed plugin installations for the exact native inputs
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: vendor/openclaw-plugins
+          # No fallback keys: registry, native host, helper or lock changes must miss.
+          key: plugins-v1-${{ runner.os }}-${{ matrix.target }}-node24.20.0-npm11.17.0-pnpm12.1.0-electron43.5.0-${{ steps.pnpm.outputs.commit }}-${{ hashFiles('package.json', 'package-lock.json', '.ci-openclaw/pnpm-lock.yaml', 'scripts/**', 'openclaw-extensions/**') }}
       - name: Build complete OpenClaw runtime for the native target
-        run: npm run openclaw:runtime:${{ matrix.target }}
+        run: node scripts/ci-build-step.cjs runtime
       - name: Smoke test Electron native database and OpenClaw gateway
         run: node scripts/ci-runtime-smoke.cjs
       - name: Create unsigned installer with the official resource hooks
-        run: node scripts/ci-package.cjs
+        run: node scripts/ci-build-step.cjs installer
       - name: Require installers and collect checksums and build metadata
         run: node scripts/ci-collect-artifacts.cjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
