@@ -136,7 +136,7 @@ CI 中显式可选且配置自定义 registry 的 `npm pack` 路径采用 30 秒
 
 runtime 与 installer 使用 `ci-build-step.cjs` 的两个固定入口；脚本先校验目标与原生宿主，再异步运行既有构建命令并实时转发输出。每 30 秒报告阶段、目标、elapsed、距最后子进程输出的秒数和 PID，结束时记录退出码、信号及耗时。心跳仅表示所监控进程的存活状态，不能换算为构建进度；静默时间本身不会触发失败，也没有增加构建总时限或自动重试。子进程失败仍使阶段失败，取消时清理 POSIX 进程组或 Windows 进程树并保留取消状态。Windows 的强制进程树清理不能保证 Bash 的 EXIT trap 执行，本机尚未实际验证 Windows 取消路径。
 
-CI 设置 `DEBUG_DMG=true`，使 macOS DMG 的 hdiutil 生成与压缩输出可见，便于区分安装包压缩等待和 runtime 构建等待；不改变 DMG 格式或验收门槛。
+CI 在 macOS installer 步骤同时设置 `DEBUG=electron-builder` 与 `DEBUG_DMG=true`，使 macOS DMG 的 hdiutil 生成与压缩输出可见，便于区分安装包压缩等待和 runtime 构建等待；该版本 builder-util 默认缓冲 hdiutil 输出，单独开启 `DEBUG_DMG` 仍会静默，须同时开启 builder 调试使 spawn 实时继承输出。不改变 DMG 格式或验收门槛。
 
 Mac Intel 的大插件安全解包预算为 15 分钟，外层插件 CLI 为 20 分钟；Windows 保留同样预算，Mac ARM 和 Linux 保留上游两分钟解包、五分钟 CLI 预算。真实 Intel CI 曾在 Discord 解包两分钟时限后发生 `ENOTEMPTY`：上游安全解包的超时先返回，而逐文件合并仍在写入，随后临时目录清理覆盖了原始超时错误。本次调整 Intel 预算，并通过实际补丁应用及六种平台/架构测试校验内外时限；必需插件仍须实际安装及校验成功。
 

@@ -74,7 +74,6 @@ jobs:
     env:
       OPENCLAW_SRC: ${{ github.workspace }}/.ci-openclaw
       CI_BUILD_TARGET: ${{ matrix.target }}
-      DEBUG_DMG: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -140,6 +139,9 @@ jobs:
         run: node scripts/ci-runtime-smoke.cjs
       - name: Create unsigned installer with the official resource hooks
         run: node scripts/ci-build-step.cjs installer
+        env:
+          DEBUG: ${{ runner.os == 'macOS' && 'electron-builder' || '' }}
+          DEBUG_DMG: 'true'
       - name: Require installers and collect checksums and build metadata
         run: node scripts/ci-collect-artifacts.cjs
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
