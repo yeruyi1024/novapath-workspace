@@ -7,8 +7,9 @@ const asar = require('@electron/asar');
 const { Arch } = require('builder-util');
 const { OPENCLAW_BUNDLE_ASSET_TARGETS } = require('./openclaw-bundle-assets.cjs');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
+const { ensurePortableGit } = require('./setup-mingit.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
-const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
+const { packMultipleSources, createWindowsResourceSources } = require('./pack-openclaw-tar.cjs');
 const {
   DIST_DIFFS_EXTENSION_DIR,
   DIST_EXTENSIONS_DIR,
@@ -19,7 +20,6 @@ const {
 } = require('./openclaw-runtime-packaging.cjs');
 const { collectHostPeerLeftovers, measureDirectorySize } = require('./openclaw-plugin-host-peer-leftovers.cjs');
 const { verifyOpenClawPluginSdkBridge } = require('./openclaw-plugin-sdk-bridge.cjs');
-const { createOpenClawWindowsPayload } = require('./openclaw-windows-payload.cjs');
 const { pruneOpenClawMacPayload } = require('./openclaw-mac-payload.cjs');
 const { configureBetterSqlite3MacPayload } = require('./better-sqlite3-mac-payload.cjs');
 
@@ -711,6 +711,15 @@ async function beforePack(context) {
   installSkillDependencies();
 
   if (isWindowsTarget(context)) {
+    // Prepare both portable runtimes before their contents enter the tar.
+    await ensurePortablePythonRuntime({ required: true });
+    const pythonRoot = path.join(__dirname, '..', 'resources', 'python-win');
+    const runtimeHealth = checkRuntimeHealth(pythonRoot, { requirePip: true });
+    if (!runtimeHealth.ok) {
+      throw new Error('Portable Python runtime health check failed before pack. Missing files: ' + runtimeHealth.missing.join(', '));
+    }
+    await ensurePortableGit({ required: true });
+
     // Pack all large resource directories into a single tar for faster NSIS
     // installation.  NSIS extracts thousands of small files very slowly on NTFS;
     // a single tar archive is extracted by 7z almost instantly, and we unpack
@@ -720,24 +729,7 @@ async function beforePack(context) {
 
     const outputTar = path.join(buildTarDir, 'win-resources.tar');
     const runtimeRoot = path.join(__dirname, '..', 'vendor', 'openclaw-runtime', 'current');
-    const sources = [
-      {
-        label: 'OpenClaw runtime',
-        dir: runtimeRoot,
-        prefix: 'cfmind',
-        ...createOpenClawWindowsPayload(runtimeRoot, resolveOpenClawRuntimeTargetId(context)),
-      },
-      {
-        label: 'SKILLs',
-        dir: path.join(__dirname, '..', 'SKILLs'),
-        prefix: 'SKILLs',
-      },
-      {
-        label: 'Python runtime',
-        dir: path.join(__dirname, '..', 'resources', 'python-win'),
-        prefix: 'python-win',
-      },
-    ];
+    const sources = createWindowsResourceSources(path.join(__dirname, '..'), runtimeRoot, resolveOpenClawRuntimeTargetId(context));
 
     console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
     const t0 = Date.now();
@@ -751,21 +743,6 @@ async function beforePack(context) {
     console.log(
       `[electron-builder-hooks] Combined tar packed in ${elapsed}s: `
       + `${totalFiles} files, ${skipped} skipped, ${sizeMB} MB`
-    );
-  }
-
-  if (!isWindowsTarget(context)) {
-    return;
-  }
-
-  console.log('[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...');
-  await ensurePortablePythonRuntime({ required: true });
-  const runtimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
-  const runtimeHealth = checkRuntimeHealth(runtimeRoot, { requirePip: true });
-  if (!runtimeHealth.ok) {
-    throw new Error(
-      'Portable Python runtime health check failed before pack. Missing files: '
-      + runtimeHealth.missing.join(', ')
     );
   }
 

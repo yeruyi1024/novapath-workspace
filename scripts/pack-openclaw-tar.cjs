@@ -11,6 +11,7 @@
  *   - OpenClaw runtime (vendor/openclaw-runtime/current -> cfmind/)
  *   - SKILLs directory (SKILLs -> SKILLs/)
  *   - Python runtime (resources/python-win -> python-win/)
+ *   - PortableGit runtime (resources/mingit -> mingit/)
  *
  * Usage:
  *   Single dir:      node scripts/pack-openclaw-tar.cjs [sourceDir] [outputTar]
@@ -161,8 +162,9 @@ function packMultipleSources(sources, outputTar) {
 
   // Pack first source (creates the tar)
   let first = true;
-  for (const { dir, prefix, filter, overrides } of sources) {
+  for (const { dir, prefix, filter, overrides, required } of sources) {
     if (!fs.existsSync(dir)) {
+      if (required) throw new Error(`[pack-openclaw-tar] Required resource ${prefix} is missing: ${dir}`);
       console.log(`[pack-openclaw-tar]   Skipping ${prefix}: ${dir} not found`);
       continue;
     }
@@ -199,6 +201,31 @@ function packMultipleSources(sources, outputTar) {
   return counts;
 }
 
+// Shared by the builder hook and the standalone --win-combined entry point.
+// Required sources must never silently disappear from an otherwise valid tar.
+function createWindowsResourceSources(projectRoot, runtimeRoot, target) {
+  const gitRoot = path.join(projectRoot, 'resources', 'mingit');
+  for (const [name, candidates] of [
+    ['Git Bash', ['bin/bash.exe', 'usr/bin/bash.exe']],
+    ['Git executable', ['cmd/git.exe', 'bin/git.exe', 'mingw64/bin/git.exe']],
+  ]) {
+    if (!candidates.some(relative => fs.existsSync(path.join(gitRoot, relative)))) {
+      throw new Error(`[pack-openclaw-tar] Required PortableGit ${name} is missing from ${gitRoot}. Run npm run setup:mingit -- --required.`);
+    }
+  }
+  for (const relative of ['dev/shm', 'dev/mqueue']) {
+    if (!fs.existsSync(path.join(gitRoot, relative)) || !fs.statSync(path.join(gitRoot, relative)).isDirectory()) {
+      throw new Error(`[pack-openclaw-tar] Required PortableGit runtime directory is missing: ${relative}`);
+    }
+  }
+  return [
+    { dir: runtimeRoot, prefix: 'cfmind', required: true, ...createOpenClawWindowsPayload(runtimeRoot, target) },
+    { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs', required: true },
+    { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win', required: true },
+    { dir: gitRoot, prefix: 'mingit', required: true },
+  ];
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -215,11 +242,7 @@ function main() {
     const runtimeRoot = path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current');
     const { target } = JSON.parse(fs.readFileSync(path.join(runtimeRoot, 'runtime-build-info.json'), 'utf8'));
     if (!target?.startsWith('win-')) throw new Error(`Expected a Windows runtime, found ${target}.`);
-    const sources = [
-      { dir: runtimeRoot, prefix: 'cfmind', ...createOpenClawWindowsPayload(runtimeRoot, target) },
-      { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
-      { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win' },
-    ];
+    const sources = createWindowsResourceSources(projectRoot, runtimeRoot, target);
 
     console.log(`[pack-openclaw-tar] Packing combined Windows tar: ${outputTar}`);
     const t0 = Date.now();
@@ -263,4 +286,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { packSingleSource, packMultipleSources };
+module.exports = { packSingleSource, packMultipleSources, createWindowsResourceSources };

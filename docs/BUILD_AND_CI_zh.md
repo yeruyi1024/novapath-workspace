@@ -77,7 +77,7 @@ npm run dist:linux
 
 macOS 分别使用明确的 `dist:mac:arm64` / `dist:mac:x64`，避免把 `dist:mac` 的前置 runtime 行为当作自动检测所有架构。Windows 首次准备可以执行 `node scripts/setup-mingit.js --required` 与 `node scripts/setup-python-runtime.js --required`；打包还必须通过 `npm run verify:installer-patches`。CI 不构建 universal macOS、Windows arm64 或 Linux arm64，这些目标不在本次已配置矩阵中。
 
-主要链路为：Renderer/Main 编译 → 内置技能依赖与产物 → 锁定 OpenClaw 源码、补丁、网关 bundle、插件、本地扩展与裁剪 → runtime smoke → electron-builder。CI 将步骤拆开执行以保留独立失败点，最后调用 `scripts/ci-package.cjs` 一次，使用上游 `scripts/electron-builder-config.cjs` 和资源 hook，并指定 `--publish never`。Windows 资源仍经上游 hook 合并为 `win-resources.tar`，安装后解压；默认 NSIS 包是完整安装器，未启用需要 CDN 的在线 stub。
+主要链路为：Renderer/Main 编译 → 内置技能依赖与产物 → 锁定 OpenClaw 源码、补丁、网关 bundle、插件、本地扩展与裁剪 → runtime smoke → electron-builder。CI 将步骤拆开执行以保留独立失败点，最后调用 `scripts/ci-package.cjs` 一次，使用上游 `scripts/electron-builder-config.cjs` 和资源 hook，并指定 `--publish never`。Windows 的 OpenClaw、SKILLs、便携 Python 与 Git 经 hook 合并为 `win-resources.tar`，安装后解压；本次补齐上游遗漏的 `mingit`，归档前与安装提交前要求关键 Git/Bash 文件及 MSYS 空目录完整；默认 NSIS 包是完整安装器，未启用需要 CDN 的在线 stub。
 
 ## GitHub Actions 方案
 
@@ -146,7 +146,7 @@ sha256sum -c SHA256SUMS-linux-x64.txt
 
 Windows 可以用 `Get-FileHash <安装包路径> -Algorithm SHA256` 与清单比较。SHA-256 能检查下载内容是否与构建记录相符，不提供代码签名或发行者身份认证。
 
-Release job 仅在所有**所选**目标成功后运行，会再次核对目标格式、源 commit、版本和 SHA-256。自定义 tag 若已指向其他 commit，会拒绝挂接；已经正式发布的 Release 不会被覆盖；同 commit 的已有 draft 可更新资产。手动只选一个平台生成的 draft 只包含该平台，不表示四个平台均已验收。
+Release job 仅在所有**所选**目标成功后运行，会再次核对目标格式、源 commit、版本、实际大小和 SHA-256。checksum 清单必须准确覆盖全部 manifest 产物和 metadata，缺项、重复或多余项都会拒绝发布。自定义 tag 若已指向其他 commit，会拒绝挂接；已经正式发布的 Release 不会被覆盖；同 commit 的已有 draft 可更新资产。手动只选一个平台生成的 draft 只包含该平台，不表示四个平台均已验收。
 
 默认 `GITHUB_TOKEN` 权限为 `contents: read`，checkout 不持久化凭据；只有 draft release job 使用 `contents: write`。安装包构建不需要 PAT、上游内部签名凭据或 Apple 凭据。第一次 push 仍需操作者拥有目标仓库写权限和 workflow 写入权限；Actions 还受仓库/组织策略及账户可用额度约束。
 
@@ -177,27 +177,30 @@ CI 关闭 macOS 签名身份自动发现，不传 Apple 或 Windows 内部签名
 
 ## 验证记录
 
-记录日期：2026-10-10，Asia/Shanghai。下表区分本次真实完成结果与尚未完成的验证，后续由实际执行者补齐运行链接、命令、时间和结果。
+记录日期：2026-10-10，Asia/Shanghai。本机验证在 macOS arm64 上使用 Node `24.15.0`、npm `11.17.0`、pnpm `12.1.0` 完成。下表区分本次真实完成结果与尚未完成的验证；GitHub 矩阵状态是本次记录时的快照，后续由实际执行者补齐最终结果。
 
 | 验证项 | 当前状态 | 证据 / 后续记录 |
 | --- | --- | --- |
 | 上游最新发布 tag 与 commit | 已核验 | `2026.9.23` / `791a352dee3b3d8c6f64edcaf229ce474a68f6c5`，见 `UPSTREAM.md` |
-| 本机 `npm ci` | 已通过 | 固定 Node `24.15.0` / npm `11.17.0`，已生成并使用提交的锁文件 |
+| Git 对象完整性 | 已通过 | `git fsck --full --no-dangling` exit 0；发布 tag 指向已核验的上游 commit |
+| 本机 `npm ci` | 已通过 | 固定 Node `24.15.0` / npm `11.17.0` / pnpm `12.1.0`，已生成并使用提交的 npm 锁文件 |
 | 本机 `npm run build` | 已通过 | Renderer、thumbnail 生产构建完成 |
 | 本机 `npm run compile:electron` | 已通过 | Main 与 preload 编译完成 |
 | OpenClaw 打包插件定向测试 | 已通过 | 9 项测试通过，其中本次新增 2 项，必需/可选边界覆盖 |
-| 本机完整 `npm test` | 最终重跑通过 | 522 suites passed、16 skipped；5,580 tests passed、154 skipped，共 5,734 tests；60.31 秒。初次受沙箱 `EPERM` / `EMFILE`、Electron 未下载、OpenClaw 未 patch 等影响失败，修复环境与 fixture 后重跑完成；skipped 项未验证 |
+| 本机完整 `npm test` | 最终重跑通过 | 522 suites passed、16 skipped；5,596 tests passed、148 skipped，共 5,744 tests；60.26 秒。初次受沙箱 `EPERM` / `EMFILE`、Electron 未下载、OpenClaw 未 patch 等影响失败，修复环境与 fixture 后重跑完成；skipped 项未验证 |
 | 锁式技能构建与编译输出 gate | 已通过 | `ci-prepare-skills.cjs` 与 `ci-verify-output.cjs` |
 | CI workflow / 脚本静态检查 | 已通过 | `actionlint 1.7.12` 检查三份现行 workflow 通过；Node 脚本语法检查通过 |
-| 改动 TypeScript lint | 待补 | 记录实际运行命令与最终结果 |
-| 本机完整 OpenClaw runtime 构建 | 进行中，待最终结果 | 源码、production runtime 与 gateway bundle 已构建；插件阶段尚未全部完成，不能记为完整通过 |
-| 本机基础 runtime smoke | 待补 | Electron SQLite ABI 与独立基础网关 readiness；启用插件仍需另验 |
-| 本机桌面启动与完整应用网关 | 待补 | 窗口与 Renderer 初始化、SQLite、config sync、gateway `running`、实际端口及 `/startupz` |
-| 本地模型聊天与工具调用 | 待补 | 使用实际 Ollama/LM Studio/vLLM 模型完成聊天、工具操作及重启持久化；未验证时不承诺离线 Agent 可用 |
-| Windows installer patches | 本机契约测试已通过 | 47 项通过；Windows CI 在打包前仍须重新执行 `npm run verify:installer-patches` |
-| 本机安装包及安装后 UI 验收 | 待补 | 分平台记录产物、SHA-256、安装/卸载及安装后启动 |
-| 首次 GitHub Actions 质量 job | 待补 | 运行 URL、commit、结论 |
-| 首次 GitHub 四目标打包 | 待补 | 每目标结论、耗时、artifact 和可选插件缺失记录 |
+| 改动 TypeScript lint | 首次 GitHub CI 质量门槛通过 | 质量 job 包含 `ci-lint-changed.cjs`，按改动文件检查；未宣称全仓库历史 lint 已清零 |
+| 本机完整 OpenClaw runtime 构建 | 已通过 | `mac-arm64` / OpenClaw `v2026.8.1` 完整构建成功；17 个插件安装及检查可用。可选 `moltbot-popo` 因第三方 registry timeout 跳过，本次产物不保证 POPO 功能 |
+| 本机基础 runtime smoke | 已通过 | Electron Node ABI 下 SQLite 查询成功；`plugins.enabled=false` 的独立 gateway startup/readiness smoke 通过；不代替插件或模型功能验收 |
+| 本机桌面启动与完整应用网关 | 已通过启动验证 | 真实 Electron 窗口成功加载本地 `dist/index.html`（`file://`）；跳过登录后欢迎会话 UI 可见。应用 gateway 为 `running`，loopback `18789`，启动用时 3,527 ms；实际 `/startupz` HTTP 200 返回 `ok: true`、`status: "started"` |
+| 本地模型聊天与工具调用 | 未执行 | 按用户要求不验证模型；没有实际模型聊天及工具调用结果，尚不能宣称完整离线 Agent 已验证 |
+| Windows installer patches | 本机契约测试已通过 | 修复后 52 项通过；实际归档/解包与恢复相关 3 suites 共 110 项通过；Windows CI 在打包前仍须重新执行 `npm run verify:installer-patches` |
+| 本机 macOS arm64 DMG 打包及收集 | 已通过 | 打包与 `ci-collect-artifacts.cjs` 均 exit 0，已收集 DMG、SHA-256 清单与构建元数据；`shasum -c` 全部通过，`hdiutil verify` 报告有效；未签名、未公证 |
+| 安装包安装后 UI / 安装卸载验收 | 待补 | 本机源码桌面启动与 DMG 生成不等同于安装包安装后的验收；分平台补充安装、卸载及安装后启动结果 |
+| 首次 GitHub Actions 质量 job | 已通过 | [Build Platforms run 38030285389](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38030285389) 的质量检查为 `success`；522 suites passed、16 skipped；5,571 tests passed、163 skipped（共 5,734），113.63 秒。不同宿主跳过的平台测试数量不同 |
+| 首次 GitHub 四目标打包 | 旧尝试主动取消，待修正后重跑 | 质量通过后最终审计发现上游 Windows payload 遗漏便携 Git；run `38030285389` 主动取消，不作为四目标成功证据 |
+| draft release 严格校验 fixture | 已通过 | 成功案例及 10 个拒绝案例通过；缺 checksum、错误 hash/size、重复/多余文件会在任何 gh 调用前失败 |
 | 首次 draft release / checksum 复核 | 待补 | 若启用 `publish_draft`，记录 draft URL、tag、对应源 commit 和校验结果 |
 
 完整应用启动的 readiness 合同为 `/startupz` 返回 HTTP 成功、JSON `ok: true` 且 `status: "started"`；只有该路径返回 404 时才兼容 `/ready` 的 `ready: true`。默认端口为 18789，冲突时扫描备用端口，应记录实际使用端口。主日志的启动参数可能含 gateway token，保存截图或日志证据前应脱敏，不把账号 Key、token 或带凭据的 URL 提交到仓库。

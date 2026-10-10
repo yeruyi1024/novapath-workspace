@@ -2525,9 +2525,28 @@ FunctionEnd
   Goto TarExtractRequiredResourceMissing
 
   TarExtractVerifyPython:
-  IfFileExists "$INSTDIR\resources\python-win\python.exe" TarExtractSucceeded
-  IfFileExists "$INSTDIR\resources\python-win\python3.exe" TarExtractSucceeded
+  IfFileExists "$INSTDIR\resources\python-win\python.exe" TarExtractVerifyGitBash
+  IfFileExists "$INSTDIR\resources\python-win\python3.exe" TarExtractVerifyGitBash
   StrCpy $R5 "python-entry-missing"
+  Goto TarExtractRequiredResourceMissing
+
+  TarExtractVerifyGitBash:
+  IfFileExists "$INSTDIR\resources\mingit\bin\bash.exe" TarExtractVerifyGit
+  IfFileExists "$INSTDIR\resources\mingit\usr\bin\bash.exe" TarExtractVerifyGit
+  StrCpy $R5 "git-bash-entry-missing"
+  Goto TarExtractRequiredResourceMissing
+
+  TarExtractVerifyGit:
+  IfFileExists "$INSTDIR\resources\mingit\cmd\git.exe" TarExtractVerifyGitRuntimeDirs
+  IfFileExists "$INSTDIR\resources\mingit\bin\git.exe" TarExtractVerifyGitRuntimeDirs
+  IfFileExists "$INSTDIR\resources\mingit\mingw64\bin\git.exe" TarExtractVerifyGitRuntimeDirs
+  StrCpy $R5 "git-entry-missing"
+  Goto TarExtractRequiredResourceMissing
+
+  TarExtractVerifyGitRuntimeDirs:
+  StrCpy $R5 "git-runtime-directory-missing"
+  IfFileExists "$INSTDIR\resources\mingit\dev\shm\." 0 TarExtractRequiredResourceMissing
+  IfFileExists "$INSTDIR\resources\mingit\dev\mqueue\." TarExtractSucceeded TarExtractRequiredResourceMissing
 
   TarExtractRequiredResourceMissing:
   FileOpen $2 "$APPDATA\LobsterAI\install-timing.log" a
@@ -2906,8 +2925,27 @@ FunctionEnd
     StrCpy $lobsterNewInstallValidationReason "skills-content-missing"
     IfFileExists "$INSTDIR\resources\SKILLs\*.*" 0 NewInstallPrevalidateFailed
     StrCpy $lobsterNewInstallValidationReason "python-entry-missing"
-    IfFileExists "$INSTDIR\resources\python-win\python.exe" NewInstallPrevalidateSucceeded
-    IfFileExists "$INSTDIR\resources\python-win\python3.exe" NewInstallPrevalidateSucceeded
+    IfFileExists "$INSTDIR\resources\python-win\python.exe" NewInstallPrevalidateGitBash
+    IfFileExists "$INSTDIR\resources\python-win\python3.exe" NewInstallPrevalidateGitBash
+    Goto NewInstallPrevalidateFailed
+
+  NewInstallPrevalidateGitBash:
+    StrCpy $lobsterNewInstallValidationReason "git-bash-entry-missing"
+    IfFileExists "$INSTDIR\resources\mingit\bin\bash.exe" NewInstallPrevalidateGit
+    IfFileExists "$INSTDIR\resources\mingit\usr\bin\bash.exe" NewInstallPrevalidateGit
+    Goto NewInstallPrevalidateFailed
+
+  NewInstallPrevalidateGit:
+    StrCpy $lobsterNewInstallValidationReason "git-entry-missing"
+    IfFileExists "$INSTDIR\resources\mingit\cmd\git.exe" NewInstallPrevalidateGitRuntimeDirs
+    IfFileExists "$INSTDIR\resources\mingit\bin\git.exe" NewInstallPrevalidateGitRuntimeDirs
+    IfFileExists "$INSTDIR\resources\mingit\mingw64\bin\git.exe" NewInstallPrevalidateGitRuntimeDirs
+    Goto NewInstallPrevalidateFailed
+
+  NewInstallPrevalidateGitRuntimeDirs:
+    StrCpy $lobsterNewInstallValidationReason "git-runtime-directory-missing"
+    IfFileExists "$INSTDIR\resources\mingit\dev\shm\." 0 NewInstallPrevalidateFailed
+    IfFileExists "$INSTDIR\resources\mingit\dev\mqueue\." NewInstallPrevalidateSucceeded
     Goto NewInstallPrevalidateFailed
 
   NewInstallPrevalidateSucceeded:

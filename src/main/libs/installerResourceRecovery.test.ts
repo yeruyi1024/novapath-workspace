@@ -20,14 +20,27 @@ describe('installerResourceRecovery', () => {
   const entryPath = () => path.join(resourcesDir, 'cfmind', 'gateway-bundle.mjs');
   const bundleAssetPath = () => path.join(resourcesDir, 'cfmind', 'web-tree-sitter.wasm');
 
-  const createInstallerTar = async (): Promise<void> => {
+  const createInstallerTar = async (options: { includeGit?: boolean; missingGit?: string } = {}): Promise<void> => {
     const stagingDir = path.join(workDir, 'staging');
     fs.mkdirSync(path.join(stagingDir, 'cfmind'), { recursive: true });
     fs.mkdirSync(path.join(stagingDir, 'python-win'), { recursive: true });
     fs.writeFileSync(path.join(stagingDir, 'cfmind', 'gateway-bundle.mjs'), 'export const ok = true;\n');
     fs.writeFileSync(path.join(stagingDir, 'cfmind', 'web-tree-sitter.wasm'), 'fake-wasm');
     fs.writeFileSync(path.join(stagingDir, 'python-win', 'python.exe'), 'fake-binary');
-    await tar.create({ file: tarPath(), cwd: stagingDir }, ['cfmind', 'python-win']);
+    const roots = ['cfmind', 'python-win'];
+    if (options.includeGit) {
+      roots.push('mingit');
+      for (const relative of ['usr/bin/bash.exe', 'cmd/git.exe']) {
+        const file = path.join(stagingDir, 'mingit', relative);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, 'fake-git-binary');
+      }
+      for (const relative of ['dev/shm', 'dev/mqueue']) {
+        fs.mkdirSync(path.join(stagingDir, 'mingit', relative), { recursive: true });
+      }
+      if (options.missingGit) fs.rmSync(path.join(stagingDir, 'mingit', options.missingGit), { recursive: true });
+    }
+    await tar.create({ file: tarPath(), cwd: stagingDir }, roots);
   };
 
   beforeEach(() => {
@@ -58,6 +71,8 @@ describe('installerResourceRecovery', () => {
     expect(fs.existsSync(entryPath())).toBe(true);
     expect(fs.existsSync(bundleAssetPath())).toBe(true);
     expect(fs.existsSync(path.join(resourcesDir, 'python-win', 'python.exe'))).toBe(true);
+    // Legacy archives without PortableGit remain recoverable.
+    expect(fs.existsSync(path.join(resourcesDir, 'mingit'))).toBe(false);
     // Mirrors the installer success path: marker stamped, archive removed.
     expect(fs.existsSync(markerPath())).toBe(true);
     expect(fs.existsSync(tarPath())).toBe(false);
@@ -65,8 +80,7 @@ describe('installerResourceRecovery', () => {
     expect(progressCalls[0]).toBe(0);
   });
 
-  test('is a no-op when the runtime entry is already present', async () => {
-    await createInstallerTar();
+  test('is a no-op when the runtime entry is already present and no archive remains', async () => {
     fs.writeFileSync(entryPath(), 'export const ok = true;\n');
     fs.writeFileSync(bundleAssetPath(), 'fake-wasm');
 
@@ -74,7 +88,41 @@ describe('installerResourceRecovery', () => {
 
     expect(result.attempted).toBe(false);
     expect(result.success).toBe(true);
+    expect(fs.existsSync(tarPath())).toBe(false);
+  });
+
+  test('finishes a retained archive when OpenClaw was extracted before PortableGit', async () => {
+    await createInstallerTar({ includeGit: true });
+    fs.writeFileSync(entryPath(), 'export const ok = true;\n');
+    fs.writeFileSync(bundleAssetPath(), 'fake-wasm');
+    expect(hasBundledRuntimeEntry(resourcesDir)).toBe(true);
+    expect(fs.existsSync(path.join(resourcesDir, 'mingit'))).toBe(false);
+
+    const result = await recoverInstallerResourcesFromTar(resourcesDir, 'interrupted-git-extraction');
+
+    expect(result.attempted).toBe(true);
+    expect(result.success).toBe(true);
+    expect(fs.existsSync(path.join(resourcesDir, 'mingit/usr/bin/bash.exe'))).toBe(true);
+    expect(fs.existsSync(path.join(resourcesDir, 'mingit/cmd/git.exe'))).toBe(true);
+    for (const relative of ['dev/shm', 'dev/mqueue']) {
+      expect(fs.statSync(path.join(resourcesDir, 'mingit', relative)).isDirectory()).toBe(true);
+    }
+    expect(fs.existsSync(markerPath())).toBe(true);
+    expect(fs.existsSync(tarPath())).toBe(false);
+  });
+
+  test.each(['usr/bin/bash.exe', 'cmd/git.exe', 'dev/shm', 'dev/mqueue'])('keeps a retained archive with incomplete PortableGit missing %s', async missingGit => {
+    await createInstallerTar({ includeGit: true, missingGit });
+    fs.writeFileSync(entryPath(), 'export const ok = true;\n');
+    fs.writeFileSync(bundleAssetPath(), 'fake-wasm');
+
+    const result = await recoverInstallerResourcesFromTar(resourcesDir, 'incomplete-git-archive');
+
+    expect(result.attempted).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('PortableGit');
     expect(fs.existsSync(tarPath())).toBe(true);
+    expect(fs.existsSync(markerPath())).toBe(false);
   });
 
   test('recovers when the gateway bundle exists without its required root asset', async () => {

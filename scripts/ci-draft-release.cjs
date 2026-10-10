@@ -29,15 +29,49 @@ async function main() {
     if (metadata.target !== id || metadata.sourceCommit !== sourceCommit || metadata.version !== pkg.version) {
       throw new Error(`Artifact metadata differs from the requested source for ${id}.`);
     }
+    if (!Array.isArray(metadata.artifacts) || !metadata.artifacts.length) {
+      throw new Error(`Missing artifact manifest for ${id}.`);
+    }
+    const sumsName = `SHA256SUMS-${id}.txt`;
+    const expectedChecksums = new Map([[metadataName, await hashFile(path.join(directory, metadataName))]]);
+    for (const artifact of metadata.artifacts) {
+      const name = artifact?.filename;
+      if (typeof name !== 'string' || !name || name !== path.basename(name)
+        || /[/\\\r\n]/.test(name) || name === '.' || name === '..'
+        || name === sumsName || expectedChecksums.has(name)) {
+        throw new Error(`Unsafe or duplicate manifest filename for ${id}: ${name}`);
+      }
+      if (!/^[a-f0-9]{64}$/.test(artifact.sha256 || '')
+        || !Number.isSafeInteger(artifact.size) || artifact.size <= 0) {
+        throw new Error(`Invalid manifest hash or size for ${id}: ${name}`);
+      }
+      const location = path.join(directory, name);
+      const stat = fs.statSync(location);
+      if (!stat.isFile() || stat.size !== artifact.size) {
+        throw new Error(`Artifact size differs from the manifest for ${id}: ${name}`);
+      }
+      const actualHash = await hashFile(location);
+      if (actualHash !== artifact.sha256) {
+        throw new Error(`Artifact hash differs from the manifest for ${id}: ${name}`);
+      }
+      expectedChecksums.set(name, actualHash);
+    }
     const formats = targets.find(entry => entry.target === id).formats;
     for (const format of formats) {
       if (!metadata.artifacts.some(entry => entry.filename.endsWith(format))) throw new Error(`Missing ${id} ${format} in manifest.`);
     }
-    const sumsName = `SHA256SUMS-${id}.txt`;
-    const sums = fs.readFileSync(path.join(directory, sumsName), 'utf8').trim().split('\n');
+    const sums = fs.readFileSync(path.join(directory, sumsName), 'utf8').trimEnd().split('\n');
+    const verifiedNames = new Set();
     for (const line of sums) {
       const match = /^([a-f0-9]{64})  ([^/\\]+)$/.exec(line);
-      if (!match || await hashFile(path.join(directory, match[2])) !== match[1]) throw new Error(`Invalid artifact checksum in ${id}: ${line}`);
+      if (!match || !expectedChecksums.has(match[2]) || verifiedNames.has(match[2])
+        || expectedChecksums.get(match[2]) !== match[1]) {
+        throw new Error(`Invalid, unexpected, or duplicate artifact checksum in ${id}: ${line}`);
+      }
+      verifiedNames.add(match[2]);
+    }
+    for (const name of expectedChecksums.keys()) {
+      if (!verifiedNames.has(name)) throw new Error(`Missing artifact checksum in ${id}: ${name}`);
     }
     for (const name of [metadataName, sumsName, ...metadata.artifacts.map(entry => entry.filename)]) {
       if (name !== path.basename(name) || names.has(name)) throw new Error(`Unsafe or duplicate release filename: ${name}`);

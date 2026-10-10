@@ -1,9 +1,37 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import fs, { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import os from 'node:os';
+import { join, resolve } from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
 const repoFile = (path: string): string => readFileSync(resolve(process.cwd(), path), 'utf8');
+const require = createRequire(import.meta.url);
+const { createWindowsResourceSources, packMultipleSources } = require('../scripts/pack-openclaw-tar.cjs');
+
+function windowsResourceFixture(root: string) {
+  const runtime = join(root, 'vendor', 'openclaw-runtime', 'current');
+  for (const [relative, content] of Object.entries({
+    'vendor/openclaw-runtime/current/package.json': JSON.stringify({ name: 'openclaw', version: 'fixture' }),
+    'vendor/openclaw-runtime/current/runtime-build-info.json': JSON.stringify({ target: 'win-x64' }),
+    'vendor/openclaw-runtime/current/gateway-bundle.mjs': 'gateway fixture',
+    'vendor/openclaw-runtime/current/web-tree-sitter.wasm': 'wasm fixture',
+    'SKILLs/sample-skill/server.js': 'skill fixture',
+    'resources/python-win/python.exe': 'python fixture',
+    'resources/mingit/usr/bin/bash.exe': 'bash fixture',
+    'resources/mingit/usr/bin/msys-2.0.dll': 'msys fixture',
+    'resources/mingit/cmd/git.exe': 'git fixture',
+  })) {
+    const file = join(root, relative);
+    fs.mkdirSync(join(file, '..'), { recursive: true });
+    fs.writeFileSync(file, content);
+  }
+  for (const relative of ['dev/shm', 'dev/mqueue']) {
+    fs.mkdirSync(join(root, 'resources', 'mingit', relative), { recursive: true });
+  }
+  return createWindowsResourceSources(root, runtime, 'win-x64');
+}
 
 const installerInclude = repoFile('scripts/nsis-installer.nsh');
 const unpackScript = repoFile('scripts/unpack-cfmind.cjs');
@@ -64,6 +92,46 @@ const classifyFreshTarget = ({
 };
 
 describe('Windows installer hardening contracts', () => {
+  test('ships PortableGit, its DLL, and empty runtime directories through the combined archive and installer extractor', () => {
+    const root = fs.realpathSync(fs.mkdtempSync(join(os.tmpdir(), 'lobsterai-win-resources-')));
+    try {
+      const sources = windowsResourceFixture(root);
+      const archive = join(root, 'win-resources.tar');
+      packMultipleSources(sources, archive);
+      const destination = join(root, 'installed resources 空间');
+      const extracted = spawnSync(process.execPath, [resolve('scripts/unpack-cfmind.cjs'), archive, destination], { encoding: 'utf8' });
+      expect(extracted.status, extracted.stdout + extracted.stderr).toBe(0);
+      expect(fs.readFileSync(join(destination, 'mingit/usr/bin/bash.exe'), 'utf8')).toBe('bash fixture');
+      expect(fs.readFileSync(join(destination, 'mingit/usr/bin/msys-2.0.dll'), 'utf8')).toBe('msys fixture');
+      expect(fs.readFileSync(join(destination, 'mingit/cmd/git.exe'), 'utf8')).toBe('git fixture');
+      for (const relative of ['dev/shm', 'dev/mqueue']) {
+        expect(fs.statSync(join(destination, 'mingit', relative)).isDirectory()).toBe(true);
+      }
+      expect(fs.existsSync(join(destination, '.unpack-cfmind-ok'))).toBe(true);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each(['usr/bin/bash.exe', 'cmd/git.exe', 'dev/shm', 'dev/mqueue'])('rejects a partial PortableGit archive missing %s', relative => {
+    const root = fs.realpathSync(fs.mkdtempSync(join(os.tmpdir(), 'lobsterai-win-resources-')));
+    try {
+      const sources = windowsResourceFixture(root);
+      fs.rmSync(join(root, 'resources/mingit', relative), { recursive: true });
+      // Revalidate before packaging, and also simulate corruption after the
+      // source contract passed so the actual installer extractor must reject it.
+      expect(() => createWindowsResourceSources(root, sources[0].dir, 'win-x64')).toThrow(/PortableGit/);
+      const archive = join(root, 'win-resources.tar');
+      packMultipleSources(sources, archive);
+      const destination = join(root, 'installed');
+      const extracted = spawnSync(process.execPath, [resolve('scripts/unpack-cfmind.cjs'), archive, destination], { encoding: 'utf8' });
+      expect(extracted.status, extracted.stdout + extracted.stderr).toBe(1);
+      expect(fs.existsSync(join(destination, '.unpack-cfmind-ok'))).toBe(false);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('can force channel double-click installs into silent mode before init logging', () => {
     const start = installerInclude.indexOf('!macro customInit');
     const end = installerInclude.indexOf('!macroend', start);
@@ -907,6 +975,8 @@ describe('Windows installer hardening contracts', () => {
     expect(unpackScript).toContain("name: 'cfmind-bundle-assets'");
     expect(unpackScript).toContain("name: 'skills-content'");
     expect(unpackScript).toContain("name: 'python-entry'");
+    expect(unpackScript).toContain("name: 'git-bash-entry'");
+    expect(unpackScript).toContain("name: 'git-entry'");
     expect(unpackScript).toContain('phase=sentinel-written');
     expect(unpackScript).toContain('phase=sentinel-write-failed');
     expect(unpackScript.indexOf('phase=verify-missing')).toBeLessThan(
@@ -939,7 +1009,7 @@ describe('Windows installer hardening contracts', () => {
     expect(branch).toContain('will not commit a partial application');
   });
 
-  test('requires complete OpenClaw bundle assets, Skills, and Python before committing an installation', () => {
+  test('requires complete OpenClaw bundle assets, Skills, Python, and PortableGit before committing an installation', () => {
     const extractVerifyStart = installerInclude.indexOf('TarExtractVerify:');
     const extractVerifyEnd = installerInclude.indexOf('TarExtractProcessFailed:', extractVerifyStart);
     const extractVerify = installerInclude.slice(extractVerifyStart, extractVerifyEnd);
@@ -949,6 +1019,12 @@ describe('Windows installer hardening contracts', () => {
     expect(extractVerify).toContain(String.raw`resources\SKILLs\*.*`);
     expect(extractVerify).toContain(String.raw`resources\python-win\python.exe`);
     expect(extractVerify).toContain(String.raw`resources\python-win\python3.exe`);
+    expect(extractVerify).toContain('TarExtractVerifyGitBash:');
+    expect(extractVerify).toContain(String.raw`resources\mingit\bin\bash.exe`);
+    expect(extractVerify).toContain(String.raw`resources\mingit\usr\bin\bash.exe`);
+    expect(extractVerify).toContain(String.raw`resources\mingit\cmd\git.exe`);
+    expect(extractVerify).toContain(String.raw`resources\mingit\dev\shm\.`);
+    expect(extractVerify).toContain(String.raw`resources\mingit\dev\mqueue\.`);
     expect(extractVerify).toContain('TarExtractRequiredResourceMissing:');
 
     const prevalidateStart = installerInclude.indexOf('NewInstallPrevalidateBundleAssets:');
@@ -959,6 +1035,12 @@ describe('Windows installer hardening contracts', () => {
     expect(prevalidate).toContain(String.raw`resources\SKILLs\*.*`);
     expect(prevalidate).toContain(String.raw`resources\python-win\python.exe`);
     expect(prevalidate).toContain(String.raw`resources\python-win\python3.exe`);
+    expect(prevalidate).toContain('NewInstallPrevalidateGitBash:');
+    expect(prevalidate).toContain(String.raw`resources\mingit\bin\bash.exe`);
+    expect(prevalidate).toContain(String.raw`resources\mingit\usr\bin\bash.exe`);
+    expect(prevalidate).toContain(String.raw`resources\mingit\cmd\git.exe`);
+    expect(prevalidate).toContain(String.raw`resources\mingit\dev\shm\.`);
+    expect(prevalidate).toContain(String.raw`resources\mingit\dev\mqueue\.`);
   });
 
   test('binds Skills backup and restore to the current attempt manifest', () => {

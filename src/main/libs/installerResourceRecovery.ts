@@ -6,7 +6,7 @@ import * as tar from 'tar';
  * Recovery for Windows installs where the NSIS installer stopped (killed by
  * the user, or its extractor child was frozen by security software) after the
  * main app files were extracted but before win-resources.tar was unpacked.
- * In that state the app launches, but resources/cfmind, python-win and SKILLs
+ * In that state the app launches, but resources/cfmind, python-win, mingit and SKILLs
  * are empty directories; the tar preserved next to them is the only local
  * source of the OpenClaw runtime. The installer only deletes the tar after a
  * successful extraction, so we can finish its job here.
@@ -64,6 +64,17 @@ const stringifyError = (error: unknown): string => {
   return String(error);
 };
 
+const hasBundledPortableGit = (resourcesDir: string): boolean => {
+  const root = path.join(resourcesDir, 'mingit');
+  const hasBash = ['bin/bash.exe', 'usr/bin/bash.exe'].some((file) => fs.existsSync(path.join(root, file)));
+  const hasGit = ['cmd/git.exe', 'bin/git.exe', 'mingw64/bin/git.exe'].some((file) => fs.existsSync(path.join(root, file)));
+  try {
+    return hasBash && hasGit && ['dev/shm', 'dev/mqueue'].every((dir) => fs.statSync(path.join(root, dir)).isDirectory());
+  } catch {
+    return false;
+  }
+};
+
 const doRecover = async (
   resourcesDir: string,
   reason: string,
@@ -72,11 +83,10 @@ const doRecover = async (
   const tarPath = path.join(resourcesDir, INSTALLER_RESOURCES_TAR);
   const markerPath = path.join(resourcesDir, INSTALLER_RESOURCES_MARKER);
 
-  if (hasBundledRuntimeEntry(resourcesDir)) {
-    return { attempted: false, success: true, tarPath };
-  }
-
   if (!fs.existsSync(tarPath)) {
+    if (hasBundledRuntimeEntry(resourcesDir)) {
+      return { attempted: false, success: true, tarPath };
+    }
     console.warn(
       `[InstallerRecovery] runtime entry or required bundle assets are missing and no installer tar ` +
         `is left to recover from ` +
@@ -96,8 +106,9 @@ const doRecover = async (
   let entries = 0;
   let bytes = 0;
   let nextProgressBytes = PROGRESS_LOG_STEP_BYTES;
+  let archiveIncludesPortableGit = false;
   console.log(
-    `[InstallerRecovery] runtime entry or required bundle assets are missing, extracting ` +
+    `[InstallerRecovery] completing retained installer resources, extracting ` +
       `${tarPath} -> ${resourcesDir} ` +
       `(reason=${reason}, tarBytes=${totalBytes})`,
   );
@@ -108,6 +119,8 @@ const doRecover = async (
       file: tarPath,
       cwd: resourcesDir,
       onReadEntry: (entry) => {
+        const relative = String(entry.path).replace(/\\/g, '/').replace(/^(\.\/)+/, '');
+        if (/^mingit(?:\/|$)/i.test(relative)) archiveIncludesPortableGit = true;
         entries += 1;
         bytes += Number(entry.size ?? 0);
         if (bytes >= nextProgressBytes) {
@@ -139,6 +152,20 @@ const doRecover = async (
   }
 
   const elapsedMs = Date.now() - t0;
+  // Old installer archives did not contain PortableGit. Require its contents
+  // only when this archive ships it, preserving recovery of those old builds.
+  if (archiveIncludesPortableGit && !hasBundledPortableGit(resourcesDir)) {
+    console.error(`[InstallerRecovery] PortableGit resources are still missing after extraction, keeping ${tarPath}`);
+    return {
+      attempted: true,
+      success: false,
+      tarPath,
+      entries,
+      elapsedMs,
+      error: 'PortableGit required resources are still missing after extraction',
+    };
+  }
+
   if (!hasBundledRuntimeEntry(resourcesDir)) {
     console.error(
       `[InstallerRecovery] extraction finished (entries=${entries}, elapsedMs=${elapsedMs}) ` +
@@ -173,11 +200,11 @@ const doRecover = async (
 let inflightRecovery: Promise<InstallerResourceRecoveryResult> | null = null;
 
 /**
- * Extract win-resources.tar back into the resources directory if (and only
- * if) the OpenClaw runtime entry is missing. The tar is deleted only after
- * the runtime entry is confirmed present, so a failed attempt (e.g. security
+ * Complete a retained win-resources.tar even if OpenClaw was already extracted.
+ * The tar is deleted only after the runtime entry and any PortableGit payload
+ * are confirmed present, so a failed attempt (e.g. security
  * software still holding files) can be retried later. Concurrent calls share
- * one extraction. Cheap no-op when the runtime is intact.
+ * one extraction. Cheap no-op when no archive remains and the runtime is intact.
  */
 export const recoverInstallerResourcesFromTar = (
   resourcesDir: string,

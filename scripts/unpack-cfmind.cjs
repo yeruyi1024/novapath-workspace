@@ -10,7 +10,7 @@
  *
  * 效果:
  *   输入: $INSTDIR/resources/win-resources.tar
- *   输出: $INSTDIR/resources/cfmind/, SKILLs/, python-win/
+ *   输出: $INSTDIR/resources/cfmind/, SKILLs/, python-win/, mingit/
  *   tar 文件由 NSIS 脚本在解压后删除
  *   全部目录校验通过后写入 <destDir>/.unpack-cfmind-ok 哨兵文件,
  *   供安装器在读不到本进程退出码的环境下兜底判定成功
@@ -221,7 +221,7 @@ try {
   }
 
   // Verify key directories exist
-  const expectedDirs = ['cfmind', 'SKILLs', 'python-win'];
+  const expectedDirs = ['cfmind', 'SKILLs', 'python-win', 'mingit', 'mingit/dev/shm', 'mingit/dev/mqueue'];
   let missingDirs = 0;
   for (const dir of expectedDirs) {
     const dirPath = path.join(destDir, dir);
@@ -260,6 +260,16 @@ try {
       name: 'python-entry',
       ok: ['python.exe', 'python3.exe']
         .some(fileName => fs.existsSync(path.join(destDir, 'python-win', fileName))),
+    },
+    {
+      name: 'git-bash-entry',
+      ok: ['bin/bash.exe', 'usr/bin/bash.exe']
+        .some(fileName => fs.existsSync(path.join(destDir, 'mingit', fileName))),
+    },
+    {
+      name: 'git-entry',
+      ok: ['cmd/git.exe', 'bin/git.exe', 'mingw64/bin/git.exe']
+        .some(fileName => fs.existsSync(path.join(destDir, 'mingit', fileName))),
     },
   ];
   const missingResources = requiredResourceChecks
