@@ -23,7 +23,7 @@
 - 将 `.github/workflows/build-platforms.yml` 改为四个原生宿主上的安装包流水线：macOS arm64、macOS x64、Windows x64、Linux x64。固定 Node.js、npm、pnpm，构建完整 OpenClaw runtime，执行基础 runtime smoke，输出安装包、SHA-256 清单及构建元数据。
 - `.nvmrc` 与 CI 固定 Node `24.20.0`，包含上游确认的 Windows libuv 退出竞态修复；npm `11.17.0`、pnpm `12.1.0` 保持固定，上游最低 Node engine 不变。旧 Windows CI 的 npm 子进程曾退出 `0xC0000409`；采用含修复的版本，最终仍以实际安装和 runtime smoke 结果为准。
 - 新增 `scripts/ci-*.cjs` 支持矩阵选择、工具链检查、技能准备、输出校验、runtime smoke、打包、产物收集及可选 GitHub Release draft。
-- 增加 `vendor/openclaw-plugins` 的精确输入缓存：键覆盖原生 OS / 目标架构、Node/npm/pnpm/Electron、OpenClaw source commit、应用与上游锁文件、全部构建脚本及本地扩展。无 fallback key，不缓存完整 runtime；恢复后仍执行必需插件、原生 smoke 和官方资源 hook 门槛，未声称云端加速已验证。
+- 增加 `vendor/openclaw-plugins` 的精确输入缓存：键覆盖原生 OS / 目标架构、Node/npm/pnpm/Electron、OpenClaw source commit、应用与上游锁文件、全部构建脚本及本地扩展。无 fallback key，不缓存完整 runtime；恢复后仍执行必需插件、原生 smoke 和官方资源 hook 门槛，两次 Mac ARM 云端记录已验证同 key 命中及 17 个插件复用，其他目标与变动输入仍以各自结果为准。
 - runtime / installer 增加 30 秒阶段心跳，报告 elapsed、距最后输出的时间与 PID，保留真实退出码和取消状态。心跳仅反映进程存活，不代表完成比例；不增加总构建超时、重试或跳过检查。POSIX 进程组取消已用真实子进程验证，Windows 进程树取消尚未在本机实际验证。
 - CI 在 macOS installer 步骤同时设置 `DEBUG=electron-builder` 与 `DEBUG_DMG=true`，显示 macOS hdiutil 的 DMG 生成与压缩输出，便于定位打包等待；不改变产物格式及校验门槛。
 - 为 CI 中可选且使用自定义 registry 的插件 pack 限定 30 秒外层时限、25 秒 fetch 时限和零 fetch 重试；当前对应 POPO，其余 pack 路径保持 180 秒。可选下载失败不保证对应功能，必需插件门槛保持不变。

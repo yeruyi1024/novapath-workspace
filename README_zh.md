@@ -18,6 +18,8 @@
   <a href="README.md">English</a> · 中文
 </p>
 
+本仓库以 `2026.9.23` 发布版为基线。[源码来源](UPSTREAM.md)和[本地构建、打包及 GitHub CI 方案](docs/BUILD_AND_CI_zh.md)包含四个平台的构建结果、校验和及本地化边界。
+
 <p align="center">
   <strong>全场景办公助手 Agent。</strong><br/>
   国内大厂首个开源桌面级 Agent，网易有道出品。

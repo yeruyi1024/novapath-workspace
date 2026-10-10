@@ -18,6 +18,8 @@
   English · <a href="README_zh.md">中文</a>
 </p>
 
+This repository uses release `2026.9.23` as its baseline. See [source provenance](UPSTREAM.md) and the [local build and GitHub CI guide (Chinese)](docs/BUILD_AND_CI_zh.md) for package results, checksums, and localization scope.
+
 <p align="center">
   <strong>All-scenario office assistant Agent.</strong><br/>
   The first open-source desktop-grade Agent among major Chinese tech companies, built by NetEase Youdao.
