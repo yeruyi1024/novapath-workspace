@@ -23,7 +23,7 @@
 - 将 `.github/workflows/build-platforms.yml` 改为四个原生宿主上的安装包流水线：macOS arm64、macOS x64、Windows x64、Linux x64。固定 Node.js、npm、pnpm，构建完整 OpenClaw runtime，执行基础 runtime smoke，输出安装包、SHA-256 清单及构建元数据。
 - `.nvmrc` 与 CI 固定 Node `24.20.0`，包含上游确认的 Windows libuv 退出竞态修复；npm `11.17.0`、pnpm `12.1.0` 保持固定，上游最低 Node engine 不变。旧 Windows CI 的 npm 子进程曾退出 `0xC0000409`；采用含修复的版本，最终仍以实际安装和 runtime smoke 结果为准。
 - 新增 `scripts/ci-*.cjs` 支持矩阵选择、工具链检查、技能准备、输出校验、runtime smoke、打包、产物收集及可选 GitHub Release draft。
-- 增加 `vendor/openclaw-plugins` 的精确输入缓存：键覆盖原生 OS / 目标架构、Node/npm/pnpm/Electron、OpenClaw source commit、应用与上游锁文件、全部构建脚本及本地扩展。无 fallback key，不缓存完整 runtime；恢复后仍执行必需插件、原生 smoke 和官方资源 hook 门槛，未声称云端加速已验证。
+- 增加 `vendor/openclaw-plugins` 的精确输入缓存：键覆盖原生 OS / 目标架构、Node/npm/pnpm/Electron、OpenClaw source commit、应用与上游锁文件、全部构建脚本及本地扩展。无 fallback key，不缓存完整 runtime；恢复后仍执行必需插件、原生 smoke 和官方资源 hook 门槛，两次 Mac ARM 云端记录已验证同 key 命中及 17 个插件复用，其他目标与变动输入仍以各自结果为准。
 - runtime / installer 增加 30 秒阶段心跳，报告 elapsed、距最后输出的时间与 PID，保留真实退出码和取消状态。心跳仅反映进程存活，不代表完成比例；不增加总构建超时、重试或跳过检查。POSIX 进程组取消已用真实子进程验证，Windows 进程树取消尚未在本机实际验证。
 - CI 在 macOS installer 步骤同时设置 `DEBUG=electron-builder` 与 `DEBUG_DMG=true`，显示 macOS hdiutil 的 DMG 生成与压缩输出，便于定位打包等待；不改变产物格式及校验门槛。
 - 为 CI 中可选且使用自定义 registry 的插件 pack 限定 30 秒外层时限、25 秒 fetch 时限和零 fetch 重试；当前对应 POPO，其余 pack 路径保持 180 秒。可选下载失败不保证对应功能，必需插件门槛保持不变。
@@ -31,7 +31,7 @@
 - 修正打包阶段对可选 OpenClaw 插件的处理：只有显式标记 `optional: true` 的缺失插件可以警告后继续；必需插件缺失仍会失败，已安装的可选插件仍接受完整校验，并增加对应测试。
 - 修正 Windows 安装资源：便携 Git、Bash、Python 和必要空目录随合并归档分发；归档、解包完成标记及中断安装恢复均检查资源完整性，并增加实际归档/解包测试。
 - 延长 Mac Intel 的大插件解包预算为 15 分钟、外层 CLI 为 20 分钟，处理真实 CI 中 Discord 解包在原两分钟上限触发的超时/并发清理失败；Windows 保留已有长预算，Mac ARM 与 Linux 保留原预算。必需插件安装或校验失败仍阻止打包。
-- 加强 draft release 校验：SHA-256 清单精确覆盖 manifest 中的产物和构建元数据，实际产物大小和摘要必须与元数据一致；校验失败时不写入 GitHub Release。复用已有 draft 时还要求其 `targetCommitish` 与本次源码 commit 完全一致，避免未发布且尚未生成 tag 的 draft 被跨源码更新；已正式发布的 Release 不覆盖。
+- 加强 draft release 校验：SHA-256 清单精确覆盖 manifest 中的产物和构建元数据，实际产物大小和摘要必须与元数据一致；校验失败时不写入 GitHub Release。发布前先在 plan 阶段核对或创建指向本次源 commit 的远端 tag，release 阶段重新解析 tag（含带注释 tag）并核对源码。创建 draft 使用 `--verify-tag`，省略 `--target`，允许 GitHub 的默认分支提示与实际 tag 源码不同。复用提示不同的 draft 时还要求唯一、完整匹配的脚本源码声明；未生成 tag 的 draft 只接受精确源 SHA 提示，已正式发布的 Release 不覆盖。
 - 修正四个测试 fixture 的跨平台行为，不改变业务代码：`openclawCompatibilityRepairCore.test.ts`、`nspClawguardCompatibility.test.ts`、`nspClawguardInstallRepair.test.ts` 使用临时目录的真实路径，避免 macOS `/var` 符号链接被安全检查识别为别名；`reviewSource.test.ts` 为测试 Git 仓库设置本地 `core.autocrlf=false`，保持预期 blob 字节。
 - 将上游 workflow 与 Dependabot 配置快照保存到 [`docs/upstream-workflows/`](docs/upstream-workflows/)。该目录不是 GitHub Actions 或 Dependabot 执行目录；上游欢迎、标签、stale、OpenClaw 检查、安全 workflow 和 Dependabot 定时更新不自动启用。当前构建流水线没有定时触发，也不依赖 GitHub Advanced Security。
 - 新增 [`docs/BUILD_AND_CI_zh.md`](docs/BUILD_AND_CI_zh.md)，记录运行边界、命令、打包流程、验证状态及分发限制。

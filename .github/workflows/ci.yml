@@ -59,7 +59,7 @@ jobs:
         run: node scripts/ci-prepare-skills.cjs
       - name: Run tests
         run: npm test -- --maxWorkers=2
-      - name: Test CI process and readiness failure handling
+      - name: Test CI process, readiness, and draft release contracts
         run: node --test scripts/ci-tests/*.test.cjs
       - name: Verify compiled output
         run: node scripts/ci-verify-output.cjs

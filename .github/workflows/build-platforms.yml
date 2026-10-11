@@ -40,6 +40,8 @@ jobs:
   plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: write
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       targets: ${{ steps.matrix.outputs.targets }}
@@ -56,6 +58,12 @@ jobs:
         run: node scripts/ci-build-matrix.cjs
         env:
           CI_BUILD_PLATFORM: ${{ inputs.platform || 'all' }}
+      - name: Verify or reserve the draft source tag before long builds
+        if: ${{ startsWith(github.ref, 'refs/tags/v') || inputs.publish_draft }}
+        run: node scripts/ci-draft-release.cjs --prepare-tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CI_RELEASE_TAG: ${{ inputs.release_tag }}
 
   validate:
     uses: ./.github/workflows/ci.yml

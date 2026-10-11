@@ -130,7 +130,7 @@ gh run download <run-id> --dir artifacts
 
 构建首先复用质量工作流，验证成功后各平台并行打包，矩阵不因一个平台失败而提前取消其他平台。每个平台在原生宿主校验工具链及目标架构，准备 Electron/技能/Windows Git 与 Python，拉取锁定 OpenClaw 源码并检查其 pnpm pin。npm/pnpm 下载缓存继续保留，pnpm cache key 包含操作系统、架构、版本及上游锁文件哈希。
 
-为减少重复插件安装，另缓存 `vendor/openclaw-plugins`，仅接受完全匹配的键：操作系统、目标及架构、Node/npm/pnpm/Electron 固定版本、OpenClaw 源 commit，以及 `package.json`、根 npm 锁文件、OpenClaw pnpm 锁文件、全部 `scripts/**` 和本地 `openclaw-extensions/**` 的哈希。没有 fallback / `restore-keys`，不跨目标复用，也不缓存完整 runtime 或已生成的安装包。恢复插件缓存后仍构建 runtime，并执行必需插件与布局校验、原生 SQLite / gateway smoke 及官方打包资源 hooks；缓存命中不表示这些门槛已通过。实际云端缓存命中率和节省时间须以后续运行记录为准。
+为减少重复插件安装，另缓存 `vendor/openclaw-plugins`，仅接受完全匹配的键：操作系统、目标及架构、Node/npm/pnpm/Electron 固定版本、OpenClaw 源 commit，以及 `package.json`、根 npm 锁文件、OpenClaw pnpm 锁文件、全部 `scripts/**` 和本地 `openclaw-extensions/**` 的哈希。没有 fallback / `restore-keys`，不跨目标复用，也不缓存完整 runtime 或已生成的安装包。恢复插件缓存后仍构建 runtime，并执行必需插件与布局校验、原生 SQLite / gateway smoke 及官方打包资源 hooks；缓存命中不表示这些门槛已通过。两次 Mac ARM 云端记录已确认相同精确 key 命中及 17 个插件复用，详见末尾；其他平台命中率和后续输入变化的用时仍以各自运行记录为准。
 
 CI 中显式可选且配置自定义 registry 的 `npm pack` 路径采用 30 秒外层时限、25 秒 fetch 时限和零次 fetch 重试；当前对应可选 POPO 插件，避免不可达 registry 让每个平台长时间等待。其余 `npm pack` 路径仍保留 180 秒时限。下载失败仍按可选插件边界警告后继续，不会把必需插件改为可选，也不改变必需插件的安装和打包校验。
 
@@ -164,9 +164,13 @@ Windows 可以用 `Get-FileHash <安装包路径> -Algorithm SHA256` 与清单�
 
 Release job 仅在所有**所选**目标成功后运行，会再次核对目标格式、源 commit、版本、实际大小和 SHA-256。checksum 清单必须准确覆盖全部 manifest 产物和 metadata，缺项、重复或多余项都会拒绝发布。自定义 tag 若已指向其他 commit，会拒绝挂接；已经正式发布的 Release 不会被覆盖；同 commit 的已有 draft 可更新资产。手动只选一个平台创建的新 draft 只包含该平台，不表示四个平台均已验收；复用同源已有 draft 时只替换本次同名资产，会保留其他目标的旧资产。每份资产的源 commit、run URL 和时间以各自 metadata 为准。
 
+发布请求先在 plan 阶段执行 `ci-draft-release.cjs --prepare-tag`，在长时间构建之前解析远端 tag 并核对本次源 SHA；tag 不存在时先检查同名 draft 的来源，再通过 Git refs API 创建精确源码 tag。错误来源、正式 Release、API 错误或超出有界分页的 draft 查找都会拒绝继续。release 阶段先完成全部本地文件校验，再重新解析远端 tag，使用 `gh release create --draft --verify-tag` 且省略 `--target`。已有 tag 的实际 SHA 是源码依据，Release 的 `target_commitish` 可以保留默认分支提示；提示不同的已有 draft 必须同时具有唯一且精确匹配的 `Unsigned LobsterAI <version> build from commit <SHA>.` 声明。没有 tag 的 draft 只接受精确源 SHA 提示，不能通过新建 tag 接管其他源码的 draft。
+
+首次创建曾两次返回 HTTP 403；日志不能直接确定具体权限检查原因。GitHub 的 [Create/Update Release 文档](https://docs.github.com/en/rest/releases/releases?apiVersion=latest) 描述了目标与默认分支 workflow 内容不同的额外权限条件，而已有 tag 时 `target_commitish` 不用于决定 tag 源码。上述流程提前固定 tag 并省略创建时的旧源码 target 提示，最新自动创建路径仍需云端验证；本次新复验在 runner 启动前被 GitHub 账单限制阻止，详见末尾。
+
 draft 资产不受 Actions artifact 的 7 天保留期限制，但尚未公开发布，需要以拥有仓库 push 权限的账号登录访问，参见 [GitHub Release API 文档](https://docs.github.com/en/rest/releases/releases#list-releases)。
 
-默认 `GITHUB_TOKEN` 权限为 `contents: read`，checkout 不持久化凭据；只有 draft release job 使用 `contents: write`。安装包构建不需要 PAT、上游内部签名凭据或 Apple 凭据。第一次 push 仍需操作者拥有目标仓库写权限和 workflow 写入权限；Actions 还受仓库/组织策略及账户可用额度约束。
+默认 `GITHUB_TOKEN` 权限为 `contents: read`，checkout 不持久化凭据；plan 的 tag 准备和 draft release 两个 jobs 使用 `contents: write`，普通质量与原生打包保持只读；只有请求 draft 或 `v*` tag 构建时执行远端 tag 准备。安装包构建不需要 PAT、上游内部签名凭据或 Apple 凭据。第一次 push 仍需操作者拥有目标仓库写权限和 workflow 写入权限；Actions 还受仓库/组织策略及账户可用额度约束。
 
 上游 workflow 与 Dependabot 配置快照位于 [`docs/upstream-workflows/`](upstream-workflows/)，不在可执行目录。现行三份 workflow 没有 `schedule`，不会自动发送欢迎/标签/stale 消息，不运行依赖 GitHub Advanced Security 权限的 CodeQL job，也不会自动修改上游 OpenClaw 版本。`.github/dependabot.yml` 同样已归档，本次不启用其自动依赖 PR。
 
@@ -199,7 +203,7 @@ CI 关闭 macOS 签名身份自动发现，不传 Apple 或 Windows 内部签名
 
 ## 验证记录
 
-记录日期：2026-10-10，Asia/Shanghai。本机最终代码编译及测试在 macOS arm64 上使用 Node `24.20.0`、npm `11.17.0`、pnpm `12.1.0` 完成；初次依赖安装、完整 runtime 和本机 DMG 使用 Node `24.15.0`，各产物以自身元数据为准。下表区分本次真实完成结果与尚未完成的验证；GitHub 矩阵状态是本次记录时的快照，后续由实际执行者补齐最终结果。
+记录日期：2026-10-10，Asia/Shanghai。本机最终代码编译及测试在 macOS arm64 上使用 Node `24.20.0`、npm `11.17.0`、pnpm `12.1.0` 完成；初次依赖安装、完整 runtime 和本机 DMG 使用 Node `24.15.0`，各产物以自身元数据为准。下表记录本次真实完成结果及明确未执行的验收。最终 GitHub 同源四平台与 draft 发布已全部成功；本机早期 DMG 是源码 `f983e6fb` 的验证样本，最终云端分发产物以 `55b616ff` 的 draft 为准。
 
 | 验证项 | 当前状态 | 证据 / 后续记录 |
 | --- | --- | --- |
@@ -217,15 +221,59 @@ CI 关闭 macOS 签名身份自动发现，不传 Apple 或 Windows 内部签名
 | 本机基础 runtime smoke | 已通过 | Electron Node ABI 下 SQLite 查询成功；`plugins.enabled=false` 的独立 gateway startup/readiness smoke 通过；不代替插件或模型功能验收 |
 | 本机桌面启动与完整应用网关 | 已通过启动验证 | 真实 Electron 窗口成功加载本地 `dist/index.html`（`file://`）；跳过登录后欢迎会话 UI 可见。应用 gateway 为 `running`，loopback `18789`，启动用时 3,527 ms；实际 `/startupz` HTTP 200 返回 `ok: true`、`status: "started"` |
 | 本地模型聊天与工具调用 | 未执行 | 按用户要求不验证模型；没有实际模型聊天及工具调用结果，尚不能宣称完整离线 Agent 已验证 |
-| Windows installer patches | 本机契约测试已通过 | 修复后 52 项通过；实际归档/解包与恢复相关 3 suites 共 110 项通过；Windows CI 在打包前仍须重新执行 `npm run verify:installer-patches` |
+| Windows installer patches | 本机契约测试已通过 | 修复后 52 项通过；实际归档/解包与恢复相关 3 suites 共 110 项通过；最终 Windows CI 打包前已重新执行并通过 `npm run verify:installer-patches` |
 | 本机 macOS arm64 DMG 打包及收集 | 已通过 | 样本源码 `f983e6fb0acc88d664173c4c981ac65f5d373f88`、Node `24.15.0`，与最终云端源码 `55b616ff` / Node `24.20.0` 区分；打包与 `ci-collect-artifacts.cjs` 均 exit 0，已收集 DMG、SHA-256 清单与构建元数据；`shasum -c` 全部通过，`hdiutil verify` 报告有效；未签名、未公证 |
 | 安装包安装后 UI / 安装卸载验收 | 本次未执行 | 本机源码桌面启动与 DMG 生成不等同于安装包安装后的验收；该记录不宣称各平台已完成安装、卸载及安装后 UI 验收 |
 | 旧尝试 GitHub Actions 质量 job | 已通过，打包随后主动取消 | [Build Platforms run 38030285389](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38030285389) 的质量检查为 `success`；522 suites passed、16 skipped；5,571 tests passed、163 skipped（共 5,734），113.63 秒。不同宿主跳过的平台测试数量不同 |
 | 中间尝试 GitHub Actions 质量 job | 已通过 | [run 38031661849](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38031661849)：522 suites passed、16 skipped；5,581 tests passed、163 skipped（共 5,744），115.63 秒；quality job 墙钟 5 分 43 秒 |
 | 最终修正 GitHub Actions 质量 job | 已通过 | [run 38035150205](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38035150205)：523 suites passed、16 skipped；5,587 tests passed、163 skipped（共 5,750），119.37 秒；quality job 墙钟 5 分 42 秒 |
-| 首次 GitHub 四目标打包 | 新同源构建进行中 | Intel 时限与 Node 工具链修复源 commit `55b616fff1085e9675d32348bf7bdb6fe82f42ce`；[完整构建 run 38035150205](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38035150205) 已通过质量门槛，四原生平台均已启动。此前 `38031661849` 的 Mac ARM/Linux 成功但 Intel/Windows runtime 失败、draft 被阻止；`38030285389` 因审计发现 Windows 资源遗漏主动取消，均不作为四目标成功证据 |
+| 首次 GitHub 四目标打包 | 四目标全部成功 | 源 commit `55b616fff1085e9675d32348bf7bdb6fe82f42ce`；[完整构建 run 38035150205](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38035150205) 的质量、四目标打包及 draft 发布共 7 个 jobs 全部 success。此前 `38031661849` 的 Mac ARM/Linux 成功但 Intel/Windows 失败，draft 被阻止；`38030285389` 因审计发现 Windows 资源遗漏主动取消，均不作为四目标成功证据 |
 | Intel 插件解包时限与补丁合同 | 已通过 | 实际 patch apply/check/reverse、六种平台/架构及显式 timeout 覆盖；新增 suite 与既有插件安装 suite 共 24 tests passed，既有升级补丁合同也已同步并在完整回归通过 |
 | draft release 严格校验 fixture | 已通过 | 成功案例及 10 个拒绝案例通过；manifest 产物及 metadata 缺 checksum、错误 hash/size、重复或多余 checksum 项会在任何 gh 调用前失败 |
-| 首次 draft release / checksum 复核 | 待补 | 若启用 `publish_draft`，记录 draft URL、tag、对应源 commit 和校验结果 |
+| 首次 draft release / checksum 复核 | 已通过 | [Release draft](https://github.com/yeruyi1024/novapath-workspace/releases/tag/untagged-9d2655d8b867ade0ae26)，tag `v2026.9.23-ci.38035150205`，source `55b616fff1085e9675d32348bf7bdb6fe82f42ce`，16 个资产全部 uploaded。8 份小型 metadata/checksum 已下载并本地计算 SHA-256；全部 manifest 包文件的 SHA-256、大小与 GitHub API digest/size 一致。大型云端安装包未再次下载到本机；Release job 已重新计算完整文件哈希 |
+
+### 最终云端安装包
+
+| 目标 | 构建 job 用时 | 安装包 | 大小（bytes） |
+| --- | --- | --- | --- |
+| `mac-arm64` | 14 分 55 秒 | `LobsterAI-darwin-arm64-2026.9.23-official.dmg` | 351,668,392 |
+| `mac-x64` | 69 分 26 秒 | `LobsterAI-darwin-x64-2026.9.23-official.dmg` | 351,660,256 |
+| `win-x64` | 55 分 11 秒 | `LobsterAI-Setup-x64-2026.9.23-official.exe` | 391,084,560 |
+| `linux-x64` | 27 分 19 秒 | `LobsterAI-2026.9.23.AppImage` | 556,860,491 |
+| `linux-x64` | 27 分 19 秒 | `lobsterai_2026.9.23_amd64.deb` | 352,986,728 |
+
+`mac-arm64`：全部必需插件已安装并通过打包结构 gate；缺失的可选插件为 `moltbot-popo`。
+
+`mac-x64`：全部必需插件已安装并通过打包结构 gate；缺失的可选插件为 `moltbot-popo`。
+
+`win-x64`：全部必需插件已安装并通过打包结构 gate；缺失的可选插件为 `moltbot-popo`。
+
+`linux-x64`：全部必需插件已安装并通过打包结构 gate；缺失的可选插件为 `moltbot-popo`。
+
+独立来源核验也检查了四份 metadata 的根锁文件与三个技能锁文件哈希。Mac/Linux 与源 commit 的 LF Git blob 字节完全一致；Windows 的四个哈希分别与同一源 blob 经完整 LF→CRLF checkout 转换后的字节完全一致。仅接受这两套完整、平台适用的预期映射，未使用忽略空白或任意 JSON 规范化来放宽源码一致性。
+
+上表用时为单个平台 job 的墙钟时间。安装包名称沿用上游的 `official` 后缀，仅为文件命名，不代表签名或官方发行。本次产物均未签名、未公证；Linux 为实验性。摘要见每个平台 `SHA256SUMS` 与 metadata；独立交叉核验未执行安装器，也未验证真实插件通道或模型调用。
 
 完整应用启动的 readiness 合同为 `/startupz` 返回 HTTP 成功、JSON `ok: true` 且 `status: "started"`；只有该路径返回 404 时才兼容 `/ready` 的 `ready: true`。默认端口为 18789，冲突时扫描备用端口，应记录实际使用端口。主日志的启动参数可能含 gateway token，保存截图或日志证据前应脱敏，不把账号 Key、token 或带凭据的 URL 提交到仓库。
+
+首次发布在 release create 阶段遇到两次 HTTP 403；四平台 package jobs 均已成功。为已核对指向 `55b616fff1085e9675d32348bf7bdb6fe82f42ce` 的 tag 使用授权本地账号初始化空 draft，随后第 3 次只重跑 release job，其完整文件校验、资产上传及信息更新全部成功。`target_commitish=main` 在已有 tag 时仅是创建提示，实际源码以 Git refs API 的 tag SHA、四份 metadata 及各构建 job SHA 共同核对。
+
+包产物源为 `55b616fff1085e9675d32348bf7bdb6fe82f42ce`。draft 保护提交 `f7d74377190e0bbf690256621f9ec55b22a70b87` 仅加强 draft 复用的来源检查及来源文档，不修改应用或 runtime；[自动质量 CI](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38036739624) 已通过。该早期保护已由当前 tag 准备与解析、draft 来源声明校验替代，支持已有精确 tag 的默认分支提示。当前 28 项发布 fixture 覆盖带注释 tag、严格 HTTP 状态、分页界限、提示与来源声明、正式 Release 拒绝，以及 manifest/checksum 的 10 个完整性拒绝案例；不进行真实 API 写入。
+
+
+### CI 长时间等待修复及复验
+
+原生构建中的插件安装和 DMG 压缩耗时较长，日志静默不能单独证明死锁。本次把可选自定义 registry 等待限制为约 30 秒，加入精确输入插件缓存、每 30 秒阶段心跳，以及可实时显示 hdiutil 输出的 macOS 打包调试；必需插件、native ABI、网关和产物校验门槛均保留。
+
+| 记录 | 源码 | 插件缓存 | runtime | installer | 结果 |
+| --- | --- | --- | ---: | ---: | --- |
+| [冷构建 38039212416](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38039212416) | `cf6b0abed8066291cdf6f4e8ead7f441e33298c4` | miss；17 个新装，随后保存 | 528.1 秒 | 76.1 秒 | success |
+| [热构建 38040305916](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38040305916) | `497f8424cc3fdb49f9db8ffe5732e2be090f9e18` | 同一完整 key 命中；17 个插件逐项 Cache hit | 333.2 秒 | 64.2 秒 | success |
+
+两次均为 `mac-arm64`，可选 POPO 均在约 30 秒超时后跳过；必需插件、SQLite、plugins-disabled gateway smoke、包格式、checksum、metadata 收集及 artifact 上传全部通过。两次 `publish_draft=false`，release job 按配置跳过。热构建实际记录了 hdiutil create/convert 输出并均返回 0；runtime 11 次心跳、installer 2 次心跳。两次 runtime 用时缩短 36.9%，这是本次观测值，不保证其他目标或未来构建的速度；脚本输入变动会产生新 key，最新发布脚本不在此命中保证内。
+
+发布保护代码 `242fab127013da8d73587724b206efe83c74aad2` 的 [自动质量 CI 38041088947](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38041088947) 已成功：Renderer/Main 编译、技能构建及输出 gate 通过；523 suites passed / 16 skipped，5,596 tests passed / 163 skipped（5,759 total，76.37 秒）；41 项 Node CI 合同全部通过，7,029.390157 ms。本地 41 项也通过，6,792.266 ms；实际只读 GitHub API 验证了 source55 的已有精确 tag 与默认 `main` 提示 draft 的来源声明。此实际读取没有创建或更新远端对象。
+
+同一提交的 [自动 tag / draft 复验 38041093149](https://github.com/yeruyi1024/novapath-workspace/actions/runs/38041093149) 被 GitHub 账户账单限制阻止。plan 与 validate 的官方 Check Run annotations 均提示近期付款失败或需要提高支出上限；两个 jobs 无 runner、零 steps，package/release skipped。新的 tag 准备及自动 draft 发布尚未执行，不能称为最新发布路径已云端验证；这不影响此前 source55 四平台产物和两次 cf/497 Mac ARM 修复复验的成功记录。
+
+仓库所有者需要在 GitHub Settings → Billing & plans 检查账户状态，恢复可运行条件后，在失败运行点击 **Re-run all jobs**（保留该 run ID 及源码）或重新手动触发所需平台。当前代码可直接运行，不需要更换 CI 机器或重新修改产物门槛。本次未修改财务设置，也未反复重试相同账户阻断。Windows 新 wrapper 的真实取消路径、各平台安装后的 UI/卸载、真实 IM 及模型调用仍未验证；按要求本次不验证模型。

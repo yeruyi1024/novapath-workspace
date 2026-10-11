@@ -4,6 +4,8 @@ A desktop workspace for an aggregated model platform: tasks, files, models, tool
 
 See [中文开发与产品配置说明](README_zh.md).
 
+This repository uses release `2026.9.23` as its baseline. See [source provenance](UPSTREAM.md) and the [local build and GitHub CI guide (Chinese)](docs/BUILD_AND_CI_zh.md) for the company repository’s previous package results, checksums, and build scope. Those results predate the StarPath changes and do not validate this version’s installers.
+
 ## Projects and files
 
 The sidebar supports projects, independent chats, project editing, and conversation grouping. Folder paths are validated before saving and starting a project conversation. Removing a project preserves its chats and local files. Regrouping an existing chat does not change its working directory.
