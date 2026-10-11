@@ -2,6 +2,9 @@ import { spawnSync } from 'node:child_process';
 
 import { describe, expect, test } from 'vitest';
 
+import packageJson from '../package.json';
+import { PRODUCT } from '../src/shared/product';
+
 const runChannelDryRun = (args: string[], env: NodeJS.ProcessEnv = {}) => (
   spawnSync(process.execPath, ['scripts/dist-win-channel.cjs', ...args, '--dry-run'], {
     cwd: process.cwd(),
@@ -169,11 +172,11 @@ describe('web installer build flags', () => {
 
     expect(plain.status).toBe(0);
     expect(plain.stdout).toContain(
-      'artifact=LobsterAI-WebSetup-${arch}-${version}-dictbind.${ext}',
+      'artifact=' + PRODUCT.slug + '-WebSetup-${arch}-${version}-dictbind.${ext}',
     );
     expect(silent.status).toBe(0);
     expect(silent.stdout).toContain(
-      'artifact=LobsterAI-WebSetup-${arch}-${version}-dictbind-silent.${ext}',
+      'artifact=' + PRODUCT.slug + '-WebSetup-${arch}-${version}-dictbind-silent.${ext}',
     );
   });
 
@@ -181,8 +184,8 @@ describe('web installer build flags', () => {
     const probe = readWebBasePackageUrl();
 
     expect(probe.status).toBe(0);
-    expect(probe.stdout).toMatch(
-      /packageUrl=https:\/\/cdn\.example\.test\/releases\/dictbind\/lobsterai-[^/\s]+-x64\.nsis\.7z/,
+    expect(probe.stdout).toContain(
+      `packageUrl=https://cdn.example.test/releases/dictbind/${PRODUCT.name.toLowerCase()}-${packageJson.version}-x64.nsis.7z`,
     );
   });
 });

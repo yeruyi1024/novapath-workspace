@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { PRODUCT } from '../../shared/product';
+
 const mocks = vi.hoisted(() => ({
   quit: vi.fn(),
   focus: vi.fn(),
@@ -127,7 +129,7 @@ describe('showAppQuitConfirmation', () => {
     expect(mocks.focus).toHaveBeenCalledWith({ steal: true });
     expect(mocks.showMessageBox).toHaveBeenCalledTimes(1);
     const [options] = mocks.showMessageBox.mock.calls[0];
-    expect(options).toMatchObject({ type: 'warning', title: 'LobsterAI', noLink: true });
+    expect(options).toMatchObject({ type: 'warning', title: PRODUCT.name, noLink: true });
     expect(options.buttons).toHaveLength(2);
     expect(options.message).not.toBe('appQuitConfirmTitle');
     expect(options.detail).not.toBe('appQuitConfirmDetail');
