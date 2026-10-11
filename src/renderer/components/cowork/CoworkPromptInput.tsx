@@ -1,5 +1,6 @@
 import {
   ArrowTurnDownRightIcon,
+  ArrowUpIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -7,7 +8,6 @@ import {
   PauseCircleIcon,
   PlayCircleIcon,
 } from '@heroicons/react/24/outline';
-import { ArrowUpIcon, FolderIcon } from '@heroicons/react/24/solid';
 import { AuthSubscriptionStatus } from '@shared/auth/constants';
 import {
   BrowserAnnotationScreenshotStatus,
@@ -40,6 +40,7 @@ import {
   type CoworkPendingSteer,
   CoworkSteerStatus,
 } from '../../../shared/cowork/steer';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import { agentService } from '../../services/agent';
 import { authService } from '../../services/auth';
 import { configService, ConfigServiceEvent } from '../../services/config';
@@ -113,6 +114,7 @@ import {
 import Modal from '../common/Modal';
 import DefaultAgentIcon from '../icons/DefaultAgentIcon';
 import EditIcon from '../icons/EditIcon';
+import FolderIcon from '../icons/FolderIcon';
 import GoalIcon from '../icons/GoalIcon';
 import PaperClipIcon from '../icons/PaperClipIcon';
 import PlanModeIcon from '../icons/PlanModeIcon';
@@ -334,7 +336,7 @@ const SEND_SHORTCUT_OPTIONS = [
   { value: 'Alt+Enter', label: 'Alt+Enter', labelMac: 'Option+Enter' },
 ] as const;
 
-const isMacPlatform = navigator.platform.includes('Mac');
+const isMacPlatform = window.electron.platform === 'darwin';
 
 const ContextLabelMaxLength = {
   Folder: 12,
@@ -443,6 +445,7 @@ interface CoworkPromptInputProps {
   showFolderSelector?: boolean;
   showModelSelector?: boolean;
   showAgentSelector?: boolean;
+  homeContext?: React.ReactNode;
   showReadOnlyContext?: boolean;
   readOnlyContextTrailingText?: string;
   contextAgentId?: string;
@@ -481,6 +484,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       showFolderSelector = false,
       showModelSelector = false,
       showAgentSelector = false,
+      homeContext,
       showReadOnlyContext = false,
       readOnlyContextTrailingText,
       contextAgentId,
@@ -665,7 +669,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
 
   const isCompact = size === 'compact';
   const isLarge = size === 'large' || isCompact;
-  const useHomeContextLayout = isLarge && showAgentSelector;
+  const useHomeContextLayout = isLarge && (showAgentSelector || Boolean(homeContext));
   const useCompactSendButton = isLarge && (useHomeContextLayout || showReadOnlyContext || isCompact);
   const hasActiveContext = hasActiveSkills || hasActiveKits || isPlanMode || goalInputActive || steerInputActive;
   const hasAttachments = attachments.length > 0;
@@ -674,7 +678,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     : isLarge
       ? useHomeContextLayout
         ? hasAttachments ? 34 : hasActiveContext ? 36 : 52
-        : hasAttachments ? 38 : hasActiveContext ? 44 : 60
+        : hasAttachments ? 38 : hasActiveContext ? 40 : 52
       : 24;
   const maxHeight = isCompact ? 96 : 200;
 
@@ -1744,6 +1748,10 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       return;
     }
 
+    if (accessPrompt && !PRODUCT_FEATURES.account && accessPrompt !== ModelAccessPromptKind.AgenticNotReady) {
+      window.dispatchEvent(new CustomEvent(CoworkUiEvent.OpenModelSettings));
+      return;
+    }
     if (accessPrompt) {
       reportPromptControl('submit_blocked', {
         blockedReason: 'model_access_required',
@@ -2167,11 +2175,11 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
   ]);
 
   const containerClass = isCompact
-    ? 'relative rounded-2xl border border-border bg-surface shadow-subtle'
+    ? 'workspace-composer relative rounded-[22px] border border-border bg-surface'
     : isLarge
     ? useHomeContextLayout
       ? 'relative rounded-2xl'
-      : `relative rounded-2xl border border-border bg-surface ${showReadOnlyContext ? '' : 'shadow-card'}`
+      : 'workspace-composer relative rounded-[22px] border border-border bg-surface'
     : 'relative flex items-end gap-2 p-3 rounded-xl border border-border bg-surface';
 
   const textareaClass = isCompact
@@ -2180,7 +2188,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     ? `w-full resize-none bg-transparent px-4 pb-2 text-foreground placeholder:dark:text-foregroundSecondary/60 placeholder:text-secondary/60 focus:outline-none min-h-[${minHeight}px] max-h-[${maxHeight}px] ${
       useHomeContextLayout
         ? `${hasActiveContext ? 'pt-2' : 'pt-3'} text-sm leading-[var(--lobster-leading-prompt)]`
-        : `${hasActiveContext ? 'pt-2' : 'pt-2.5'} text-[length:var(--lobster-text-promptLarge)] leading-[var(--lobster-leading-promptLarge)]`
+        : `${hasActiveContext ? 'pt-2' : 'pt-3'} text-sm leading-[var(--lobster-leading-prompt)]`
     }`
     : 'flex-1 resize-none bg-transparent text-foreground placeholder:placeholder:text-secondary focus:outline-none text-sm leading-relaxed min-h-[24px] max-h-[200px]';
 
@@ -2834,7 +2842,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     && !agentModelIsInvalid
     && (effectiveModelIsAvailable || resolveSubmitModelAccessPrompt() === ModelAccessPromptKind.Login)
     && (!!activeTextareaValue.trim() || (!steerInputActive && (hasAttachments || browserAnnotationBatches.length > 0)));
-  const showNewUserWelcomeLockOverlay = showNewUserWelcomeLoginOverlay && !isLoggedIn;
+  const showNewUserWelcomeLockOverlay = PRODUCT_FEATURES.account && showNewUserWelcomeLoginOverlay && !isLoggedIn;
   const enhancedContainerClass = isDraggingFiles
     ? `${containerClass} ring-2 ring-primary/50 border-primary/60`
     : containerClass;
@@ -2887,9 +2895,9 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
   const largeModelSelector = showModelSelector ? (
     <div className="flex flex-col items-start gap-1">
       <ModelSelector
-        compact={useHomeContextLayout}
+        compact
         dropdownDirection="up"
-        alignDropdownToTriggerEnd={useHomeContextLayout}
+        alignDropdownToTriggerEnd
         portal={showReadOnlyContext}
         triggerMaxWidthClassName={largeModelTriggerMaxWidthClassName}
         disabled={isPatchingModel || isPersistingAgentModel || modelSelectionRefreshPending}
@@ -3144,12 +3152,12 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
   const largeInputToolActions = (
     <div className={`flex items-center ${useLargeToolbarCompactLayout ? 'gap-0' : 'gap-0.5'}`}>
       {largeInputActions}
-      <MediaModelPicker draftKey={draftKey} disabled={disabled || voiceInputLocksEditing} />
+      {PRODUCT_FEATURES.account && <MediaModelPicker draftKey={draftKey} disabled={disabled || voiceInputLocksEditing} />}
     </div>
   );
-  const largeSendButtonSizeClass = useCompactSendButton ? 'h-7 w-7' : 'h-8 w-8';
+  const largeSendButtonSizeClass = useCompactSendButton ? 'h-8 w-8' : 'h-9 w-9';
   const largeSendIconSizeClass = useCompactSendButton ? 'h-4 w-4' : 'h-[18px] w-[18px]';
-  const largeVoiceInputButton = !remoteManaged ? renderVoiceInputButton(
+  const largeVoiceInputButton = PRODUCT_FEATURES.account && !remoteManaged ? renderVoiceInputButton(
     `flex ${largeSendButtonSizeClass} shrink-0 items-center justify-center rounded-full`,
     largeSendIconSizeClass,
   ) : null;
@@ -3174,9 +3182,9 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       data-onboarding-target={isLarge && useHomeContextLayout ? 'home-prompt-send' : undefined}
       onClick={() => handleSubmit('button')}
       disabled={!canUseSubmitButton}
-      className={`flex ${largeSendButtonSizeClass} shrink-0 items-center justify-center rounded-full transition-all ${
+      className={`workspace-send-button flex ${largeSendButtonSizeClass} shrink-0 items-center justify-center rounded-full transition-all ${
         canUseSubmitButton
-          ? 'bg-neutral-950 text-white shadow-subtle hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200'
+          ? 'bg-primary text-primary-foreground shadow-subtle hover:bg-primary-hover active:scale-95'
           : 'cursor-not-allowed bg-neutral-300 text-white dark:bg-neutral-700 dark:text-neutral-500'
       }`}
       aria-label={i18nService.t('sendMessage')}
@@ -3600,18 +3608,18 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     );
 
   const readOnlyContextRow = isLarge && showReadOnlyContext && !useHomeContextLayout ? (
-    <div className="mt-2 grid min-h-7 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4">
-      <div ref={readOnlyContextGroupRef} className="flex min-w-0 items-center gap-1">
+    <div className="workspace-composer-context flex min-w-0 flex-1 items-center">
+      <div ref={readOnlyContextGroupRef} className="flex min-w-0 flex-1 items-center gap-2">
         <button
           type="button"
           onClick={handleOpenWorkingDirectory}
           disabled={!hasWorkingDirectory}
-          className={`flex h-7 items-center rounded-lg text-[13px] text-secondary transition-colors ${
+          className={`flex h-7 items-center rounded-md text-xs text-secondary transition-colors ${
             hasWorkingDirectory ? 'hover:bg-background/80 hover:text-foreground' : 'cursor-default'
           } ${
             isReadOnlyContextCompact
               ? 'w-7 flex-none justify-center'
-              : 'min-w-0 max-w-[260px] shrink gap-1.5 px-2'
+              : 'min-w-0 max-w-[160px] shrink gap-1.5 px-1'
           }`}
           title={workingDirectory || i18nService.t('noFolderSelected')}
           aria-label={i18nService.t('coworkOpenFolder')}
@@ -3624,25 +3632,21 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
           )}
         </button>
         <div
-          className={`flex h-7 items-center rounded-lg text-[13px] text-secondary ${
+          role="img"
+          aria-label={`${i18nService.t('coworkCurrentAgent')}: ${readOnlyContextAgentName}`}
+          className={`flex h-7 items-center rounded-md text-xs text-secondary ${
             isReadOnlyContextCompact
               ? 'w-7 flex-none justify-center'
-              : 'min-w-0 max-w-[220px] shrink gap-1.5 px-2'
+              : 'min-w-0 max-w-[110px] shrink gap-1.5'
           }`}
           title={`${i18nService.t('coworkCurrentAgent')}: ${readOnlyContextAgentName}`}
         >
           <AgentContextAvatar agent={readOnlyContextAgentForDisplay} />
-          {!isReadOnlyContextCompact && (
+          {!isReadOnlyContextCompact && !shouldUseDefaultAgentIcon(readOnlyContextAgentForDisplay) && (
             <span className="min-w-0 truncate">{readOnlyContextAgentLabel}</span>
           )}
         </div>
       </div>
-      {readOnlyContextTrailingText && (
-        <span className="pointer-events-none min-w-0 max-w-full select-none truncate text-center text-[13px] text-muted opacity-85">
-          {readOnlyContextTrailingText}
-        </span>
-      )}
-      <div aria-hidden="true" />
     </div>
   ) : null;
 
@@ -3793,7 +3797,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
             <>
               <div
                 data-onboarding-target="home-prompt"
-                className="relative z-10 rounded-2xl border border-border bg-surface shadow-card transition-[border-color,box-shadow] duration-200 focus-within:border-primary/35 focus-within:shadow-elevated"
+                className="workspace-composer relative z-10 rounded-3xl border border-border bg-surface shadow-subtle transition-[border-color,box-shadow] duration-200 focus-within:border-primary/35 focus-within:shadow-card"
               >
                 {largeAttachmentPreview}
                 {selectedTextSnippetPreview}
@@ -3826,6 +3830,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                   )}
                   <div className={`flex min-w-0 items-center ${largeToolbarControlGapClass}`}>
                     {voiceRecordingUiState.showLargeInputControls && largeInputToolActions}
+                    {homeContext}
                   </div>
                   <div className={`flex shrink-0 items-center ${largeToolbarControlGapClass}`}>
                     {contextUsageControl}
@@ -3834,8 +3839,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     {largeSendButton}
                   </div>
                 </div>
-              </div>
-              <div className="-mt-2 flex min-h-10 items-center gap-1 rounded-b-2xl bg-black/[0.035] px-4 pb-2 pt-3.5 dark:bg-white/[0.05]">
+              <div className={`${!showFolderSelector && !showAgentSelector ? 'hidden' : 'flex'} mx-4 mt-1 min-h-10 items-center gap-1 py-1`}>
                 {showFolderSelector && (
                   <div className="relative min-w-0 shrink">
                     <button
@@ -3875,7 +3879,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     )}
                   </div>
                 )}
-                <div className="relative min-w-0 shrink">
+                {showAgentSelector && <div className="relative min-w-0 shrink">
                   <button
                     ref={agentButtonRef}
                     type="button"
@@ -3919,7 +3923,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                       })}
                     </div>
                   )}
-                </div>
+                </div>}
+              </div>
               </div>
             </>
           ) : (
@@ -3944,7 +3949,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                   onDismiss={() => setMentionPickerOpen(false)}
                 />
               )}
-              <div ref={largeToolbarRef} className={`relative flex items-center justify-between ${largeToolbarGapClass} px-4 ${isCompact ? 'pb-1.5 pt-0.5' : 'pb-2 pt-1.5'}`}>
+              <div ref={largeToolbarRef} className={`workspace-composer-toolbar relative flex items-center justify-between ${largeToolbarGapClass} px-3 ${isCompact ? 'pb-2 pt-0.5' : 'pb-2.5 pt-1'}`}>
                 {voiceRecordingUiState.showFooterRecordingStatus && (
                   <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 flex -translate-y-1/2 justify-center">
                     <VoiceInputRecordingStatus
@@ -3953,7 +3958,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     />
                   </div>
                 )}
-                <div className={`relative flex min-w-0 items-center ${largeToolbarControlGapClass}`}>
+                <div className={`relative flex min-w-0 flex-1 items-center ${largeToolbarControlGapClass}`}>
                   {voiceRecordingUiState.showLargeInputControls && showFolderSelector && (
                     <>
                       <div className="flex items-center">
@@ -4000,6 +4005,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                     </>
                   )}
                   {voiceRecordingUiState.showLargeInputControls && largeInputToolActions}
+                  {voiceRecordingUiState.showLargeInputControls && readOnlyContextRow}
                 </div>
                 <div className={`flex shrink-0 items-center ${largeToolbarControlGapClass}`}>
                   {contextUsageControl}
@@ -4081,7 +4087,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
           </>
         )}
       </div>
-      {readOnlyContextRow}
+      {showReadOnlyContext && readOnlyContextTrailingText && <p className="workspace-composer-caption mt-2 text-center text-[10px] text-muted">{readOnlyContextTrailingText}</p>}
       {showChatLoginExperiencePrompt && (
         <ChatLoginExperienceModal
           loginPending={chatLoginExperiencePending}

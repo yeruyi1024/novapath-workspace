@@ -13,7 +13,7 @@ export const JEV_LATEST_MODEL = 'jev-latest';
 export const OPENROUTER_JEV_MODEL = 'typesafe/jev-1.13';
 
 // OpenRouter attributes requests to the calling app through these headers.
-const OPENROUTER_APP_REFERER = 'https://lobsterai.youdao.com';
+const OPENROUTER_APP_REFERER = 'https://openrouter.ai';
 const OPENROUTER_APP_TITLE = 'LobsterAI';
 
 export const DEFAULT_DECISION_TIMEOUT_MS = 30_000;

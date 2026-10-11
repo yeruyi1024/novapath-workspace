@@ -1,8 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import https from 'https';
 
 import { McpIpcChannel } from '../../../shared/mcp/constants';
 import { normalizeMcpServerUrlInput } from '../../../shared/mcp/url';
+import { PRODUCT_SERVICES } from '../../../shared/product';
 import { OpenClawConfigImpact } from '../../libs/openclawConfigImpact';
 import type { McpRuntime } from '../../mcp/mcpRuntime';
 import type { McpServerFormData } from '../../mcp/mcpStore';
@@ -344,9 +345,8 @@ export function registerMcpHandlers(deps: McpHandlerDeps): void {
   });
 
   ipcMain.handle(McpIpcChannel.FetchMarketplace, async () => {
-    const url = app.isPackaged
-      ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/mcp-marketplace'
-      : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/mcp-marketplace';
+    const url = PRODUCT_SERVICES.mcpMarketplaceUrl;
+    if (!url) return { success: true, data: { servers: [], categories: [] } };
     try {
       const data = await fetchText(url);
       const json = JSON.parse(data);

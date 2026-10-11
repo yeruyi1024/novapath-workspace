@@ -56,8 +56,8 @@ const AppUpdateBlockingPanel: React.FC<AppUpdateBlockingPanelProps> = ({ updateS
       <div className="relative mb-5 shrink-0">
         <div className="absolute -inset-2 animate-pulse rounded-3xl bg-primary/20 blur-xl" aria-hidden="true" />
         <img
-          src="logo.png"
-          alt="LobsterAI"
+          src="logo.svg"
+          alt={i18nService.t('productName')}
           width={72}
           height={72}
           className="relative select-none rounded-2xl"

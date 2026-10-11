@@ -1,6 +1,6 @@
 /**
  * ConversationTurnsView — reusable conversation rendering component.
- * Used by both CoworkSessionDetail (main session) and SubagentSessionDetail.
+ * Shared by the main conversation and the right-hand subagent panel.
  */
 import React, { useMemo } from 'react';
 

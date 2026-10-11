@@ -92,7 +92,6 @@ const AssistantMessageItem: React.FC<{
   const goalCompletionLabel = goalCompletionDuration
     ? i18nService.t('coworkGoalCompletedIn').replace('{duration}', goalCompletionDuration)
     : null;
-  const metaVisible = isHovered || !!goalCompletionLabel;
   const showPlanConfirmationActions = planConfirmationMessageId === message.id;
   const handleImageClick = useCallback((image: ImagePreviewSource) => {
     reportConversationMessageAction({
@@ -134,7 +133,7 @@ const AssistantMessageItem: React.FC<{
 
   return (
     <div
-      className="relative focus:outline-none"
+      className="workspace-assistant-message relative focus:outline-none"
       data-cowork-assistant-message-id={message.id}
       data-cowork-search-message-id={message.id}
       tabIndex={showCopyButton ? 0 : undefined}
@@ -155,8 +154,8 @@ const AssistantMessageItem: React.FC<{
             />
             {showCopyButton && (
               <div
-                className={messageMetaClassName(metaVisible)}
-                aria-hidden={!metaVisible}
+                className={`workspace-message-actions ${messageMetaClassName(true)}`}
+                aria-hidden={false}
                 data-cowork-search-exclude="true"
               >
                 {goalCompletionLabel && (
@@ -165,12 +164,12 @@ const AssistantMessageItem: React.FC<{
                     <span>{goalCompletionLabel}</span>
                   </span>
                 )}
-                <span>{formatMessageDateTime(message.timestamp)}</span>
-                {modelLabel && <span>{modelLabel}</span>}
+                <span className={isHovered ? 'opacity-100' : 'opacity-0'}>{formatMessageDateTime(message.timestamp)}</span>
+                {modelLabel && <span className={isHovered ? 'opacity-100' : 'opacity-0'}>{modelLabel}</span>}
                 {onFork && (
                   <ForkButton
                     message={message}
-                    visible={isHovered}
+                    visible
                     onFork={() => onFork(message.id)}
                   />
                 )}
@@ -185,7 +184,7 @@ const AssistantMessageItem: React.FC<{
                       copiedLength: copyContent.length,
                     },
                   })}
-                  visible={isHovered}
+                  visible
                 />
               </div>
             )}
@@ -207,8 +206,8 @@ const AssistantMessageItem: React.FC<{
       </div>
       {showCopyButton && !displayContent && (
         <div
-          className={messageMetaClassName(metaVisible)}
-          aria-hidden={!metaVisible}
+          className={`workspace-message-actions ${messageMetaClassName(true)}`}
+          aria-hidden={false}
           data-cowork-search-exclude="true"
         >
           {goalCompletionLabel && (
@@ -217,12 +216,12 @@ const AssistantMessageItem: React.FC<{
               <span>{goalCompletionLabel}</span>
             </span>
           )}
-          <span>{formatMessageDateTime(message.timestamp)}</span>
-          {modelLabel && <span>{modelLabel}</span>}
+          <span className={isHovered ? 'opacity-100' : 'opacity-0'}>{formatMessageDateTime(message.timestamp)}</span>
+          {modelLabel && <span className={isHovered ? 'opacity-100' : 'opacity-0'}>{modelLabel}</span>}
           {onFork && (
             <ForkButton
               message={message}
-              visible={isHovered}
+              visible
               onFork={() => onFork(message.id)}
             />
           )}
@@ -237,7 +236,7 @@ const AssistantMessageItem: React.FC<{
                 copiedLength: copyContent.length,
               },
             })}
-            visible={isHovered}
+            visible
           />
         </div>
       )}

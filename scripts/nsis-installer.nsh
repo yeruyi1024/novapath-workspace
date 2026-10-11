@@ -506,10 +506,9 @@ FunctionEnd
 
 ; -- Stop every process that might hold file handles in the install dir --
 ;
-; 1. LobsterAI.exe -- the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
-; 2. node.exe whose binary lives inside the LobsterAI install tree
-;    (Web Search bridge server, MCP servers spawned with detached:true)
-; 3. any other process whose executable lives under the install root --
+; Match only processes whose executable lives under this install root --
+; the desktop app, gateway, node bridges and any bundled helpers.
+; Never stop a different product by its process name. This includes
 ;    python-win skill/MCP servers, bundled git/ssh helpers -- matched by
 ;    path prefix (field failure 2026-09-01: a survivor under the tree made
 ;    the old-install replacement fail on a held handle). The invoking
@@ -529,7 +528,7 @@ FunctionEnd
 ;
 ; Shared between the installer and the uninstaller via customCheckAppRunning.
 !macro stopLobsterAIProcesses
-  DetailPrint "[Installer] Stopping running LobsterAI processes"
+  DetailPrint "[Installer] Stopping running ${PRODUCT_NAME} processes"
   StrCpy $lobsterTargetProcessesStopStatus "helper-not-found"
   System::Call 'kernel32::GetCurrentProcessId()i .r4'
   StrCpy $lobsterCurrentProcessPid $4
@@ -550,10 +549,9 @@ FunctionEnd
     if ($$root -and -not $$root.EndsWith([char]92)) { $$root = $$root + [char]92 };\
     $$selfPid = $$env:LOBSTERAI_STOP_SELF_PID;\
     $$sweep = $$root -and $$root.Length -gt 3;\
+    if (-not $$sweep) { exit 2 };\
     for ($$i = 0; $$i -lt 30; $$i++) {\
       $$procs = @();\
-      $$procs += Get-Process -Name LobsterAI -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" };\
       if ($$sweep) { $$procs += Get-Process -ErrorAction SilentlyContinue | Where-Object { $$fp = $$null; try { $$fp = $$_.Path } catch { }; $$fp -and $$fp.StartsWith($$root, [System.StringComparison]::OrdinalIgnoreCase) -and $$_.Id.ToString() -ne $$selfPid } };\
       if ($$procs.Count -eq 0) { exit 0 };\
       $$procs | Stop-Process -Force -ErrorAction SilentlyContinue;\
@@ -583,9 +581,8 @@ FunctionEnd
     if ($$root -and -not $$root.EndsWith([char]92)) { $$root = $$root + [char]92 };\
     $$selfPid = $$env:LOBSTERAI_STOP_SELF_PID;\
     $$sweep = $$root -and $$root.Length -gt 3;\
+    if (-not $$sweep) { exit 2 };\
     $$procs = @();\
-    $$procs += Get-Process -Name LobsterAI -ErrorAction SilentlyContinue;\
-    $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*LobsterAI*\" };\
     if ($$sweep) { $$procs += Get-Process -ErrorAction SilentlyContinue | Where-Object { $$fp = $$null; try { $$fp = $$_.Path } catch { }; $$fp -and $$fp.StartsWith($$root, [System.StringComparison]::OrdinalIgnoreCase) -and $$_.Id.ToString() -ne $$selfPid } };\
     foreach ($$p in $$procs) {\
       $$fp = \"unknown\";\
@@ -934,7 +931,7 @@ FunctionEnd
     FileWrite $9 "$8 phase=staging-preflight-insufficient attempt_id=$lobsterInstallerAttemptId plugins_drive=$4 plugins_free_mb=$2 staging_needed_mb=$1 install_drive=$3 install_free_mb=$5 install_needed_mb=$6 action=abort-install$\r$\n"
     FileClose $9
     !insertmacro customBeforeInstallerQuit "staging-space-insufficient"
-    MessageBox MB_OK|MB_ICONEXCLAMATION "${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+4E0D}${U+8DB3}${U+FF0C}${U+65E0}${U+6CD5}${U+5B89}${U+88C5} LobsterAI${U+3002}${U+8BF7}${U+6E05}${U+7406}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+540E}${U+91CD}${U+8BD5}${U+3002}$\r$\n$\r$\nThere is not enough free disk space to install LobsterAI: drive $4 has $2 MB free but staging the installation needs about $1 MB, and installing to drive $3 would need about $6 MB free there. Free up disk space and run the installer again. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+4E0D}${U+8DB3}${U+FF0C}${U+65E0}${U+6CD5}${U+5B89}${U+88C5} ${PRODUCT_NAME}${U+3002}${U+8BF7}${U+6E05}${U+7406}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+540E}${U+91CD}${U+8BD5}${U+3002}$\r$\n$\r$\nThere is not enough free disk space to install ${PRODUCT_NAME}: drive $4 has $2 MB free but staging the installation needs about $1 MB, and installing to drive $3 would need about $6 MB free there. Free up disk space and run the installer again. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     SetErrorLevel 2
     Quit
 
@@ -1051,7 +1048,7 @@ FunctionEnd
       ; Never commit a partial app: restore the previous installation first,
       ; then report. /SD keeps silent (/S) installs from blocking on the box.
       !insertmacro customBeforeInstallerQuit "payload-staging-validation-failed"
-      MessageBox MB_OK|MB_ICONEXCLAMATION "${U+5B89}${U+88C5}${U+5305}${U+6570}${U+636E}${U+4E0D}${U+5B8C}${U+6574}${U+FF1A}${U+53EF}${U+80FD}${U+662F}${U+4E34}${U+65F6}${U+76EE}${U+5F55}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+4E0D}${U+8DB3}${U+6216}${U+5B89}${U+88C5}${U+5305}${U+4E0B}${U+8F7D}${U+4E0D}${U+5B8C}${U+6574}${U+3002}${U+8BF7}${U+6E05}${U+7406}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+540E}${U+91CD}${U+8BD5}${U+FF0C}${U+6216}${U+91CD}${U+65B0}${U+4E0B}${U+8F7D}${U+5B89}${U+88C5}${U+5305}${U+3002}$\r$\n$\r$\nThe LobsterAI installation stopped because the unpacked installer data is incomplete ($1). This usually means the drive holding the temporary directory ran out of space during extraction, or the installer download was truncated. Free up disk space on the temp drive or download the installer again. No partial application was committed. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${U+5B89}${U+88C5}${U+5305}${U+6570}${U+636E}${U+4E0D}${U+5B8C}${U+6574}${U+FF1A}${U+53EF}${U+80FD}${U+662F}${U+4E34}${U+65F6}${U+76EE}${U+5F55}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+4E0D}${U+8DB3}${U+6216}${U+5B89}${U+88C5}${U+5305}${U+4E0B}${U+8F7D}${U+4E0D}${U+5B8C}${U+6574}${U+3002}${U+8BF7}${U+6E05}${U+7406}${U+78C1}${U+76D8}${U+7A7A}${U+95F4}${U+540E}${U+91CD}${U+8BD5}${U+FF0C}${U+6216}${U+91CD}${U+65B0}${U+4E0B}${U+8F7D}${U+5B89}${U+88C5}${U+5305}${U+3002}$\r$\n$\r$\nThe ${PRODUCT_NAME} installation stopped because the unpacked installer data is incomplete ($1). This usually means the drive holding the temporary directory ran out of space during extraction, or the installer download was truncated. Free up disk space on the temp drive or download the installer again. No partial application was committed. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SetErrorLevel 2
       Quit
     ${EndIf}
@@ -1409,7 +1406,7 @@ FunctionEnd
       !insertmacro GetTimestamp $8
       FileWrite $9 "$8 phase=install-failed-before-mutation attempt_id=$lobsterInstallerAttemptId failure_kind=process-stop-failed raw_status=$lobsterTargetProcessesStopStatus exit=$R2 action=old-install-untouched$\r$\n"
       FileClose $9
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update stopped before replacing the previous version because the old application processes could not be confirmed stopped. Please close LobsterAI and retry. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update stopped before replacing the previous version because the old application processes could not be confirmed stopped. Please close ${PRODUCT_NAME} and retry. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SetErrorLevel 2
       Quit
     TargetProcessesStopped:
@@ -1620,7 +1617,7 @@ FunctionEnd
       FileWrite $9 "$8 phase=skill-backup-failed-abort attempt_id=$lobsterInstallerAttemptId status=$lobsterLegacySkillsStatus exit=$R2 action=old-install-preserved$\r$\n"
       FileClose $9
       Call lobsterTryRelaunchOldApp
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update stopped because legacy user skills could not be safely inspected or backed up (status=$lobsterLegacySkillsStatus). The previous installation was not replaced. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update stopped because legacy user skills could not be safely inspected or backed up (status=$lobsterLegacySkillsStatus). The previous installation was not replaced. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SetErrorLevel 2
       Quit
     SkillBackupValidated:
@@ -1756,7 +1753,7 @@ FunctionEnd
       !insertmacro GetTimestamp $8
       FileWrite $9 "$8 phase=old-install-rename-verification-abort attempt_id=$lobsterInstallerAttemptId outcome=recovery-required rollback_status=$lobsterOldInstallRollbackStatus rollback_error=$lobsterOldInstallRollbackError source=$lobsterOldInstallOriginalPath backup=$lobsterOldInstallBackupPath$\r$\n"
       FileClose $9
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the previous installation move could not be verified and automatic recovery did not complete. No recovery copy was deleted. Restart Windows before retrying. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the previous installation move could not be verified and automatic recovery did not complete. No recovery copy was deleted. Restart Windows before retrying. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SetErrorLevel 3
       Quit
 
@@ -1769,7 +1766,7 @@ FunctionEnd
       !insertmacro GetTimestamp $8
       FileWrite $9 "$8 phase=old-install-rename-verification-abort attempt_id=$lobsterInstallerAttemptId outcome=restored rollback_status=$lobsterOldInstallRollbackStatus relaunch_status=$lobsterOldAppRelaunchStatus source=$lobsterOldInstallOriginalPath$\r$\n"
       FileClose $9
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the previous installation move could not be verified. The previous version was restored. Please retry the installation. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the previous installation move could not be verified. The previous version was restored. Please retry the installation. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SetErrorLevel 2
       Quit
 
@@ -2560,7 +2557,7 @@ FunctionEnd
   ; in /S installs unless a silent default is declared, and the in-app update
   ; must never block on an orphan dialog.
   StrCmp $R3 "system-tar" TarExtractElectron
-  MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because resource extraction completed without all required runtime resources ($R5). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+  MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because resource extraction completed without all required runtime resources ($R5). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
   Goto TarExtractFailed
 
   TarExtractProcessFailed:
@@ -2569,7 +2566,7 @@ FunctionEnd
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error attempt_id=$lobsterInstallerAttemptId extractor=$R3 exit=$R2 raw_marker=$R4 elapsed_ms=$5 reason=process-start-failed$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the resource extractor could not be started (exit=$R2). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the resource extractor could not be started (exit=$R2). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     Goto TarExtractFailed
 
   TarExtractTimeout:
@@ -2578,7 +2575,7 @@ FunctionEnd
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error attempt_id=$lobsterInstallerAttemptId extractor=$R3 exit=$R2 raw_marker=$R4 elapsed_ms=$5 reason=timeout$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because resource extraction timed out after 10 minutes. The blocked extractor was terminated and the installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because resource extraction timed out after 10 minutes. The blocked extractor was terminated and the installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     Goto TarExtractFailed
 
   TarExtractTerminationFailed:
@@ -2588,7 +2585,7 @@ FunctionEnd
     FileWrite $2 "$8 phase=tar-extract-error attempt_id=$lobsterInstallerAttemptId extractor=$R3 exit=$R2 raw_marker=$R4 elapsed_ms=$5 reason=process-termination-failed action=preserve-all-no-concurrent-rollback$\r$\n"
     FileClose $2
     System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "")i'
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the extractor process could not be confirmed terminated. No automatic rollback or cleanup was attempted while that process may still be writing files. Restart Windows before retrying. Recovery files (if any): $lobsterOldInstallBackupPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the extractor process could not be confirmed terminated. No automatic rollback or cleanup was attempted while that process may still be writing files. Restart Windows before retrying. Recovery files (if any): $lobsterOldInstallBackupPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     SetErrorLevel 3
     Quit
 
@@ -2614,7 +2611,7 @@ FunctionEnd
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error attempt_id=$lobsterInstallerAttemptId extractor=$R3 exit=$R2 raw_marker=$R4 elapsed_ms=$5 reason=watchdog-output-validation-failed$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the resource extractor watchdog returned an invalid result. The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the resource extractor watchdog returned an invalid result. The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     Goto TarExtractFailed
 
   TarExtractNonZero:
@@ -2623,7 +2620,7 @@ FunctionEnd
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=tar-extract-error attempt_id=$lobsterInstallerAttemptId extractor=$R3 exit=$R2 raw_marker=$R4 elapsed_ms=$5 reason=numeric-child-exit$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because resource extraction failed (child exit code $R2). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because resource extraction failed (child exit code $R2). The installer will not commit a partial application. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     Goto TarExtractFailed
 
   TarExtractSucceeded:
@@ -2798,10 +2795,10 @@ FunctionEnd
       System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "")i'
       !insertmacro customRollbackOldInstall "skill-restore-failed"
       StrCmp $lobsterOldInstallRollbackStatus "success" SkillRestoreRollbackSucceeded
-        MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update could not restore user skills, and automatic rollback did not complete. No recovery copy was deleted. Previous files: $lobsterOldInstallBackupPath. Partial update: $lobsterOldInstallFailedPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+        MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update could not restore user skills, and automatic rollback did not complete. No recovery copy was deleted. Previous files: $lobsterOldInstallBackupPath. Partial update: $lobsterOldInstallFailedPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
         Goto SkillRestoreAbort
       SkillRestoreRollbackSucceeded:
-        MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update could not restore user skills, so the previous version was restored. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+        MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update could not restore user skills, so the previous version was restored. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       SkillRestoreAbort:
       SetErrorLevel 2
       Quit
@@ -2818,7 +2815,7 @@ FunctionEnd
       !insertmacro GetTimestamp $8
       FileWrite $2 "$8 phase=skill-restore-degraded attempt_id=$lobsterInstallerAttemptId status=$lobsterLegacySkillsRestoreStatus action=continue-with-attempt-backup-preserved backup=$APPDATA\LobsterAI\skills-backup\$lobsterInstallerAttemptId$\r$\n"
       FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "LobsterAI will finish installing, but legacy user skills could not be restored automatically ($lobsterLegacySkillsRestoreStatus). The recovery backup was preserved at $APPDATA\LobsterAI\skills-backup\$lobsterInstallerAttemptId. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${PRODUCT_NAME} will finish installing, but legacy user skills could not be restored automatically ($lobsterLegacySkillsRestoreStatus). The recovery backup was preserved at $APPDATA\LobsterAI\skills-backup\$lobsterInstallerAttemptId. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       Goto SkillRestoreValidated
 
     SkillRestoreDegradedBackupMissing:
@@ -2829,7 +2826,7 @@ FunctionEnd
       !insertmacro GetTimestamp $8
       FileWrite $2 "$8 phase=skill-restore-degraded attempt_id=$lobsterInstallerAttemptId status=$lobsterLegacySkillsRestoreStatus action=continue-no-backup-found backup=$APPDATA\LobsterAI\skills-backup\$lobsterInstallerAttemptId$\r$\n"
       FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "LobsterAI will finish installing, but the recovery backup for legacy user skills was not found, so no skills were restored ($lobsterLegacySkillsRestoreStatus). Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "${PRODUCT_NAME} will finish installing, but the recovery backup for legacy user skills was not found, so no skills were restored ($lobsterLegacySkillsRestoreStatus). Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       Goto SkillRestoreValidated
 
     SkillRestoreConflictPreserved:
@@ -2970,13 +2967,13 @@ FunctionEnd
     StrCmp $lobsterOldInstallRenameStatus "success" 0 NewInstallPrevalidateAbort
     !insertmacro customRollbackOldInstall "new-install-validation-failed"
     StrCmp $lobsterOldInstallRollbackStatus "success" NewInstallPrevalidateRollbackSucceeded
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update could not be validated, and automatic rollback did not complete. No recovery copy was deleted. Previous files: $lobsterOldInstallBackupPath. Partial update: $lobsterOldInstallFailedPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update could not be validated, and automatic rollback did not complete. No recovery copy was deleted. Previous files: $lobsterOldInstallBackupPath. Partial update: $lobsterOldInstallFailedPath. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       Goto NewInstallPrevalidateAbortAfterMessage
     NewInstallPrevalidateRollbackSucceeded:
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI update could not be validated, so the previous version was restored. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} update could not be validated, so the previous version was restored. Please retry the update. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
       Goto NewInstallPrevalidateAbortAfterMessage
     NewInstallPrevalidateAbort:
-      MessageBox MB_OK|MB_ICONEXCLAMATION "The LobsterAI installation stopped because the new application could not be validated ($lobsterNewInstallValidationReason). New registration and shortcuts were not written. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
+      MessageBox MB_OK|MB_ICONEXCLAMATION "The ${PRODUCT_NAME} installation stopped because the new application could not be validated ($lobsterNewInstallValidationReason). New registration and shortcuts were not written. Details: $APPDATA\LobsterAI\install-timing.log" /SD IDOK
     NewInstallPrevalidateAbortAfterMessage:
     SetErrorLevel 2
     Quit

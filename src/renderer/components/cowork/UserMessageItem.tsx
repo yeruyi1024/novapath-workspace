@@ -285,7 +285,7 @@ const UserMessageItem: React.FC<{
 
   return (
     <div
-      className={`py-2 ${COWORK_DETAIL_GUTTER_CLASS} focus:outline-none`}
+      className={`workspace-user-message py-3 ${COWORK_DETAIL_GUTTER_CLASS} focus:outline-none`}
       tabIndex={0}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
@@ -296,7 +296,7 @@ const UserMessageItem: React.FC<{
         <div>
           <div className="flex items-start gap-3 flex-row-reverse">
             <div className="w-full min-w-0 flex flex-col items-end">
-              <div className="w-fit max-w-full rounded-2xl px-4 py-2.5 bg-surface text-foreground shadow-subtle">
+              <div className="workspace-user-bubble w-fit min-w-0 max-w-[88%] rounded-[20px] px-4 py-3 text-foreground">
                 {browserAnnotationCount > 0 && sessionId && (
                   <BrowserAnnotationMessageAttachments
                     draftKey={sessionId}

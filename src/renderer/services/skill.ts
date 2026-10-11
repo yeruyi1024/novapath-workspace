@@ -1,4 +1,4 @@
-import { BUNDLED_SKILL_DISPLAY_NAMES } from '../components/skills/bundledSkillNames';
+import { BUNDLED_SKILL_DESCRIPTIONS, BUNDLED_SKILL_DISPLAY_NAMES } from '../components/skills/bundledSkillNames';
 import { LocalizedText, LocalSkillInfo, MarketplaceSkill, MarketTag, Skill } from '../types/skill';
 import { i18nService } from './i18n';
 import { LogReporterAction, reportYdAnalyzer } from './logReporter';
@@ -499,7 +499,8 @@ class SkillService {
     if (marketDesc != null) return resolveLocalizedText(marketDesc);
     const kitDesc = this.installedKitSkillDescriptions.get(skillId);
     if (kitDesc != null) return resolveLocalizedText(kitDesc);
-    return fallback;
+    const bundled = BUNDLED_SKILL_DESCRIPTIONS[skillId];
+    return bundled ? resolveLocalizedText(bundled) : fallback;
   }
 }
 

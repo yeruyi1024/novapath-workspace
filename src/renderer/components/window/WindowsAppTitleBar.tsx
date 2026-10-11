@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 
+import { i18nService } from '@/services/i18n';
+
 import SidebarTaskFilterButton from '../agentSidebar/SidebarTaskFilterButton';
 import SidebarTaskSearchButton from '../agentSidebar/SidebarTaskSearchButton';
 import ComposeIcon from '../icons/ComposeIcon';
@@ -79,13 +81,13 @@ const WindowsAppTitleBar: React.FC<WindowsAppTitleBarProps> = ({
       >
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
           <img
-            src="logo.png"
+            src="logo.svg"
             alt=""
             draggable={false}
             className="h-4 w-4 max-w-none shrink-0"
           />
           <span className={`${isSidebarCollapsed ? 'hidden' : 'min-w-0 truncate'} text-sm font-medium text-foreground`}>
-            LobsterAI
+            {i18nService.t('productName')}
           </span>
         </div>
         {(onToggleSidebar || onSearch || showFilterIcon || onNewChat || updateBadge) && (

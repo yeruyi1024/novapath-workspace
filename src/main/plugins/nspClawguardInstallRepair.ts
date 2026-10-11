@@ -129,6 +129,6 @@ export async function repairNspClawguardInstall(
     if (!isDeepStrictEqual({ ...owners.read() }, repaired)) {
       throw new Error('Clawguard install record could not be verified after startup repair.');
     }
-    return [`Reconciled ${id} ${pkg.version} with its existing LobsterAI installation at ${pluginDir}.`];
+    return [`Reconciled ${id} ${pkg.version} with its existing application installation at ${pluginDir}.`];
   });
 }

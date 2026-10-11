@@ -268,7 +268,7 @@ const OpenDropdown: React.FC<OpenDropdownProps> = ({
           onClick={handleBrowserOpen}
           className={menuItemClassName}
         >
-          <img src="logo.png" alt="" className={menuIconClassName} draggable={false} />
+          <img src="logo.svg" alt="" className={menuIconClassName} draggable={false} />
           <span className="truncate">{browserOpenAction.label}</span>
         </button>
       )}

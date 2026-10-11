@@ -17,6 +17,11 @@ vi.mock('electron', () => ({
 import { DB_FILENAME } from './appConstants';
 import { CoworkStore } from './coworkStore';
 import { SqliteStore } from './sqliteStore';
+const testSecretStorage = {
+  isEncryptionAvailable: () => true,
+  encryptString: (value: string) => Buffer.from(value.split('').reverse().join('')),
+  decryptString: (value: Buffer) => value.toString().split('').reverse().join(''),
+};
 
 let tempDirs: string[] = [];
 
@@ -85,6 +90,28 @@ const createLegacyDatabase = (userDataPath: string): void => {
 
   db.close();
 };
+
+test('migrates legacy model keys and keeps reads, changes, and restored databases usable', async () => {
+  const userDataPath = createTempUserDataPath();
+  const legacy = await SqliteStore.create(userDataPath);
+  const config = { api: { key: 'legacy-secret' }, providers: { platform: { apiKey: 'legacy-secret' } } };
+  legacy.getDatabase().prepare('INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)')
+    .run('app_config', JSON.stringify(config), Date.now());
+  legacy.close();
+  const store = await SqliteStore.create(userDataPath, testSecretStorage);
+  expect(store.get('app_config')).toEqual(config);
+  const row = store.getDatabase().prepare("SELECT value FROM kv WHERE key = 'app_config'").get() as { value: string };
+  expect(row.value).not.toContain('legacy-secret');
+  const listener = vi.fn();
+  const unsubscribe = store.onDidChange('app_config', listener);
+  store.set('app_config', { ...config, theme: 'dark' });
+  expect(listener).toHaveBeenCalledWith({ ...config, theme: 'dark' }, config);
+  unsubscribe();
+  store.close();
+  const restored = await SqliteStore.create(userDataPath, testSecretStorage);
+  expect(restored.get('app_config')).toEqual({ ...config, theme: 'dark' });
+  restored.close();
+});
 
 test('backfills agent working directories from legacy cowork config only once', async () => {
   const userDataPath = createTempUserDataPath();

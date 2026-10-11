@@ -38,7 +38,7 @@ describe('AppUpdateBlockingPanel', () => {
     expect(html).toContain('第一项更新');
     expect(html).toContain('第二项更新');
     expect(html).toContain('第三项更新');
-    expect(html).toContain('logo.png');
+    expect(html).toContain('logo.svg');
     expect(html).toContain('animate-shimmer');
     expect(html).toContain('overflow-y-auto');
     expect(html).toContain('max-h-full');

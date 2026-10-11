@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
 
 import App from './App';
+import AppErrorBoundary from './components/AppErrorBoundary';
 import EngineRepairOverlay from './components/cowork/EngineRepairOverlay';
 import { store } from './store';
 
@@ -17,8 +18,10 @@ try {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <Provider store={store}>
-        <App />
-        <EngineRepairOverlay />
+        <AppErrorBoundary>
+          <App />
+          <EngineRepairOverlay />
+        </AppErrorBoundary>
       </Provider>
     </React.StrictMode>
   );

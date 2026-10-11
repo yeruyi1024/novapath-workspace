@@ -22,6 +22,7 @@
  * Environment variables:
  *   OPENCLAW_SKIP_PLUGINS          – Set to "1" to skip this script entirely
  *   OPENCLAW_FORCE_PLUGIN_INSTALL  – Set to "1" to force re-download all plugins
+ *   STARPATH_EXTRA_PLUGINS        – Comma-separated ids of legacy opt-in plugins
  */
 
 const { spawnSync } = require('child_process');
@@ -644,6 +645,25 @@ function copyPreinstalledPluginToRuntime(cacheDir, runtimeRoot, plugin) {
   return targetDir;
 }
 
+function selectBuildPlugins(plugins, extraPlugins = '') {
+  const requested = new Set(extraPlugins.split(',').map(value => value.trim()).filter(Boolean));
+  for (const id of requested) {
+    if (!plugins.some(plugin => plugin.id === id)) throw new Error(`Unknown extra plugin: ${id}`);
+  }
+  return plugins.filter(plugin => plugin.installByDefault !== false || requested.has(plugin.id));
+}
+
+function pruneUnselectedBuildPlugins(runtimeRoot, declarations, extraPlugins = '') {
+  const selected = selectBuildPlugins(declarations, extraPlugins);
+  for (const plugin of declarations.filter(item => !selected.includes(item))) {
+    fs.rmSync(resolvePreinstalledPluginDir(runtimeRoot, plugin), { recursive: true, force: true });
+    // Old runtimes also used this layout; never leave an excluded legacy copy.
+    fs.rmSync(path.join(runtimeRoot, 'extensions', plugin.id), { recursive: true, force: true });
+    log(`Excluded opt-in plugin ${plugin.id}. Enable with STARPATH_EXTRA_PLUGINS=${plugin.id}`);
+  }
+  return selected;
+}
+
 function main() {
   if (process.env.OPENCLAW_SKIP_PLUGINS === '1') {
     log('Skipped (OPENCLAW_SKIP_PLUGINS=1).');
@@ -652,7 +672,8 @@ function main() {
 
   // Read plugin declarations from package.json
   const pkg = require(path.join(rootDir, 'package.json'));
-  const plugins = (pkg.openclaw && pkg.openclaw.plugins) || [];
+  const declarations = (pkg.openclaw && pkg.openclaw.plugins) || [];
+  const plugins = selectBuildPlugins(declarations, process.env.STARPATH_EXTRA_PLUGINS || '');
 
   if (!Array.isArray(plugins) || plugins.length === 0) {
     log('No plugins declared in package.json, nothing to do.');
@@ -687,6 +708,10 @@ function main() {
 
   ensureDir(runtimeExtensionsDir);
   ensureDir(pluginCacheBase);
+
+  // Remove stale build output for excluded plugins; keep source declarations
+  // and vendor caches so an explicitly selected build can restore them.
+  pruneUnselectedBuildPlugins(runtimeCurrentDir, declarations, process.env.STARPATH_EXTRA_PLUGINS || '');
 
   log(`Processing ${plugins.length} plugin(s)...`);
 
@@ -868,6 +893,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  selectBuildPlugins,
+  pruneUnselectedBuildPlugins,
   buildOpenClawPluginInstallArgs,
   buildNpmPackInvocation,
   buildPluginInstallEnv,

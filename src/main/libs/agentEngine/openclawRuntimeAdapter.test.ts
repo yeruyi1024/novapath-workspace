@@ -1066,6 +1066,21 @@ test('buildOpenClawChatSendPayloadTooLargeError includes a stable classification
   expect(error.message).toContain('attachment base64 bytes 36335652');
 });
 
+test('outbound prompt identifies the application without replacing custom assistant instructions', async () => {
+  const adapter = new OpenClawRuntimeAdapter({ getSession: () => null, getAgent: () => null } as never, {} as never);
+  const internal = adapter as unknown as {
+    bridgedSessions: Set<string>;
+    buildOutboundPrompt: (sessionId: string, prompt: string, systemPrompt?: string) => Promise<string>;
+  };
+  internal.bridgedSessions.add('session-1');
+  const custom = 'Your assistant name is My Project Helper.';
+  const prompt = await internal.buildOutboundPrompt('session-1', 'What application is this?', custom);
+  expect(prompt).toContain('This conversation runs in 星途 StarPath');
+  expect(prompt).toContain('[StarPath system instructions]');
+  expect(prompt).toContain(custom);
+  expect(prompt).not.toContain('LobsterAI');
+});
+
 test('outbound prompt includes selected assistant text as quoted reference data', async () => {
   const adapter = new OpenClawRuntimeAdapter({
     getSession: () => null,
@@ -1144,10 +1159,10 @@ test('outbound prompt injects continuity capsule bridge before the current reque
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续');
 
-  expect(prompt).toContain('[LobsterAI continuity context after context compaction]');
+  expect(prompt).toContain('[StarPath continuity context after context compaction]');
   expect(prompt).toContain('Improve compaction continuity.');
   expect(prompt).toContain('src/main/libs/agentEngine/openclawRuntimeAdapter.ts');
-  expect(prompt.indexOf('[LobsterAI continuity context after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[StarPath continuity context after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1192,10 +1207,10 @@ test('outbound prompt injects full capsule first and mini capsule on later turns
   const firstPrompt = await internal.buildOutboundPrompt('session-1', '继续');
   const secondPrompt = await internal.buildOutboundPrompt('session-1', '再继续');
 
-  expect(firstPrompt).toContain('[LobsterAI continuity context after context compaction]');
+  expect(firstPrompt).toContain('[StarPath continuity context after context compaction]');
   expect(firstPrompt).toContain('Touched files:');
   expect(firstPrompt).toContain('src/main/libs/agentEngine/openclawRuntimeAdapter.ts');
-  expect(secondPrompt).toContain('[LobsterAI brief continuity context after context compaction]');
+  expect(secondPrompt).toContain('[StarPath brief continuity context after context compaction]');
   expect(secondPrompt).toContain('Improve compaction continuity.');
   expect(secondPrompt).toContain('Inject capsule bridge.');
   expect(secondPrompt).not.toContain('Touched files:');
@@ -1244,9 +1259,9 @@ test('outbound prompt injects workspace rehydration bridge before the current re
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续');
 
-  expect(prompt).toContain('[LobsterAI workspace state after context compaction]');
+  expect(prompt).toContain('[StarPath workspace state after context compaction]');
   expect(prompt).toContain('src/main/libs/agentEngine/coworkWorkspaceRehydration.ts');
-  expect(prompt.indexOf('[LobsterAI workspace state after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[StarPath workspace state after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1294,8 +1309,8 @@ test('outbound prompt injects workspace rehydration bridge once per compaction',
   const firstPrompt = await internal.buildOutboundPrompt('session-1', '继续');
   const secondPrompt = await internal.buildOutboundPrompt('session-1', '再继续');
 
-  expect(firstPrompt).toContain('[LobsterAI workspace state after context compaction]');
-  expect(secondPrompt).not.toContain('[LobsterAI workspace state after context compaction]');
+  expect(firstPrompt).toContain('[StarPath workspace state after context compaction]');
+  expect(secondPrompt).not.toContain('[StarPath workspace state after context compaction]');
 });
 
 test('outbound prompt injects top-k evidence bridge before the current request', async () => {
@@ -1354,9 +1369,9 @@ test('outbound prompt injects top-k evidence bridge before the current request',
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续处理 src/pages/Bakery.tsx 的 npm test failed');
 
-  expect(prompt).toContain('[LobsterAI retrieved evidence after context compaction]');
+  expect(prompt).toContain('[StarPath retrieved evidence after context compaction]');
   expect(prompt).toContain('npm test failed in src/pages/Bakery.tsx');
-  expect(prompt.indexOf('[LobsterAI retrieved evidence after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[StarPath retrieved evidence after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1398,7 +1413,7 @@ test('outbound prompt skips continuity capsule bridge before compaction', async 
 
   const prompt = await internal.buildOutboundPrompt('session-1', 'hello');
 
-  expect(prompt).not.toContain('[LobsterAI continuity context after context compaction]');
+  expect(prompt).not.toContain('[StarPath continuity context after context compaction]');
 });
 
 test('context usage ignores non-checkpoint compactionCount', () => {
@@ -5202,10 +5217,10 @@ test('reconcileWithHistory: content mismatch — triggers replace', async () => 
 });
 
 test('subagent history sync preserves visible local user text instead of raw outbound prompt', async () => {
-  const rawOutboundPrompt = `[LobsterAI system instructions]
+  const rawOutboundPrompt = `[StarPath system instructions]
 hidden setup
 
-[Context bridge from previous LobsterAI conversation]
+[Context bridge from previous StarPath conversation]
 previous context
 
 [Current user request]
@@ -5707,7 +5722,8 @@ test('chat error can consume quota signal after lifecycle error schedules fallba
     const persistedError = session.messages.find((message) => message.type === 'system');
     expect(session.status).toBe('error');
     expect(errorSpy).toHaveBeenCalledWith(session.id, expect.stringContaining('积分额度已用完'));
-    expect(persistedError?.content).toContain('立即升级/充值');
+    expect(persistedError?.content).toContain('请在设置中检查模型服务的额度');
+    expect(persistedError?.content).not.toContain('立即升级/充值');
     expect(abortRequest).not.toHaveBeenCalled();
     expect(consumeRecentOpenClawTokenProxyQuotaError()).toBeNull();
   } finally {

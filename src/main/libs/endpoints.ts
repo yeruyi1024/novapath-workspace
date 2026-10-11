@@ -1,6 +1,7 @@
 import { app } from 'electron';
 
 import { HtmlSharePublicRoute } from '../../shared/htmlShare/constants';
+import { PRODUCT_SERVICES } from '../../shared/product';
 import type { SqliteStore } from '../sqliteStore';
 import { resolveDevelopmentServerBaseUrl } from './developmentServerBaseUrl';
 
@@ -29,12 +30,10 @@ export const isTestModeEnabled = (): boolean => {
  * Used for auth exchange/refresh, models, proxy, etc.
  */
 export const getServerApiBaseUrl = (): string => {
-  const defaultBaseUrl = isTestModeEnabled()
-    ? 'https://lobsterai-server.inner.youdao.com'
-    : 'https://lobsterai-server.youdao.com';
+  const defaultBaseUrl = PRODUCT_SERVICES.apiBaseUrl;
   const serverBaseUrl = resolveDevelopmentServerBaseUrl({
     defaultBaseUrl,
-    developmentOverride: process.env.LOBSTER_SERVER_BASE_URL,
+    developmentOverride: process.env.API_CONSOLE_SERVER_BASE_URL,
     isDev: process.env.NODE_ENV === 'development',
     isPackaged: app.isPackaged,
   });
@@ -52,40 +51,17 @@ export const getHtmlSharePublicBaseUrl = (): string => {
   return `${getServerApiBaseUrl()}${HtmlSharePublicRoute.Root}`;
 };
 
-export const getUpdateCheckUrl = (): string => (
-  isTestModeEnabled()
-    ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/update'
-    : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/update'
-);
+export const getUpdateCheckUrl = (): string => PRODUCT_SERVICES.updateUrl;
 
-export const getManualUpdateCheckUrl = (): string => (
-  isTestModeEnabled()
-    ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/update-manual'
-    : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/update-manual'
-);
+export const getManualUpdateCheckUrl = (): string => PRODUCT_SERVICES.manualUpdateUrl;
 
-export const getFallbackDownloadUrl = (): string => (
-  isTestModeEnabled()
-    ? 'https://lobsterai.inner.youdao.com/#/download-list'
-    : 'https://lobsterai.youdao.com/#/download-list'
-);
+export const getFallbackDownloadUrl = (): string => PRODUCT_SERVICES.downloadUrl;
 
-export const getSkillStoreUrl = (): string => (
-  isTestModeEnabled()
-    ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/skill-store'
-    : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/skill-store'
-);
+export const getSkillStoreUrl = (): string => PRODUCT_SERVICES.skillStoreUrl;
 
 // Portal 页面
-const PORTAL_BASE_TEST = 'https://lobsterai.inner.youdao.com/portal#';
-const PORTAL_BASE_PROD = 'https://lobsterai.youdao.com/portal#';
-
-const getPortalBase = (): string => isTestModeEnabled() ? PORTAL_BASE_TEST : PORTAL_BASE_PROD;
+const getPortalBase = (): string => PRODUCT_SERVICES.portalBaseUrl;
 
 export const getPortalTasksUrl = (): string => `${getPortalBase()}/profile/detail?tab=tasks`;
 
-export const getKitStoreUrl = (): string => (
-  isTestModeEnabled()
-    ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/kit-store'
-    : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/kit-store'
-);
+export const getKitStoreUrl = (): string => PRODUCT_SERVICES.kitStoreUrl;

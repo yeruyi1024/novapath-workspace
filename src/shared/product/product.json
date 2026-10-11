@@ -1,0 +1,29 @@
+{
+  "name": "星途 StarPath",
+  "slug": "starpath",
+  "appId": "com.starpath.desktop",
+  "supportEmail": "",
+  "services": {
+    "apiBaseUrl": "",
+    "portalBaseUrl": "",
+    "updateUrl": "",
+    "manualUpdateUrl": "",
+    "downloadUrl": "",
+    "skillStoreUrl": "",
+    "kitStoreUrl": "",
+    "mcpMarketplaceUrl": "",
+    "loginConfigUrl": "",
+    "analyticsUrl": "",
+    "docsUrl": "",
+    "communityUrl": "",
+    "termsUrl": ""
+  },
+  "features": {
+    "account": false,
+    "promotions": false,
+    "analytics": false
+  },
+  "englishName": "StarPath",
+  "shortName": "星途",
+  "dataDirectory": "API Console"
+}

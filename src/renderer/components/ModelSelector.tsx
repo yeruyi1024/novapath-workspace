@@ -18,6 +18,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { PRODUCT_FEATURES } from '../../shared/product';
 import { getProviderIcon, ProviderIconId } from '../providers/uiRegistry';
 import { authService } from '../services/auth';
 import { i18nService } from '../services/i18n';
@@ -29,6 +30,7 @@ import { RootState } from '../store';
 import type { Model } from '../store/slices/modelSlice';
 import { getModelIdentityKey, isSameModelIdentity, setSelectedModel } from '../store/slices/modelSlice';
 import Modal from './common/Modal';
+import { CoworkUiEvent } from './cowork/constants';
 import ModelThinkingMenu, {
   getModelThinkingLevelLabel,
 } from './modelSelector/ModelThinkingMenu';
@@ -151,7 +153,7 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
 }) => {
   const agenticNotReadyPrompt = promptKind === ModelAccessPromptKind.AgenticNotReady;
   const loginPrompt = promptKind === ModelAccessPromptKind.Login;
-  const purchaseOffer = useModelPurchaseOffer(promptKind === ModelAccessPromptKind.Subscribe, onClose);
+  const purchaseOffer = useModelPurchaseOffer(PRODUCT_FEATURES.promotions && promptKind === ModelAccessPromptKind.Subscribe, onClose);
   const resolvedTitleKey = titleKey ?? (
     agenticNotReadyPrompt
       ? 'modelSelectorAgenticNotReadyTitle'
@@ -176,6 +178,11 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
   };
 
   const handlePrimary = async () => {
+    if (!PRODUCT_FEATURES.account && !agenticNotReadyPrompt) {
+      onClose();
+      window.dispatchEvent(new CustomEvent(CoworkUiEvent.OpenModelSettings));
+      return;
+    }
     if (promptKind === ModelAccessPromptKind.Login) {
       onClose();
       await authService.login();
@@ -197,10 +204,10 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-base font-semibold leading-6 text-foreground">
-            {i18nService.t(resolvedTitleKey)}
+            {i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetup' : resolvedTitleKey)}
           </div>
           <div className="mt-1.5 text-sm leading-5 text-secondary">
-            {purchaseOffer.description ?? i18nService.t(resolvedDescriptionKey)}
+            {purchaseOffer.description ?? i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetupHint' : resolvedDescriptionKey)}
           </div>
           {purchaseOffer.offer?.expiresAtEpochMs != null && (
             <div className="mt-3">
@@ -223,9 +230,9 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
         disabled={purchaseOffer.isRefreshing}
         className="mt-5 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
       >
-        {i18nService.t(resolvedPrimaryButtonKey)}
+        {i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetup' : resolvedPrimaryButtonKey)}
       </button>
-      {loginPrompt && showLearnMore && (
+      {PRODUCT_FEATURES.account && loginPrompt && showLearnMore && (
         <button
           type="button"
           onClick={() => { void openSubscriptionPage(); }}
@@ -834,9 +841,11 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
 
     return (
-      <div className="px-3 py-1.5 rounded-xl bg-surface text-secondary text-sm">
-        {i18nService.t('modelSelectorNoModels')}
-      </div>
+      <button type="button" title={i18nService.t('modelSelectorNoModels')}
+        onClick={() => window.dispatchEvent(new CustomEvent(CoworkUiEvent.OpenModelSettings))}
+        className="rounded-md px-2 py-1.5 text-xs text-secondary hover:bg-surface-raised hover:text-foreground">
+        {i18nService.t('workspaceModelDisconnected')}
+      </button>
     );
   }
 

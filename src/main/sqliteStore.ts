@@ -12,6 +12,7 @@ import {
 } from '../shared/cowork/openclawCronSessionKey';
 import { DB_FILENAME } from './appConstants';
 import { initializeLibraryTables } from './library/libraryMigrations';
+import { AppConfigSecrets, type SecretStorage } from './libs/appConfigSecrets';
 import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
@@ -51,12 +52,12 @@ export class SqliteStore {
   private emitter = new EventEmitter();
   private didRunMigration = false;
 
-  private constructor(db: Database.Database, dbPath: string) {
+  private constructor(db: Database.Database, dbPath: string, private readonly configSecrets: AppConfigSecrets) {
     this.db = db;
     this.dbPath = dbPath;
   }
 
-  static async create(userDataPath?: string): Promise<SqliteStore> {
+  static async create(userDataPath?: string, secretStorage?: SecretStorage): Promise<SqliteStore> {
     const basePath = userDataPath ?? app.getPath('userData');
     const dbPath = path.join(basePath, DB_FILENAME);
 
@@ -82,9 +83,27 @@ export class SqliteStore {
       }
     }
 
-    const store = new SqliteStore(db, dbPath);
+    const store = new SqliteStore(db, dbPath, new AppConfigSecrets(secretStorage));
     store.initializeTables(basePath);
+    store.migrateModelCredentials();
     return store;
+  }
+
+  private migrateModelCredentials(): void {
+    const row = this.db.prepare("SELECT value FROM kv WHERE key = 'app_config'").get() as
+      { value: string } | undefined;
+    if (!row) return;
+    if (!this.configSecrets.isAvailable()) {
+      console.warn('[ConfigSecrets] System credential storage unavailable; existing credentials are preserved for recovery.');
+      return;
+    }
+    const encoded = JSON.stringify(this.configSecrets.encode(JSON.parse(row.value)));
+    if (encoded === row.value) return;
+    this.db.pragma('secure_delete = ON');
+    this.db.prepare("UPDATE kv SET value = ? WHERE key = 'app_config'").run(encoded);
+    this.db.pragma('wal_checkpoint(TRUNCATE)');
+    this.db.exec('VACUUM');
+    console.info('[ConfigSecrets] Migrated model credentials to system-encrypted storage.');
   }
 
   private initializeTables(basePath: string) {
@@ -803,12 +822,14 @@ export class SqliteStore {
       | { value: string }
       | undefined;
     if (!row) return undefined;
+    let value: unknown;
     try {
-      return JSON.parse(row.value) as T;
+      value = JSON.parse(row.value);
     } catch (error) {
       console.warn(`Failed to parse store value for ${key}`, error);
       return undefined;
     }
+    return (key === 'app_config' ? this.configSecrets.decode(value) : value) as T;
   }
 
   set<T = unknown>(key: string, value: T): void {
@@ -824,7 +845,7 @@ export class SqliteStore {
         updated_at = excluded.updated_at
     `,
       )
-      .run(key, JSON.stringify(value), now);
+      .run(key, JSON.stringify(key === 'app_config' ? this.configSecrets.encode(value) : value), now);
     this.emitter.emit('change', { key, newValue: value, oldValue } as ChangePayload<T>);
   }
 

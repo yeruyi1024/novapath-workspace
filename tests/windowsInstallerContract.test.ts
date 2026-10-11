@@ -624,6 +624,10 @@ describe('Windows installer hardening contracts', () => {
     const end = installerInclude.indexOf('!macroend', start);
     const stopMacro = installerInclude.slice(start, end);
 
+    expect(stopMacro).not.toContain('Get-Process -Name LobsterAI');
+    expect(stopMacro).not.toContain('*LobsterAI*');
+    expect(stopMacro).toContain('if (-not $$sweep) { exit 2 }');
+
     // The kill must live inside the poll loop: a kill-once-then-observe gate
     // loses against slow teardown and respawned processes.
     const loop = stopMacro.indexOf('for ($$i = 0; $$i -lt 30; $$i++)');

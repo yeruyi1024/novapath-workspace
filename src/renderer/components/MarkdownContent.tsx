@@ -1,6 +1,8 @@
 import 'katex/dist/katex.min.css';
 import 'katex/contrib/mhchem';
+import './markdownPresentation.css';
 
+import { DocumentTextIcon, FolderIcon } from '@heroicons/react/24/outline';
 import React, { useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 // @ts-ignore
@@ -17,6 +19,7 @@ import { transformMarkdownTextSegments } from '../utils/markdownCodeSegments';
 import { remarkMarkdownLayout } from '../utils/remarkMarkdownLayout';
 import CodeBlock from './CodeBlock';
 import LocalFileContextMenu from './common/LocalFileContextMenu';
+import { useConversationFilePreview } from './cowork/ConversationFilePreviewContext';
 
 const SAFE_URL_PROTOCOLS = new Set(['http', 'https', 'mailto', 'tel', 'file', 'localfile', 'kit']);
 const INTERNAL_URL_PROTOCOLS = new Set(['kit']);
@@ -49,7 +52,7 @@ const formatContentSize = (bytes: number): string => {
 };
 
 const encodeFileUrl = (url: string): string => {
-  const encoded = encodeURI(url);
+  const encoded = encodeURI(url).replace(/%25([\da-f]{2})/gi, '%$1');
   return encoded.replace(/\(/g, '%28').replace(/\)/g, '%29');
 };
 
@@ -247,10 +250,10 @@ const stripHashAndQuery = (value: string): string => value.split('#')[0].split('
 
 export const normalizeMarkdownLocalFilePath = (value: string): string => {
   const cleaned = stripHashAndQuery(value.trim());
-  if (/^file:/i.test(cleaned)) {
-    return normalizeShellFilePath(cleaned);
+  if (/^(?:file|localfile):/i.test(cleaned)) {
+    return normalizeShellFilePath(cleaned.replace(/^localfile:/i, 'file:'));
   }
-  let normalized = cleaned.replace(/^localfile:\/\//i, '');
+  let normalized = cleaned;
   if (/^\/[A-Za-z]:/.test(normalized)) {
     normalized = normalized.slice(1);
   }
@@ -418,12 +421,14 @@ const LocalFileLink: React.FC<LocalFileLinkProps> = ({
   anchorProps,
   children,
 }) => {
+  const previewFile = useConversationFilePreview();
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
 
   const handleClick = async (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault();
     const anchor = e.currentTarget;
     try {
+      if (!isDirectory && previewFile && await previewFile(filePath)) return;
       const result = await window.electron.shell.openPath(filePath);
       if (result?.success) {
         return;
@@ -462,11 +467,12 @@ const LocalFileLink: React.FC<LocalFileLinkProps> = ({
         href={toFileHref(filePath)}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        className={`${LINK_CLASS_NAME} cursor-pointer`}
+        className="markdown-file-link"
         title={filePath}
         {...anchorProps}
       >
-        {children}
+        {isDirectory ? <FolderIcon aria-hidden="true" /> : <DocumentTextIcon aria-hidden="true" />}
+        <span>{children}</span>
       </a>
       {menuPosition && (
         <LocalFileContextMenu
@@ -531,7 +537,7 @@ const createMarkdownComponents = (
     </li>
   ),
   blockquote: ({ node: _node, className: _className, children, ...props }: any) => (
-    <blockquote className={`${spacing === 'compact' ? 'my-1.5' : 'my-3'} border-l-4 border-primary pl-4 py-1 bg-surface-raised/30 rounded-r-lg text-foreground/90 overflow-x-auto`} {...props}>
+    <blockquote className={`${spacing === 'compact' ? 'my-1.5' : 'my-3'} markdown-quote`} {...props}>
       {children}
     </blockquote>
   ),
@@ -540,34 +546,34 @@ const createMarkdownComponents = (
     : <>{children}</>,
   code: (props: any) => <CodeBlock {...props} inline />,
   table: ({ node: _node, className: _className, children, ...props }: any) => (
-    <div className={`${spacing === 'compact' ? 'my-2' : 'my-4'} overflow-x-auto rounded-xl border border-border`}>
-      <table className="border-collapse w-full" {...props}>
+    <div className={`${spacing === 'compact' ? 'my-2' : 'my-4'} markdown-table-scroll`}>
+      <table className="markdown-table" {...props}>
         {children}
       </table>
     </div>
   ),
   thead: ({ node: _node, className: _className, children, ...props }: any) => (
-    <thead className="bg-surface-raised" {...props}>
+    <thead className="markdown-table-head" {...props}>
       {children}
     </thead>
   ),
   tbody: ({ node: _node, className: _className, children, ...props }: any) => (
-    <tbody className="divide-y divide-border" {...props}>
+    <tbody className="markdown-table-body" {...props}>
       {children}
     </tbody>
   ),
   tr: ({ node: _node, className: _className, children, ...props }: any) => (
-    <tr className="divide-x divide-border" {...props}>
+    <tr className="markdown-table-row" {...props}>
       {children}
     </tr>
   ),
   th: ({ node: _node, className: _className, children, align, style, ...props }: any) => (
-    <th className="px-4 py-2 align-top text-left font-semibold text-foreground" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
+    <th className="markdown-table-heading" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
       {children}
     </th>
   ),
   td: ({ node: _node, className: _className, children, align, style, ...props }: any) => (
-    <td className="px-4 py-2 align-top text-foreground" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
+    <td className="markdown-table-cell" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
       {children}
     </td>
   ),
@@ -613,7 +619,7 @@ const createMarkdownComponents = (
     }
 
     if (isLocalFilePath) {
-      const filePath = normalizeMarkdownLocalFilePath(resolvedPath ?? hrefValue);
+      const filePath = resolvedPath ?? normalizeMarkdownLocalFilePath(hrefValue);
 
       return (
         <LocalFileLink

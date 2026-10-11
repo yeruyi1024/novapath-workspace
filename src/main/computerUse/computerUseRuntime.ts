@@ -6,6 +6,8 @@ import path from 'path';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 
+import { PRODUCT } from '../../shared/product';
+
 export const ComputerUseRuntime = {
   Id: 'computer-use',
   Version: '1.0.7',
@@ -33,7 +35,7 @@ export const ComputerUseHelperConfig = {
   Direction: 'ltr',
   Locale: 'zh-CN',
   EscToCancel: '按 Esc 取消',
-  UsingComputer: 'LobsterAI正在使用你的电脑',
+  UsingComputer: `${PRODUCT.shortName}正在使用你的电脑`,
 } as const;
 export type ComputerUseHelperConfig =
   typeof ComputerUseHelperConfig[keyof typeof ComputerUseHelperConfig];

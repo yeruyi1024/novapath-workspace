@@ -9,6 +9,7 @@ import {
   LogReporterEntry,
   LogReporterProduct,
 } from '../../shared/analytics/constants';
+import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../../shared/product';
 import {
   type AnalyticsIdentitySnapshot,
   getAnalyticsIdentitySnapshot,
@@ -337,7 +338,7 @@ export const reportYdAnalyzer = async (
   params: LogEventParams,
   options: ReportYdAnalyzerOptions = {},
 ): Promise<boolean> => {
-  if (configService.getConfig().usageAnalyticsEnabled === false) {
+  if (!PRODUCT_FEATURES.analytics || !PRODUCT_SERVICES.analyticsUrl || configService.getConfig().usageAnalyticsEnabled !== true) {
     writeReporterLog('debug', `skipped event ${params.action} because usage analytics is disabled`);
     return false;
   }

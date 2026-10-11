@@ -3,11 +3,9 @@
 /**
  * electron-builder custom Windows code-signing hook.
  *
- * Uploads each binary produced by the build (app exe, uninstaller, installer)
- * to the internal Youdao signing service and replaces the local file with the
- * signed result. This closes the "signed installer shell, unsigned payload"
- * gap: security software freezes the unsigned LobsterAI.exe on first
- * execution, which is what hung installations in the field.
+ * Optionally uploads build binaries (app, uninstaller, installer) to the
+ * company-configured signing service and replaces them with signed results.
+ * No service endpoint or previous vendor credentials are bundled.
  *
  * Service API (per the official signing-service doc):
  *   POST /api/sign
@@ -21,12 +19,12 @@
  *
  * Credentials (process env wins; missing keys are filled from the repo-root
  * .env file, same convention as the Apple notarization credentials). The
- * service URL is internal infrastructure and is deliberately NOT hardcoded
- * here -- ask the signing service team for all four values:
- *   YD_SIGN_SERVICE_URL   signing service base URL
- *   YD_SIGN_APP_KEY       service app key
- *   YD_SIGN_APP_SECRET    service app secret
- *   YD_SIGN_USERNAME      requesting user (shown in the service's audit log)
+ * service URL is configured by the release team and is never hardcoded.
+ * Supply all four values explicitly:
+ *   STARPATH_SIGN_SERVICE_URL   signing service base URL
+ *   STARPATH_SIGN_APP_KEY       service app key
+ *   STARPATH_SIGN_APP_SECRET    service app secret
+ *   STARPATH_SIGN_USERNAME      requesting user (shown in the service's audit log)
  *
  * Missing values -> the hook logs one warning and skips, so local dev
  * packaging keeps producing (unsigned) artifacts. See .env.example.
@@ -35,10 +33,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const SERVICE_URL_ENV = 'YD_SIGN_SERVICE_URL';
-const APP_KEY_ENV = 'YD_SIGN_APP_KEY';
-const APP_SECRET_ENV = 'YD_SIGN_APP_SECRET';
-const USERNAME_ENV = 'YD_SIGN_USERNAME';
+const SERVICE_URL_ENV = 'STARPATH_SIGN_SERVICE_URL';
+const APP_KEY_ENV = 'STARPATH_SIGN_APP_KEY';
+const APP_SECRET_ENV = 'STARPATH_SIGN_APP_SECRET';
+const USERNAME_ENV = 'STARPATH_SIGN_USERNAME';
 
 const REQUEST_TIMEOUT_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 2;
@@ -207,7 +205,7 @@ async function signOnce(serviceConfig, filePath) {
     );
   }
 
-  const tmpPath = `${filePath}.ydsign.tmp`;
+  const tmpPath = `${filePath}.starpath-sign.tmp`;
   fs.writeFileSync(tmpPath, signedBytes);
   try {
     const certTable = readPeCertTable(tmpPath);

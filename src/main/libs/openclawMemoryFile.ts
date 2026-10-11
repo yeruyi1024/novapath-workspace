@@ -21,6 +21,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { PRODUCT } from '../../shared/product';
+
 const TAG = '[OpenClaw Memory]';
 
 // ---------------------------------------------------------------------------
@@ -565,8 +567,14 @@ export function migrateSqliteToMemoryMd(
 // Bootstrap file management (IDENTITY.md, USER.md, SOUL.md)
 // ---------------------------------------------------------------------------
 
-const DEFAULT_IDENTITY_ZH = '你的名字是 LobsterAI，一个由网易有道开发的全场景个人助理 Agent。你 7×24 小时在线，能够自主处理日常生产力任务，包括数据分析、PPT 制作、视频生成、文档撰写、信息搜索、邮件工作流、定时任务等。你和用户共享同一个工作空间，协同完成用户的目标。';
-const DEFAULT_IDENTITY_EN = 'Your name is LobsterAI, a full-scenario personal assistant agent developed by NetEase Youdao. You are available 24/7 and can autonomously handle everyday productivity tasks, including data analysis, PPT creation, video generation, document writing, information search, email workflows, scheduled jobs, and more. You and the user share the same workspace, collaborating to achieve the user\'s goals.';
+const DEFAULT_IDENTITY_ZH = `你的名字是${PRODUCT.name}，是与用户协作的 AI 工作空间助手。你可以根据当前可用的模型、工具和授权，协助用户分析数据、制作演示文稿、撰写文档、搜索信息和执行工作流。你和用户共享同一个工作空间，围绕项目和对话完成目标。准确说明已执行的操作、结果和能力限制，不声称尚未启用的功能。`;
+const DEFAULT_IDENTITY_EN = `Your name is ${PRODUCT.englishName}, an AI workspace assistant collaborating with the user. Use the available models, tools, and permissions to help analyze data, create presentations, write documents, search for information, and run workflows. You share a workspace with the user and work toward their goals through projects and conversations. Accurately report actions, results, and capability limits; do not claim features that are not enabled.`;
+
+// Exact historical defaults are migration markers, never active product instructions.
+const LEGACY_DEFAULT_IDENTITIES = new Set([
+  '你的名字是 LobsterAI，一个由网易有道开发的全场景个人助理 Agent。你 7×24 小时在线，能够自主处理日常生产力任务，包括数据分析、PPT 制作、视频生成、文档撰写、信息搜索、邮件工作流、定时任务等。你和用户共享同一个工作空间，协同完成用户的目标。',
+  'Your name is LobsterAI, a full-scenario personal assistant agent developed by NetEase Youdao. You are available 24/7 and can autonomously handle everyday productivity tasks, including data analysis, PPT creation, video generation, document writing, information search, email workflows, scheduled jobs, and more. You and the user share the same workspace, collaborating to achieve the user\'s goals.',
+]);
 
 function getDefaultIdentity(): string {
   try {
@@ -575,6 +583,26 @@ function getDefaultIdentity(): string {
   } catch {
     return DEFAULT_IDENTITY_EN;
   }
+}
+
+function isUntouchedRuntimeIdentity(content: string, runtimeRoot?: string): boolean {
+  const runtimeRoots = runtimeRoot ? [runtimeRoot] : app.isPackaged
+    ? [path.join(process.resourcesPath, 'cfmind')]
+    : [path.join(app.getAppPath(), 'vendor', 'openclaw-runtime', 'current')];
+  for (const root of runtimeRoots) {
+    try {
+      const template = fs.readFileSync(path.join(root, 'docs', 'reference', 'templates', 'IDENTITY.md'), 'utf8')
+        .replace(/\r\n/g, '\n')
+        .replace(/^---\n[\s\S]*?\n---\n?/, '')
+        .trim();
+      // Only the complete bundled placeholder is replaceable. Any filled field
+      // or other edit makes this a custom identity and must be preserved.
+      if (template && content.replace(/\r\n/g, '\n').trim() === template) return true;
+    } catch {
+      // Missing runtime templates must never make a custom identity replaceable.
+    }
+  }
+  return false;
 }
 
 const BOOTSTRAP_ALLOWLIST = new Set(['IDENTITY.md', 'USER.md', 'SOUL.md']);
@@ -617,12 +645,13 @@ export function writeBootstrapFile(workingDirectory: string | undefined, filenam
 
 /**
  * Ensure IDENTITY.md exists in the workspace with built-in default content.
- * Only writes if the file doesn't exist or is empty — never overwrites user content.
+ * Creates missing defaults and migrates untouched historical/default templates.
+ * Custom identities are preserved byte-for-byte, including ones mentioning the old brand.
  */
-export function ensureDefaultIdentity(workingDirectory: string | undefined): void {
+export function ensureDefaultIdentity(workingDirectory: string | undefined, runtimeRoot?: string): void {
   const filePath = resolveBootstrapFilePath(workingDirectory, 'IDENTITY.md');
   const existing = readFileOrEmpty(filePath);
-  if (existing.trim()) return; // already has content, don't overwrite
+  if (existing.trim() && !LEGACY_DEFAULT_IDENTITIES.has(existing.trim()) && !isUntouchedRuntimeIdentity(existing, runtimeRoot)) return;
   const defaultContent = getDefaultIdentity();
   ensureDir(filePath);
   fs.writeFileSync(filePath, defaultContent, 'utf8');

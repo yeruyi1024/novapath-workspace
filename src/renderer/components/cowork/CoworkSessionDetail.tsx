@@ -65,6 +65,7 @@ import { i18nService } from '../../services/i18n';
 import { getInstalledKitSkillIds } from '../../services/kitCapability';
 import { readLocalServiceProjectDirectoryCandidate } from '../../services/localServiceProjectDirectoryCache';
 import { getSubagentWaitPhase, SubagentWaitPhase } from '../../services/subagentWaitState';
+import { resolveWorkspacePath } from '../../services/workspaceFiles';
 import { RootState } from '../../store';
 import {
   selectCurrentMessagesLength,
@@ -148,7 +149,7 @@ import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
 import SidebarSearchIcon from '../icons/SidebarSearchIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import SubagentIcon from '../icons/SubagentIcon';
-import MarkdownContent from '../MarkdownContent';
+import MarkdownContent, { normalizeMarkdownLocalFilePath } from '../MarkdownContent';
 import { type ToastEventDetail } from '../Toast';
 import { resolveAgentModelSelection, useAgentSelectedModel } from './agentModelSelection';
 import ArtifactPreviewTabItem from './ArtifactPreviewTabItem';
@@ -162,6 +163,7 @@ import {
   bucketLength,
   reportConversationNavigationAction,
 } from './conversationAnalytics';
+import ConversationFilePreviewProvider from './ConversationFilePreviewProvider';
 import {
   canScrollElementInWheelDirection,
   isAtConversationSessionBottom,
@@ -497,9 +499,9 @@ const buildRailItems = (
       messageId: primaryMessageId,
       turnIndex: index,
       absoluteIndex: messageOffsetById.get(primaryMessageId) ?? items.length,
-      label: turn.userMessage ? getRailLabel(userContent, `Turn ${index + 1}`) : 'LobsterAI',
+      label: turn.userMessage ? getRailLabel(userContent, `Turn ${index + 1}`) : i18nService.t('productName'),
       summary: assistantContent
-        ? getRailLabel(assistantContent, 'LobsterAI', COWORK_RAIL_TOOLTIP_PREVIEW_MAX_LENGTH)
+        ? getRailLabel(assistantContent, i18nService.t('productName'), COWORK_RAIL_TOOLTIP_PREVIEW_MAX_LENGTH)
         : '',
       contentLen: userContent.length + assistantContent.length,
       isUser: false,
@@ -567,7 +569,7 @@ const buildRailItemsFromIndex = (
       messageId: current.messageId,
       turnIndex: loadedTurnIndex,
       absoluteIndex: current.messageOffset,
-      label: 'LobsterAI',
+      label: i18nService.t('productName'),
       summary: current.preview,
       contentLen: current.contentLen,
       isUser: false,
@@ -1173,7 +1175,7 @@ const composeExportCanvas = async (
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Failed to load logo'));
-    img.src = 'logo.png';
+    img.src = 'logo.svg';
   });
 
   // Logo with rounded clipping
@@ -1198,11 +1200,11 @@ const composeExportCanvas = async (
 
   ctx.fillStyle = brandColor;
   ctx.font = `600 ${brandFontSize}px ${fontStack}`;
-  ctx.fillText('LobsterAI — 全场景办公助手 Agent', textX, footerCenterY - taglineFontSize / 2 - 2);
+  ctx.fillText(i18nService.t('productName'), textX, footerCenterY - taglineFontSize / 2 - 2);
 
   ctx.fillStyle = subtitleColor;
   ctx.font = `400 ${taglineFontSize}px ${fontStack}`;
-  ctx.fillText('国内大厂首个开源桌面级 Agent，网易有道出品', textX, footerCenterY + brandFontSize / 2 + 3);
+  ctx.fillText(i18nService.t('workspaceLocalHint'), textX, footerCenterY + brandFontSize / 2 + 3);
 
   ctx.restore(); // card clip
 
@@ -1321,7 +1323,7 @@ const stripFileProtocol = (value: string): string => {
 const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
 
 const isAbsolutePath = (value: string): boolean => (
-  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value)
+  value.startsWith('/') || value.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(value)
 );
 
 const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !hasScheme(value);
@@ -1348,22 +1350,17 @@ const parseRootRelativePath = (value: string): string | null => {
 };
 
 const normalizeLocalPath = (
-  value: string
+  value: string,
+  isLink = false,
 ): { path: string; isRelative: boolean; isAbsolute: boolean } | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const fileScheme = /^file:\/\//i.test(trimmed);
+  const fileScheme = /^(?:file|localfile):/i.test(trimmed);
   const schemePresent = hasScheme(trimmed);
   if (schemePresent && !fileScheme && !isAbsolutePath(trimmed)) return null;
 
-  let raw = trimmed;
-  if (fileScheme) {
-    raw = stripFileProtocol(raw);
-  }
-  raw = stripHashAndQuery(raw);
-  const decoded = safeDecodeURIComponent(raw);
-  const path = decoded || raw;
+  const path = fileScheme || isLink ? normalizeMarkdownLocalFilePath(trimmed) : trimmed;
   if (!path) return null;
 
   const isAbsolute = isAbsolutePath(path);
@@ -1371,11 +1368,12 @@ const normalizeLocalPath = (
   return { path, isRelative, isAbsolute };
 };
 
-const toAbsolutePathFromCwd = (filePath: string, cwd: string): string => {
-  if (isAbsolutePath(filePath)) {
-    return filePath;
+const toAbsolutePathFromCwd = (filePath: string, cwd: string): string | null => {
+  try {
+    return resolveWorkspacePath(filePath, cwd, window.electron.platform as 'win32' | 'darwin' | 'linux');
+  } catch {
+    return null;
   }
-  return `${cwd.replace(/\/$/, '')}/${filePath.replace(/^\.\//, '')}`;
 };
 
 const EMPTY_ARTIFACTS: Artifact[] = [];
@@ -5006,7 +5004,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       return hrefRootRelative;
     }
 
-    const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
+    const hrefPath = hrefValue ? normalizeLocalPath(hrefValue, true) : null;
     if (hrefPath) {
       if (hrefPath.isRelative && currentSession?.cwd) {
         return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
@@ -6052,12 +6050,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   };
 
   return (
+    <ConversationFilePreviewProvider sessionId={currentSession.id} cwd={currentSession.cwd}>
     <ArtifactFileShareProvider sessionId={currentSession.id}>
       <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header — spans full width */}
       <div
         data-skin-session-titlebar="true"
-        className={`draggable relative z-30 flex h-12 shrink-0 items-center justify-between overflow-visible border-b border-border bg-background ${
+        className={`workspace-conversation-header draggable relative z-30 flex h-12 shrink-0 items-center justify-between overflow-visible bg-background ${
           isArtifactPanelExpanded ? 'pl-0 pr-4' : 'px-4'
         }`}
       >
@@ -6068,6 +6067,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <button
                 type="button"
                 onClick={onToggleSidebar}
+                aria-label={i18nService.t('expand')}
+                title={i18nService.t('expand')}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
                 <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
@@ -6075,6 +6076,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <button
                 type="button"
                 onClick={onNewChat}
+                aria-label={i18nService.t('newChat')}
+                title={i18nService.t('newChat')}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
                 <ComposeIcon className="h-4 w-4" />
@@ -6449,7 +6452,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           onScroll={handleMessagesScroll}
           onWheel={handleMessagesWheel}
           onMouseUp={handleAssistantTextSelection}
-          className={`relative h-full min-h-0 overflow-y-auto pt-3${exportImageProgress ? ' cowork-export-capturing' : ''}`}
+          className={`workspace-conversation-scroll relative h-full min-h-0 overflow-y-auto pb-6 pt-4${exportImageProgress ? ' cowork-export-capturing' : ''}`}
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           {selectedTextAction && !exportImageProgress && (
@@ -6646,7 +6649,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       {/* Input Area */}
       <div
         ref={promptInputAreaRef}
-        className={`relative shrink-0 ${COWORK_DETAIL_GUTTER_CLASS} ${
+        className={`workspace-conversation-dock relative shrink-0 ${COWORK_DETAIL_GUTTER_CLASS} ${
           isArtifactPanelExpanded ? 'z-50 bg-background pb-2 pt-1' : 'pb-4 pt-0'
         } ${isArtifactPanelExpanded && isExpandedPromptInputHidden ? 'hidden' : ''}`}
       >
@@ -7021,6 +7024,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       </div>
       </div>
     </ArtifactFileShareProvider>
+    </ConversationFilePreviewProvider>
   );
 };
 

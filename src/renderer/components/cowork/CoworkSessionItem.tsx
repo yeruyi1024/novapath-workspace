@@ -1,4 +1,4 @@
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, FolderIcon } from '@heroicons/react/24/outline';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { stripGoalCommandPrefixForDisplay } from '../../../common/sessionTitle';
@@ -26,6 +26,8 @@ interface CoworkSessionItemProps {
   isBatchMode: boolean;
   isSelected: boolean;
   showBatchOption?: boolean;
+  compact?: boolean;
+  onMoveToProject?: () => void;
   onSelect: () => void;
   onDelete: () => void;
   onTogglePin: (pinned: boolean) => void;
@@ -96,6 +98,8 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   isBatchMode,
   isSelected,
   showBatchOption = true,
+  compact = false,
+  onMoveToProject,
   onSelect,
   onDelete,
   onTogglePin,
@@ -145,7 +149,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
       closeMenu();
       return;
     }
-    const menuHeight = showBatchOption ? 156 : 120;
+    const menuHeight = (showBatchOption ? 156 : 120) + (onMoveToProject ? 36 : 0);
     const position = calculateMenuPosition(menuHeight);
     if (position) {
       setMenuPosition(position);
@@ -243,12 +247,12 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
 
   useEffect(() => {
     if (!menuPosition) return;
-    const menuHeight = showConfirmDelete ? 112 : (showBatchOption ? 156 : 120);
+    const menuHeight = showConfirmDelete ? 112 : ((showBatchOption ? 156 : 120) + (onMoveToProject ? 36 : 0));
     const position = calculateMenuPosition(menuHeight);
     if (position && (position.right !== menuPosition.right || position.y !== menuPosition.y)) {
       setMenuPosition(position);
     }
-  }, [calculateMenuPosition, menuPosition, showBatchOption, showConfirmDelete]);
+  }, [calculateMenuPosition, menuPosition, showBatchOption, showConfirmDelete, onMoveToProject]);
 
   useEffect(() => {
     if (!isRenaming) return;
@@ -277,12 +281,15 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
       { key: 'pin', label: pinButtonLabel, onClick: handleTogglePin },
       { key: 'delete', label: deleteLabel, onClick: handleDeleteClick },
     ];
+    if (onMoveToProject) items.splice(2, 0, { key: 'project', label: i18nService.t('projectMoveChat'), onClick: (event: React.MouseEvent) => { event.stopPropagation(); closeMenu(); onMoveToProject(); } });
     if (showBatchOption) {
       items.unshift({ key: 'batch', label: batchLabel, onClick: handleBatchClick });
     }
     return items;
   }, [
     batchLabel,
+    onMoveToProject,
+    closeMenu,
     deleteLabel,
     handleBatchClick,
     handleDeleteClick,
@@ -304,14 +311,26 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         }
         onSelect();
       }}
-      className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-150 ${
+      role="button"
+      tabIndex={isRenaming ? -1 : 0}
+      aria-current={isActive ? 'page' : undefined}
+      aria-label={displayTitle}
+      title={`${displayTitle}\n${i18nService.t(statusLabels[session.status])} · ${relativeTime.full}${goalTitle ? `\n${goalTitle}` : ''}`}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || isRenaming) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
+      }}
+      className={`group relative rounded-lg cursor-pointer transition-colors duration-150 ${compact ? 'workspace-chat-row flex min-h-9 items-center px-2.5 py-1.5' : 'p-3'} ${
         isActive
-          ? 'bg-black/[0.06] dark:bg-white/[0.08]'
+          ? compact ? 'bg-primary-muted' : 'bg-black/[0.06] dark:bg-white/[0.08]'
           : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
       }`}
     >
       {/* Content area */}
-      <div className="flex items-start">
+      <div className="flex w-full min-w-0 items-center">
         {isBatchMode && (
           <div className="flex items-center mr-2 mt-0.5 flex-shrink-0">
             <input
@@ -327,7 +346,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <div className={`flex items-center mb-1 ${titleRowGapClassName}`}>
+          <div className={`flex items-center ${compact ? '' : 'mb-1'} ${titleRowGapClassName}`}>
             {/* Status indicator */}
             {showStatusIndicator && (
               <span
@@ -371,13 +390,15 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                     />
                   </span>
                 )}
-                <h3 className="min-w-0 flex-1 text-sm font-medium text-foreground truncate">
+                <h3 className={`min-w-0 flex-1 truncate text-foreground ${compact ? 'pr-5 text-[13px] font-normal leading-5' : 'text-sm font-medium'}`}>
                   {displayTitle}
                 </h3>
+                {compact && session.status === 'error' && <ExclamationTriangleIcon className="mr-5 h-3.5 w-3.5 shrink-0 text-error" aria-label={i18nService.t('coworkStatusError')} />}
+                {compact && session.goal && <GoalIcon className="mr-5 h-3.5 w-3.5 shrink-0 text-secondary" />}
               </>
             )}
           </div>
-          <div className="flex min-w-0 items-center gap-2 text-xs text-secondary">
+          {!compact && <div className="flex min-w-0 items-center gap-2 text-xs text-secondary">
             {showRelativeTime && (
               <span className="whitespace-nowrap" title={relativeTime.full}>
                 {relativeTime.compact}
@@ -396,25 +417,25 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                 <span className="min-w-0 truncate text-primary/75">{session.goal.objective}</span>
               </span>
             )}
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* Actions - absolutely positioned overlay */}
       {!isBatchMode && (
       <div
-        className={`absolute right-1.5 top-1.5 transition-opacity ${
+        className={`absolute right-1.5 ${compact ? 'top-1/2 -translate-y-1/2' : 'top-1.5'} transition-opacity ${
           isRenaming
             ? 'opacity-0 pointer-events-none'
             : session.pinned
               ? 'opacity-100'
-              : 'opacity-0 group-hover:opacity-100'
+              : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100'
         }`}
       >
         <button
           ref={actionButtonRef}
           onClick={openMenu}
-          className="p-1.5 rounded-lg bg-surface-raised text-secondary hover:bg-surface hover:bg-surface transition-colors"
+          className="p-1 rounded-md bg-surface-raised text-secondary hover:text-foreground transition-colors"
           aria-label={actionLabel}
         >
           {session.pinned ? (
@@ -432,7 +453,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
       {menuPosition && (
         <div
           ref={menuRef}
-          className="fixed z-50 w-max min-w-[124px] max-w-[calc(100vw-16px)] rounded-xl border border-border bg-surface shadow-lg overflow-hidden"
+          className="fixed z-50 w-max min-w-[160px] max-w-[calc(100vw-16px)] rounded-xl border border-border-subtle bg-surface p-1 shadow-popover overflow-hidden"
           style={{ top: menuPosition.y, right: menuPosition.right }}
           role="menu"
         >
@@ -441,7 +462,8 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
               key={item.key}
               type="button"
               onClick={item.onClick}
-              className="w-full flex items-center gap-2 whitespace-nowrap px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-surface-raised"
+              role="menuitem"
+              className={`w-full flex items-center gap-2.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-surface-raised ${item.key === 'delete' ? 'text-error border-t border-border-subtle mt-1' : 'text-foreground'}`}
             >
               {item.key === 'batch' && <ListChecksIcon className="h-4 w-4" />}
               {item.key === 'rename' && <PencilSquareIcon className="h-4 w-4" />}
@@ -451,6 +473,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   className={`h-4 w-4 ${session.pinned ? 'opacity-60' : ''}`}
                 />
               )}
+              {item.key === 'project' && <FolderIcon className="h-4 w-4" />}
               {item.key === 'delete' && <TrashIcon className="h-4 w-4" />}
               {item.label}
             </button>

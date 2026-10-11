@@ -18,6 +18,7 @@ import {
 import type { ModelRuntimeProfile } from '@shared/providers/modelRuntimeProfiles';
 
 import type { EnterpriseAccountContext } from '../../shared/enterpriseAccount/types';
+import { PRODUCT, PRODUCT_FEATURES, PRODUCT_SERVICES } from '../../shared/product';
 import {
   applyEnterpriseAccountContext,
   refreshEnterpriseAccountContext,
@@ -208,7 +209,7 @@ export function mapPricingCatalogTextModelsToServerModels(
     const modelName = readString(model.modelName) || modelId;
     const provider = readString(model.providerLabel)
       || readString(model.provider)
-      || 'LobsterAI';
+      || PRODUCT.name;
     const contextWindow = readPositiveNumber(model.contextWindow);
     const costMultiplier = readPositiveNumber(model.costMultiplier);
     const thinkingConfig = model.supportsThinking === true
@@ -393,6 +394,11 @@ class AuthService {
   async init() {
     // Clean up any existing listeners to prevent stacking on repeated init()
     this.destroy();
+    if (!PRODUCT_FEATURES.account || !PRODUCT_SERVICES.apiBaseUrl) {
+      this.clearAuthenticatedAccountState();
+      store.dispatch(setAuthLoading(false));
+      return;
+    }
 
     store.dispatch(setAuthLoading(true));
 
@@ -467,6 +473,9 @@ class AuthService {
    * Initiate login (opens system browser).
    */
   async login(): Promise<AuthLoginResult> {
+    if (!PRODUCT_FEATURES.account || !PRODUCT_SERVICES.apiBaseUrl || !PRODUCT_SERVICES.portalBaseUrl) {
+      return { success: false, error: i18nService.t('gatewayUnavailable') };
+    }
     const attemptId = ++this.loginAttemptSequence;
     writeAuthRendererLog('info', `login attempt ${attemptId} started`);
 

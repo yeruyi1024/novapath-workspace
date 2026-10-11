@@ -166,6 +166,59 @@ afterEach(() => {
   delete (globalThis as { window?: unknown }).window;
 });
 
+test('persists the StarPath connection and provider-specific default across unrelated saves and reloads', async () => {
+  const gatewayModel = { id: 'gpt-5.2', name: 'Gateway model', supportsImage: true };
+  const { configService, storeData } = await loadConfigServiceWithStoredConfig({ ...defaultConfig });
+  await configService.init();
+  await configService.updateConfig({
+    platformProviderId: 'custom_3',
+    providers: {
+      ...configService.getConfig().providers,
+      custom_3: { enabled: true, displayName: 'StarPath', baseUrl: 'https://gateway.example/v1', apiKey: 'test-key', apiFormat: 'openai', models: [gatewayModel] },
+    },
+    model: { ...defaultConfig.model, defaultModel: gatewayModel.id, defaultModelProvider: 'custom_3' },
+  });
+  await configService.updateConfig({ language: 'en' });
+  const saved = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
+  const reloaded = await loadConfigServiceWithStoredConfig(saved);
+  await reloaded.configService.init();
+  expect(reloaded.configService.getConfig()).toMatchObject({
+    platformProviderId: 'custom_3',
+    language: 'en',
+    model: { defaultModel: gatewayModel.id, defaultModelProvider: 'custom_3' },
+    providers: { custom_3: { models: [gatewayModel], apiKey: 'test-key' } },
+  });
+});
+
+test('platform-only settings survive reload without reactivating retained legacy providers', async () => {
+  const legacy = { enabled: true, apiKey: 'legacy-key', baseUrl: 'https://legacy.example/v1', apiFormat: 'openai' as const, models: [{ id: 'legacy-model', name: 'Legacy' }] };
+  const { configService, storeData } = await loadConfigServiceWithStoredConfig({
+    ...defaultConfig,
+    providers: { ...defaultConfig.providers, openai: legacy },
+  });
+  await configService.init();
+  const migratedLegacyModels = configService.getConfig().providers?.openai.models;
+  const { buildPlatformConfigUpdate } = await import('./starpathPlatform');
+  await configService.updateConfig(buildPlatformConfigUpdate({
+    ...configService.getConfig().providers,
+    custom_30: { enabled: true, apiKey: 'platform-key', baseUrl: 'https://gateway.example', models: [{ id: 'platform-model', name: 'Platform' }] },
+  }, 'custom_30', 'legacy-model', defaultConfig.model));
+  await configService.updateConfig({ language: 'en' });
+  const reloaded = await loadConfigServiceWithStoredConfig(storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig);
+  await reloaded.configService.init();
+  expect(reloaded.configService.getConfig()).toMatchObject({
+    platformProviderId: 'custom_30',
+    api: { key: 'platform-key', baseUrl: 'https://gateway.example/v1' },
+    model: { defaultModel: 'platform-model', defaultModelProvider: 'custom_30' },
+    providers: {
+      openai: { enabled: false, apiKey: legacy.apiKey },
+      custom_30: { enabled: true, apiFormat: 'openai', authType: 'apikey' },
+    },
+  });
+  expect(reloaded.configService.getConfig().providers?.openai.models).toEqual(migratedLegacyModels);
+  expect(Object.entries(reloaded.configService.getConfig().providers ?? {}).filter(([, config]) => config.enabled).map(([id]) => id)).toEqual(['custom_30']);
+});
+
 describe('configService initialization failures', () => {
   test('rejects when the strict store read fails so startup can schedule repair', async () => {
     vi.resetModules();
@@ -260,6 +313,21 @@ describe('configService initialization failures', () => {
 
     expect(configService.getConfig()).toEqual(defaultConfig);
     expect(setItem).not.toHaveBeenCalled();
+  });
+
+  test('does not publish unsaved config when credential encryption rejects the write', async () => {
+    vi.resetModules();
+    const saveError = new Error('System credential storage is unavailable');
+    vi.doMock('./store', () => ({ localStore: {
+      getItem: vi.fn(), getItemStrict: vi.fn(async () => defaultConfig),
+      setItem: vi.fn(async () => { throw saveError; }), removeItem: vi.fn(),
+    } }));
+    const dispatchEvent = vi.fn();
+    (globalThis as unknown as { window?: unknown }).window = { dispatchEvent };
+    const { configService } = await import('./config');
+    await expect(configService.updateConfig({ language: 'en' })).rejects.toBe(saveError);
+    expect(configService.getConfig()).toEqual(defaultConfig);
+    expect(dispatchEvent).not.toHaveBeenCalled();
   });
 });
 

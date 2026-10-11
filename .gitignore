@@ -26,6 +26,7 @@ resources/mingit/
 resources/MinGit-*.zip
 resources/PortableGit-*.7z.exe
 resources/python-win/
+resources/document-runtime/
 resources/python-*.zip
 
 # SKILLs runtime files

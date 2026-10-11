@@ -657,7 +657,12 @@ const hydrateStoredConfig = (storedConfig: AppConfig): AppConfig => {
   // Migrate model.defaultModel if it was removed
   const allRemovedIds = Object.values(REMOVED_PROVIDER_MODELS).flat();
   const migratedModel = { ...defaultConfig.model, ...storedConfig.model };
-  if (allRemovedIds.includes(migratedModel.defaultModel)) {
+  // A gateway may legitimately keep a model removed from a built-in catalog.
+  // Apply retirement only to the selected provider, retaining legacy id-only migration.
+  const removedDefaultIds = migratedModel.defaultModelProvider
+    ? REMOVED_PROVIDER_MODELS[migratedModel.defaultModelProvider] ?? []
+    : allRemovedIds;
+  if (removedDefaultIds.includes(migratedModel.defaultModel)) {
     migratedModel.defaultModel = defaultConfig.model.defaultModel;
   }
   if (migratedModel.availableModels) {
@@ -772,7 +777,7 @@ class ConfigService {
     const stored = await localStore.getItemStrict<AppConfig>(CONFIG_KEYS.APP_CONFIG);
     const base = stored ? hydrateStoredConfig(stored) : this.config;
 
-    this.config = omitLegacyVoiceInputConfig({
+    const nextConfig = omitLegacyVoiceInputConfig({
       ...base,
       ...newConfig,
       ...(normalizedProviders ? { providers: normalizedProviders } : {}),
@@ -798,7 +803,8 @@ class ConfigService {
         newConfig.notificationSettings ?? base.notificationSettings,
       ),
     } as AppConfig);
-    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
+    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, nextConfig);
+    this.config = nextConfig;
     window.dispatchEvent(new CustomEvent(ConfigServiceEvent.Updated));
   }
 

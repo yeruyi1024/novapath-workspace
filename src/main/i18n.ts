@@ -1,3 +1,5 @@
+import { formatProductText } from '../shared/product';
+
 /**
  * Lightweight i18n module for the Electron main process.
  *
@@ -8,7 +10,7 @@
  * Usage:
  *   import { t, setLanguage } from './i18n';
  *   setLanguage('en');
- *   const label = t('trayShowWindow'); // "Open LobsterAI"
+ *   const label = t('trayShowWindow'); // "Open {productName}"
  *   const msg = t('imMissingCredentials', { fields: 'appId, appSecret' });
  */
 
@@ -33,16 +35,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     dshPlanProviderName: '套餐',
 
     // Tray menu
-    trayShowWindow: '打开 LobsterAI',
+    trayShowWindow: '打开 {productName}',
     trayNewTask: '新建任务',
     trayViewCompletedTask: '查看完成的任务',
-    trayCompletedTaskTooltip: 'LobsterAI - {count} 个任务已完成',
+    trayCompletedTaskTooltip: '{productName} - {count} 个任务已完成',
     traySettings: '设置',
     trayQuit: '退出',
 
     // Quit confirmation (native dialog shown on user-initiated quit)
-    appQuitConfirmTitle: '退出 LobsterAI？',
-    appQuitConfirmDetail: 'LobsterAI 关闭期间，定时任务不会运行，也无法回复 IM 消息。',
+    appQuitConfirmTitle: '退出 {productName}？',
+    appQuitConfirmDetail: '{productName} 关闭期间，定时任务不会运行，也无法回复 IM 消息。',
     appQuitConfirmUnsafeMarkdown: '有 Markdown 修改尚未保存，且无法备份草稿。退出后这些修改将丢失。请取消退出，返回文档保存或复制修改。',
     appQuitConfirmQuit: '退出',
     appQuitConfirmCancel: '取消',
@@ -50,22 +52,22 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskCompletionNotificationBody: '有任务已完成，点击查看结果',
     taskCompletionOverlayDescription: '有任务已完成',
     permissionNotificationTitle: '等待你的确认',
-    permissionNotificationBody: 'Agent 请求执行 {toolName}，等待你的确认',
-    permissionNotificationBodyGeneric: 'Agent 请求执行操作，等待你的确认',
+    permissionNotificationBody: '{productName} 请求执行 {toolName}，等待你的确认',
+    permissionNotificationBodyGeneric: '{productName} 请求执行操作，等待你的确认',
     questionNotificationTitle: '等待你的回答',
     questionNotificationBody: '需要你回答问题后才能继续',
     browserCredentialApprovalHeader: '保存的登录信息',
-    browserCredentialApprovalTitle: '允许 Agent 自动登录',
-    browserCredentialApprovalSubtitle: 'LobsterAI 将在隔离页面中填写，密码不会提供给 Agent。',
-    browserCredentialApprovalQuestion: '是否允许 Agent 使用账号 {username} 登录 {origin}？',
-    browserCredentialApprovalReason: 'Agent 给出的原因：{reason}',
+    browserCredentialApprovalTitle: '允许自动登录',
+    browserCredentialApprovalSubtitle: '{productName} 将在隔离页面中填写，密码不会提供给 AI。',
+    browserCredentialApprovalQuestion: '是否允许使用账号 {username} 登录 {origin}？',
+    browserCredentialApprovalReason: '操作原因：{reason}',
     browserCredentialApprovalAllow: '允许并继续',
     browserCredentialApprovalAllowDescription: '自动填写已保存的账号密码并继续当前任务',
     browserCredentialApprovalDeny: '拒绝',
     browserCredentialApprovalDenyDescription: '不使用保存的登录信息',
-    browserCredentialSelectionQuestion: '选择允许 Agent 用于登录 {origin} 的账号',
+    browserCredentialSelectionQuestion: '选择用于登录 {origin} 的账号',
     browserCredentialSelectionTitle: '选择登录账号',
-    browserCredentialSelectionSubtitle: '选定后，LobsterAI 将自动完成账号密码填写。',
+    browserCredentialSelectionSubtitle: '选定后，{productName} 将自动完成账号密码填写。',
     browserCredentialSelectionDescription: '使用该账号继续登录',
     contextMenuCut: '剪切',
     contextMenuCopy: '复制',
@@ -80,7 +82,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentBrowserMenuClearCookies: '清除 Cookie',
     agentBrowserMenuClearCache: '清除缓存',
     agentBrowserMenuUnavailable: '浏览器窗口当前不可用。',
-    agentBrowserRuntimeUnavailable: 'Agent 浏览器暂不可用，请稍后重试。',
+    agentBrowserRuntimeUnavailable: '浏览器暂不可用，请稍后重试。',
     agentBrowserMenuOpenFailed: '无法打开浏览器菜单。',
     agentBrowserZoomFailed: '调整浏览器缩放失败。',
 
@@ -115,14 +117,14 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // Cowork error messages (shared with renderer via classifyErrorKey)
     coworkErrorAuthInvalid: 'API 密钥无效或已过期，请检查配置。',
-    coworkErrorSubagentSummaryFailed: '子任务已完成，但主 Agent 未能恢复汇总。请继续对话以重试汇总。',
-    coworkErrorLobsterAILoginExpired: '登录状态已过期，请重新登录后继续使用 LobsterAI 套餐模型。',
+    coworkErrorSubagentSummaryFailed: '子任务已完成，但未能继续汇总。请继续对话以重试汇总。',
+    coworkErrorLobsterAILoginExpired: '登录状态已过期，请重新登录后继续使用 {productName} 套餐模型。',
     coworkErrorOAuthInvalid: 'OAuth 授权已失效或权限不足，请重新授权后重试。',
     coworkErrorModelAccessDenied: '当前账号无权访问该模型，请切换模型或检查服务商账号权限。',
     coworkErrorQuotaExhausted:
-      '积分额度已用完，请升级套餐后继续使用。[立即升级/充值](https://lobsterai.youdao.com/portal#/pricing)',
+      '积分额度已用完，请升级套餐后继续使用。请在设置中检查模型服务的额度',
     coworkErrorFreeQuotaExhausted:
-      '积分额度已用完，请升级套餐后继续使用。[立即升级/充值](https://lobsterai.youdao.com/portal#/pricing)',
+      '积分额度已用完，请升级套餐后继续使用。请在设置中检查模型服务的额度',
     coworkErrorEnterpriseMemberQuotaExhausted: '当前团队成员周期额度已用完。',
     coworkErrorEnterprisePoolExhausted: '当前团队积分池已用完。',
     coworkErrorEnterpriseCreditBatchesExpired: '当前团队积分批次已全部过期。',
@@ -134,7 +136,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '本次消息过大，请减少附件、压缩图片或拆分提交。（单次整体需小于 30MB）',
     coworkErrorCouldNotProcessPdf: '无法处理 PDF 文件。',
     coworkErrorModelNotFound: '请求的模型不存在或不可用。',
-    coworkGatewaySessionSyncTimeout: 'OpenClaw 引擎响应缓慢，消息尚未发送。请等待 1~2 分钟后重新发送；若频繁出现，请检查系统内存与磁盘占用，并将 LobsterAI 加入杀毒软件白名单。',
+    coworkGatewaySessionSyncTimeout: 'OpenClaw 引擎响应缓慢，消息尚未发送。请等待 1~2 分钟后重新发送；若频繁出现，请检查系统内存与磁盘占用，并将 {productName} 加入杀毒软件白名单。',
     coworkErrorTranscriptOversized: '该任务的历史记录过大。为保护 AI 引擎，本次消息未发送；请新建任务继续，原任务记录仍会保留。',
     coworkErrorGatewayHeapOutOfMemory: '本地 AI 引擎内存不足并已自动重启。当前任务可能过大，请等待恢复后在新任务中继续。',
     coworkErrorGatewayDisconnected: 'AI 引擎连接中断，请重试。',
@@ -203,13 +205,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     enterpriseMediaQuotaUnavailable: '当前团队的媒体生成额度暂不可用。',
 
     // Data migration dialogs
-    dataMigrationBackupDialogTitle: '备份 LobsterAI 数据',
-    dataMigrationRestoreDialogTitle: '导入 LobsterAI 数据备份',
-    dataMigrationBackupArchiveFilter: 'LobsterAI 备份包',
+    dataMigrationBackupDialogTitle: '备份 {productName} 数据',
+    dataMigrationRestoreDialogTitle: '导入 {productName} 数据备份',
+    dataMigrationBackupArchiveFilter: '{productName} 备份包',
     dataMigrationAllFilesFilter: '所有文件',
     dataMigrationBackupBlockedByActiveWorkloads:
-      '当前有正在运行的 Agent 或定时任务，请停止或等待任务完成后再备份。',
-    dataMigrationRestoreProgressTitle: '正在导入 LobsterAI 数据',
+      '当前有任务在运行，请停止或等待完成后再备份。',
+    dataMigrationRestoreProgressTitle: '正在导入 {productName} 数据',
     dataMigrationRestoreProgressDesc: '正在恢复备份并校验数据，完成后应用会自动重启。',
     dataMigrationRestoreProgressWarning: '请不要关闭应用或重启电脑，否则可能中断本次数据迁移。',
 
@@ -349,8 +351,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: '传输模式',
     emailTransportImap: 'IMAP/SMTP（传统模式）',
     emailTransportWs: 'WebSocket（安全模式，无需密码）',
-    emailAgentBinding: '绑定 Agent',
-    emailAgentBindingHint: '该邮箱的所有邮件对话将路由到选定的 Agent',
+    emailAgentBinding: '对话配置',
+    emailAgentBindingHint: '该邮箱的对话使用选定的配置处理',
     emailAllowFrom: '允许的发件人（白名单）',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: '支持通配符，每行一个。留空表示接受所有发件人。',
@@ -369,11 +371,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailReplyTo: '回复范围',
     emailReplyToSender: '仅回复发件人',
     emailReplyToAll: '回复发件人 + 所有收件人',
-    emailA2aConfig: 'Agent-to-Agent 配置',
+    emailA2aConfig: '邮件协作',
     emailA2aEnabled: '启用 A2A',
-    emailA2aAgentDomains: 'Agent 域名',
+    emailA2aAgentDomains: '协作域名',
     emailA2aAgentDomainsPlaceholder: 'agents.example.com',
-    emailA2aAgentDomainsHint: '允许进行 Agent 协作的域名，每行一个',
+    emailA2aAgentDomainsHint: '允许自动协作的域名，每行一个',
     emailA2aMaxTurns: 'A2A最大往返次数',
     emailConnectivityFailAlert: '连通性测试失败，请检查配置',
     emailConnected: '已连接',
@@ -420,16 +422,16 @@ const translations: Record<LanguageType, Record<string, string>> = {
     dshPlanProviderName: 'Plan',
 
     // Tray menu
-    trayShowWindow: 'Open LobsterAI',
+    trayShowWindow: 'Open {productName}',
     trayNewTask: 'New Task',
     trayViewCompletedTask: 'View Completed Task',
-    trayCompletedTaskTooltip: 'LobsterAI - {count} completed task(s)',
+    trayCompletedTaskTooltip: '{productName} - {count} completed task(s)',
     traySettings: 'Settings',
     trayQuit: 'Quit',
 
     // Quit confirmation (native dialog shown on user-initiated quit)
-    appQuitConfirmTitle: 'Quit LobsterAI?',
-    appQuitConfirmDetail: 'While LobsterAI is closed, scheduled tasks will not run and IM messages will not be answered.',
+    appQuitConfirmTitle: 'Quit {productName}?',
+    appQuitConfirmDetail: 'While {productName} is closed, scheduled tasks will not run and IM messages will not be answered.',
     appQuitConfirmUnsafeMarkdown: 'Some Markdown changes have not been saved and could not be backed up as drafts. Quitting will lose these changes. Cancel and return to the document to save or copy your changes.',
     appQuitConfirmQuit: 'Quit',
     appQuitConfirmCancel: 'Cancel',
@@ -437,22 +439,22 @@ const translations: Record<LanguageType, Record<string, string>> = {
     taskCompletionNotificationBody: 'A task has finished. Click to view the result.',
     taskCompletionOverlayDescription: 'Task complete',
     permissionNotificationTitle: 'Waiting for Your Confirmation',
-    permissionNotificationBody: 'The agent requests to run {toolName} and is waiting for your confirmation.',
-    permissionNotificationBodyGeneric: 'The agent requests to run an action and is waiting for your confirmation.',
+    permissionNotificationBody: '{productName} requests to run {toolName} and is waiting for your confirmation.',
+    permissionNotificationBodyGeneric: '{productName} requests to run an action and is waiting for your confirmation.',
     questionNotificationTitle: 'Waiting for Your Answer',
     questionNotificationBody: 'Waiting for your answer to continue.',
     browserCredentialApprovalHeader: 'Saved login',
-    browserCredentialApprovalTitle: 'Allow Agent sign-in',
-    browserCredentialApprovalSubtitle: 'LobsterAI fills the isolated page without revealing the password to the Agent.',
-    browserCredentialApprovalQuestion: 'Allow the Agent to sign in to {origin} as {username}?',
-    browserCredentialApprovalReason: 'Reason from the Agent: {reason}',
+    browserCredentialApprovalTitle: 'Allow automatic sign-in',
+    browserCredentialApprovalSubtitle: '{productName} fills the isolated page without revealing the password to AI.',
+    browserCredentialApprovalQuestion: 'Allow signing in to {origin} as {username}?',
+    browserCredentialApprovalReason: 'Reason for this action: {reason}',
     browserCredentialApprovalAllow: 'Allow and continue',
     browserCredentialApprovalAllowDescription: 'Fill the saved username and password and continue the current task',
     browserCredentialApprovalDeny: 'Deny',
     browserCredentialApprovalDenyDescription: 'Do not use the saved login',
-    browserCredentialSelectionQuestion: 'Choose an account the Agent may use to sign in to {origin}',
+    browserCredentialSelectionQuestion: 'Choose an account to sign in to {origin}',
     browserCredentialSelectionTitle: 'Choose a sign-in account',
-    browserCredentialSelectionSubtitle: 'LobsterAI will fill the selected account automatically.',
+    browserCredentialSelectionSubtitle: '{productName} will fill the selected account automatically.',
     browserCredentialSelectionDescription: 'Continue with this account',
     contextMenuCut: 'Cut',
     contextMenuCopy: 'Copy',
@@ -467,7 +469,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     agentBrowserMenuClearCookies: 'Clear Cookie',
     agentBrowserMenuClearCache: 'Clear cache',
     agentBrowserMenuUnavailable: 'The browser window is unavailable.',
-    agentBrowserRuntimeUnavailable: 'The Agent browser is temporarily unavailable. Try again later.',
+    agentBrowserRuntimeUnavailable: 'The browser is temporarily unavailable. Try again later.',
     agentBrowserMenuOpenFailed: 'Failed to open the browser menu.',
     agentBrowserZoomFailed: 'Failed to adjust browser zoom.',
 
@@ -512,15 +514,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
 
     // Cowork error messages
     coworkErrorAuthInvalid: 'Invalid or expired API key. Please check your configuration.',
-    coworkErrorSubagentSummaryFailed: 'Subtasks finished, but the main agent could not resume the summary. Send a follow-up to retry.',
+    coworkErrorSubagentSummaryFailed: 'Subtasks finished, but the summary could not resume. Send a follow-up to retry.',
     coworkErrorLobsterAILoginExpired:
-      'Your login session has expired. Sign in again to continue using LobsterAI plan models.',
+      'Your login session has expired. Sign in again to continue using {productName} plan models.',
     coworkErrorOAuthInvalid: 'OAuth authorization is invalid or missing required access. Re-authenticate and try again.',
     coworkErrorModelAccessDenied: 'This account is not allowed to access the selected model. Switch models or check provider account permissions.',
     coworkErrorQuotaExhausted:
-      'Your credits have been used up. Upgrade your plan to continue.\n\n[Upgrade or recharge](https://lobsterai.youdao.com/portal#/pricing)',
+      'Your credits have been used up. Upgrade your plan to continue.\n\nCheck your model provider quota in Settings',
     coworkErrorFreeQuotaExhausted:
-      'Your credits have been used up. Upgrade your plan to continue.\n\n[Upgrade or recharge](https://lobsterai.youdao.com/portal#/pricing)',
+      'Your credits have been used up. Upgrade your plan to continue.\n\nCheck your model provider quota in Settings',
     coworkErrorEnterpriseMemberQuotaExhausted: 'The current team member period quota has been used up.',
     coworkErrorEnterprisePoolExhausted: 'The current team credit pool has been used up.',
     coworkErrorEnterpriseCreditBatchesExpired: 'All credit batches for the current team have expired.',
@@ -532,7 +534,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'This message is too large. Reduce attachments, compress images, or split it up. (Keep each message under about 30 MB.)',
     coworkErrorCouldNotProcessPdf: 'Unable to process the PDF file.',
     coworkErrorModelNotFound: 'The requested model does not exist or is unavailable.',
-    coworkGatewaySessionSyncTimeout: 'The OpenClaw engine is responding slowly and your message has not been sent. Please wait a minute or two and resend. If this happens frequently, check system memory and disk usage, and add LobsterAI to your antivirus allowlist.',
+    coworkGatewaySessionSyncTimeout: 'The OpenClaw engine is responding slowly and your message has not been sent. Please wait a minute or two and resend. If this happens frequently, check system memory and disk usage, and add {productName} to your antivirus allowlist.',
     coworkErrorTranscriptOversized: 'This task history is too large. The message was not sent to protect the AI engine. Continue in a new task; the original task will be preserved.',
     coworkErrorGatewayHeapOutOfMemory: 'The local AI engine ran out of memory and is restarting automatically. This task may be too large; wait for recovery and continue in a new task.',
     coworkErrorGatewayDisconnected: 'AI engine connection lost. Please retry.',
@@ -557,9 +559,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     serverModelRuntimeProfileUnsupported:
       'This package model task profile is not supported by the current version.',
     serverModelToolCallingUnavailable:
-      'Agent tool calling is not enabled for this model yet.',
+      'Tool calling is not enabled for this model yet.',
     serverModelAgenticNotReady:
-      'This model is still undergoing agent capability validation. Please try again later.',
+      'This model is still undergoing task capability validation. Please try again later.',
     coworkErrorModelStreamEmptySseData:
       'Model stream format error: the model service returned an empty SSE data frame. Please retry later or check the current model proxy configuration.',
     coworkErrorModelStreamOnlyEmptySseData:
@@ -609,15 +611,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     enterpriseMediaQuotaUnavailable: 'Media generation quota is unavailable for this team.',
 
     // Data migration dialogs
-    dataMigrationBackupDialogTitle: 'Back Up LobsterAI Data',
-    dataMigrationRestoreDialogTitle: 'Import LobsterAI Data Backup',
-    dataMigrationBackupArchiveFilter: 'LobsterAI Backup',
+    dataMigrationBackupDialogTitle: 'Back Up {productName} Data',
+    dataMigrationRestoreDialogTitle: 'Import {productName} Data Backup',
+    dataMigrationBackupArchiveFilter: '{productName} Backup',
     dataMigrationAllFilesFilter: 'All Files',
     dataMigrationBackupBlockedByActiveWorkloads:
-      'An agent or scheduled task is still running. Stop it or wait for it to finish before backing up.',
-    dataMigrationRestoreProgressTitle: 'Importing LobsterAI data',
+      'A task is still running. Stop it or wait for it to finish before backing up.',
+    dataMigrationRestoreProgressTitle: 'Importing {productName} data',
     dataMigrationRestoreProgressDesc:
-      'Restoring the backup and validating data. LobsterAI will restart automatically when finished.',
+      'Restoring the backup and validating data. {productName} will restart automatically when finished.',
     dataMigrationRestoreProgressWarning:
       'Do not close the app or restart the computer, or the migration may be interrupted.',
 
@@ -784,8 +786,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: 'Transport Mode',
     emailTransportImap: 'IMAP/SMTP (Traditional)',
     emailTransportWs: 'WebSocket (Secure, no password required)',
-    emailAgentBinding: 'Agent Binding',
-    emailAgentBindingHint: 'All email conversations will be routed to the selected Agent',
+    emailAgentBinding: 'Conversation profile',
+    emailAgentBindingHint: 'Email conversations use the selected profile',
     emailAllowFrom: 'Allowed Senders (Whitelist)',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: 'Supports wildcards, one per line. Empty = accept all senders.',
@@ -804,11 +806,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailReplyTo: 'Reply Recipients',
     emailReplyToSender: 'Sender only',
     emailReplyToAll: 'Sender + all recipients',
-    emailA2aConfig: 'Agent-to-Agent Configuration',
+    emailA2aConfig: 'Email collaboration',
     emailA2aEnabled: 'Enable A2A',
-    emailA2aAgentDomains: 'Agent Domains',
+    emailA2aAgentDomains: 'Collaboration domains',
     emailA2aAgentDomainsPlaceholder: 'agents.example.com',
-    emailA2aAgentDomainsHint: 'Domains allowed for agent collaboration, one per line',
+    emailA2aAgentDomainsHint: 'Domains allowed for automated collaboration, one per line',
     emailA2aMaxTurns: 'A2A Max Ping-Pong Turns',
     emailConnectivityFailAlert: 'Connectivity test failed, please check your configuration',
     emailConnected: 'Connected',
@@ -869,5 +871,5 @@ export function t(key: string, params?: Record<string, string | number>): string
       text = text.replace(`{${k}}`, String(v));
     }
   }
-  return text;
+  return formatProductText(text);
 }

@@ -7,6 +7,7 @@ import { buildGoalSettingMessageMetadata } from '../../../common/goalCommandDisp
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { buildCoworkImageAttachmentPreviews } from '../../../shared/cowork/imageAttachments';
 import type { CoworkSelectedTextSnippet } from '../../../shared/cowork/selectedText';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import startupCreditEntryGiftUrl from '../../assets/startup-credit-entry-gift.svg';
 import { EnterpriseQuotaPrompt } from '../../features/enterpriseAccount/components/EnterpriseQuotaPrompt';
 import { refreshEnterpriseAccountContext } from '../../features/enterpriseAccount/context';
@@ -18,11 +19,12 @@ import {
   selectEnterpriseAccountContext,
   selectIsEnterpriseAccount,
 } from '../../features/enterpriseAccount/selectors';
-import { agentService } from '../../services/agent';
 import { coworkService } from '../../services/cowork';
 import { buildCoworkCapabilitySelection } from '../../services/coworkCapabilitySelection';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
+import { validateProjectDirectory } from '../../services/workspaceFiles';
+import { workspaceProjects } from '../../services/workspaceProjects';
 import { RootState } from '../../store';
 import {
   selectCoworkConfig,
@@ -32,8 +34,8 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import { addMessage, setCurrentSession, setDraftCollaborationMode, setDraftKitIds, setDraftSkillIds, setStreaming, updateSessionGoal, updateSessionStatus } from '../../store/slices/coworkSlice';
 import { clearActiveKits } from '../../store/slices/kitSlice';
-import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
-import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
+import { clearSelection, setActions } from '../../store/slices/quickActionSlice';
+import { clearActiveSkills } from '../../store/slices/skillSlice';
 import {
   CoworkCollaborationMode,
   type CoworkCollaborationMode as CoworkCollaborationModeType,
@@ -51,9 +53,9 @@ import { DailyCheckInHeaderEntry } from '../DailyCheckInActivity';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import { ModelAccessPromptKind, ModelAccessPromptModal } from '../ModelSelector';
-import { PromptPanel, QuickActionBar } from '../quick-actions';
+import { ProjectSelector } from '../projects/ProjectControls';
+import { useWorkspaceProjects } from '../projects/useWorkspaceProjects';
 import type { SettingsOpenOptions } from '../Settings';
-import HomeSkinEmblem from '../skin/HomeSkinEmblem';
 import SkinAmbientEffects from '../skin/SkinAmbientEffects';
 import SkinBackdrop, { SkinBackdropVariant } from '../skin/SkinBackdrop';
 import {
@@ -64,18 +66,7 @@ import { resolveModelThinkingLevel, useAgentSelectedModel } from './agentModelSe
 import { CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionDetail from './CoworkSessionDetail';
-import { reportPromptTemplateAction } from './promptAnalytics';
 import { buildCoworkContinuationSystemPrompt, buildCoworkSystemPrompt } from './skillSystemPrompt';
-
-// Time-aware hero greeting: the brand mark stays as the logo, so the heading
-// can greet the user instead of repeating the product name on every visit.
-const resolveHomeGreetingKey = (date: Date = new Date()): string => {
-  const hour = date.getHours();
-  if (hour >= 5 && hour < 12) return 'coworkGreetingMorning';
-  if (hour >= 12 && hour < 18) return 'coworkGreetingAfternoon';
-  if (hour >= 18 && hour < 23) return 'coworkGreetingEvening';
-  return 'coworkGreetingLateNight';
-};
 
 const logCoworkViewModel = (message: string): void => {
   console.debug(`[CoworkView] ${message}`);
@@ -90,6 +81,8 @@ export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
   onShowSkills?: () => void;
   onShowKits?: () => void;
+  onShowLibrary?: () => void;
+  onShowScheduledTasks?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -162,14 +155,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const activeKitIds = useSelector((state: RootState) => state.kit.activeKitIds);
   const installedKits = useSelector((state: RootState) => state.kit.installedKits);
   const marketplaceKits = useSelector((state: RootState) => state.kit.marketplaceKits);
-  const quickActions = useSelector((state: RootState) => state.quickAction.actions);
-  const selectedActionId = useSelector((state: RootState) => state.quickAction.selectedActionId);
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
   const startupCreditEntry = useStartupCreditCampaignEntry();
   const agents = useSelector((state: RootState) => state.agent.agents);
   const currentAgent = agents.find((agent) => agent.id === currentAgentId);
   const shouldPresentConversation = Boolean(currentSession || sessionNavigationTargetId);
-  const currentAgentWorkingDirectory = currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
+  const projectState = useWorkspaceProjects();
+  const selectedProject = projectState.projects.find(project => project.id === projectState.selectedProjectId);
+  const currentAgentWorkingDirectory = selectedProject?.directory || currentAgent?.workingDirectory?.trim() || config.workingDirectory || '';
   const currentAgentSelectedModel = useAgentSelectedModel(currentAgentId, currentAgent?.model ?? '');
   const currentAgentSelectedModelRef = currentAgentSelectedModel
     ? toOpenClawModelRef(currentAgentSelectedModel)
@@ -183,9 +176,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentAgentSelectedModel,
     currentAgent?.thinkingLevel,
   );
-  const homeDraftCollaborationMode = useSelector((state: RootState) => (
-    state.cowork.draftCollaborationModes.__home__ || CoworkCollaborationMode.Default
-  ));
   const mediaSelection = useSelector((state: RootState) => {
     const key = currentSession?.id || '__home__';
     return state.cowork.mediaSelection[key];
@@ -350,6 +340,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     // Prevent duplicate submissions
     if (isStartingRef.current) return false;
     isStartingRef.current = true;
+    const sessionProjectId = selectedProject?.id ?? null;
     const requestId = ++startRequestIdRef.current;
     pendingStartRef.current = { requestId, cancelled: false, cancellationAction: null };
     const isPendingStartCancelled = () => {
@@ -365,6 +356,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     };
 
     try {
+      if (selectedProject?.directory) {
+        try { await validateProjectDirectory(selectedProject.directory); }
+        catch {
+          window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('projectPathInvalid') }));
+          return false;
+        }
+        if (isPendingStartCancelled()) return false;
+      }
       try {
         const apiConfig = await coworkService.checkApiConfig();
         if (apiConfig && !apiConfig.hasConfig) {
@@ -521,6 +520,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       if (!startedSession) {
         return false;
       }
+      await workspaceProjects.assignSession(startedSession.id, sessionProjectId).catch(error => {
+        console.error('[Projects] Failed to save conversation membership:', error);
+        window.dispatchEvent(new CustomEvent('app:showToast', { detail: i18nService.t('projectSaveError') }));
+      });
       if (currentSessionIdRef.current === tempSessionId) {
         logCoworkViewModel(`replacing temp session ${tempSessionId} with started session ${startedSession.id}`);
         dispatch(setCurrentSession(startedSession));
@@ -650,103 +653,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     await coworkService.stopSession(currentSession.id);
   }, [currentSession]);
 
-  // Get selected quick action
-  const selectedAction = React.useMemo(() => {
-    return quickActions.find(action => action.id === selectedActionId);
-  }, [quickActions, selectedActionId]);
-
-  // Deselect quick action: restore the chip bar and deactivate the auto-enabled skill
-  const handleQuickActionDeselect = () => {
-    const action = quickActions.find(a => a.id === selectedActionId);
-    dispatch(clearSelection());
-    if (action && activeSkillIds.includes(action.skillMapping)) {
-      dispatch(setActiveSkillIds(activeSkillIds.filter(id => id !== action.skillMapping)));
-    }
-  };
-
-  // Handle quick action button click: select action + activate skill in one batch.
-  // Clicking the selected chip again collapses the prompt panel.
-  const handleActionSelect = (actionId: string) => {
-    if (actionId === selectedActionId) {
-      handleQuickActionDeselect();
-      return;
-    }
-    dispatch(selectAction(actionId));
-    const action = quickActions.find(a => a.id === actionId);
-    if (action) {
-      const targetSkill = skills.find(s => s.id === action.skillMapping);
-      console.debug(`[CoworkView] reporting prompt template analytics: template_card_click ${action.id}`);
-      reportPromptTemplateAction({
-        templateActionType: 'template_card_click',
-        templateId: action.id,
-        templateName: action.label,
-        templateIndex: quickActions.findIndex(item => item.id === action.id),
-        mappedSkillId: action.skillMapping,
-        mappedSkillName: targetSkill?.name,
-        hasAutoEnabledSkill: Boolean(targetSkill),
-        params: {
-          promptCount: action.prompts.length,
-          modelId: currentAgentSelectedModel?.id,
-          modelName: currentAgentSelectedModel?.name,
-          agentId: currentAgentId,
-          isMainAgent: currentAgentId === 'main',
-          isPlanMode: homeDraftCollaborationMode === CoworkCollaborationMode.Plan,
-        },
-      });
-      if (targetSkill) {
-        dispatch(setActiveSkillIds([targetSkill.id]));
-      }
-    }
-  };
-
-  // When the mapped skill is deactivated from input area, restore the QuickActionBar.
-  // Only applies when the mapped skill exists (and thus was auto-enabled on select);
-  // otherwise a missing skill would make the prompt panel impossible to open.
-  useEffect(() => {
-    if (!selectedActionId) return;
-    const action = quickActions.find(a => a.id === selectedActionId);
-    if (action) {
-      const mappedSkillExists = skills.some(s => s.id === action.skillMapping);
-      if (mappedSkillExists && !activeSkillIds.includes(action.skillMapping)) {
-        dispatch(clearSelection());
-      }
-    }
-  }, [activeSkillIds, dispatch, quickActions, selectedActionId, skills]);
-
-  // Handle prompt selection from QuickAction
-  const handleQuickActionPromptSelect = (prompt: string, promptId?: string) => {
-    if (selectedAction) {
-      const selectedPrompt = selectedAction.prompts.find(item => item.id === promptId);
-      const targetSkill = skills.find(skill => skill.id === selectedAction.skillMapping);
-      console.debug(`[CoworkView] reporting prompt template analytics: template_prompt_click ${selectedAction.id}/${promptId ?? 'unknown'}`);
-      reportPromptTemplateAction({
-        templateActionType: 'template_prompt_click',
-        templateId: selectedAction.id,
-        templateName: selectedAction.label,
-        templateIndex: quickActions.findIndex(item => item.id === selectedAction.id),
-        mappedSkillId: selectedAction.skillMapping,
-        mappedSkillName: targetSkill?.name,
-        promptId,
-        promptName: selectedPrompt?.label,
-        promptIndex: selectedAction.prompts.findIndex(item => item.id === promptId),
-        promptLength: prompt.length,
-        hasAutoEnabledSkill: activeSkillIds.includes(selectedAction.skillMapping),
-        params: {
-          modelId: currentAgentSelectedModel?.id,
-          modelName: currentAgentSelectedModel?.name,
-          agentId: currentAgentId,
-          isMainAgent: currentAgentId === 'main',
-          isPlanMode: homeDraftCollaborationMode === CoworkCollaborationMode.Plan,
-        },
-      });
-    }
-    // Fill the prompt into input
-    promptInputRef.current?.setValue(prompt, 'template');
-    promptInputRef.current?.focus();
-  };
-
   useEffect(() => {
     const handleNewSession = () => {
+      workspaceProjects.select(null);
       // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
       const shouldClear = !currentSession;
       coworkService.clearSession({ restoreAgentSkills: true });
@@ -805,13 +714,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const isEngineReady = isOpenClawReadyForSession(openClawStatus);
 
   const homeHeader = (
-    <div className="draggable relative z-10 flex h-12 items-center justify-between px-4 shrink-0">
-      <div className="non-draggable h-8 flex items-center">
+    <div className="draggable relative z-10 flex h-14 items-center justify-between px-7 shrink-0">
+      <div className="non-draggable flex h-8 min-w-0 flex-1 items-center">
         {isSidebarCollapsed && !isWindows && (
           <div className={`flex items-center gap-1 mr-2 ${isMac ? 'pl-[68px]' : ''}`}>
             <button
               type="button"
               onClick={onToggleSidebar}
+              aria-label={i18nService.t('expand')}
               className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             >
               <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
@@ -819,6 +729,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             <button
               type="button"
               onClick={onNewChat}
+              aria-label={i18nService.t('newChat')}
               className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
             >
               <ComposeIcon className="h-4 w-4" />
@@ -826,9 +737,18 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             {updateBadge}
           </div>
         )}
+        <span className="ml-2 mr-4 truncate text-sm font-medium text-foreground">{selectedProject?.name || i18nService.t('productName')}</span>
+
       </div>
-      <div className="non-draggable flex items-center">
-        {!isEnterpriseAccount && startupCreditEntry.available && (
+      <div className="non-draggable flex items-center gap-2">
+        <div className="workspace-header-signature flex shrink-0 items-center gap-2 text-xs text-muted" aria-hidden="true">
+          <svg className="h-4 w-8 text-primary" viewBox="0 0 32 16" fill="none">
+            <path d="M20 1C21.5 5 23 6.5 27 8C23 9.5 21.5 11 20 15C18.5 11 17 9.5 13 8C17 6.5 18.5 5 20 1Z" fill="currentColor" />
+            <path d="M5 5L7 8L5 11L3 8Z" fill="currentColor" opacity=".35" />
+          </svg>
+          <span>{i18nService.t('starpathWorkspace')}</span>
+        </div>
+        {PRODUCT_FEATURES.promotions && !isEnterpriseAccount && startupCreditEntry.available && (
           <button
             type="button"
             onClick={() => openStartupCreditCampaign()}
@@ -845,11 +765,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             </span>
           </button>
         )}
-        <DailyCheckInHeaderEntry
+        {PRODUCT_FEATURES.promotions && <DailyCheckInHeaderEntry
           enabled={!isEnterpriseAccount}
           suppressed={!startupCreditEntry.resolved
             || startupCreditEntry.available}
-        />
+        />}
       </div>
     </div>
   );
@@ -858,44 +778,21 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   // the title bar as a lightweight notice; starting and blocking startup
   // failures render as global overlays in App.tsx.
   const engineStatusBanner = shouldShowEngineStatus && !isEngineError && openClawStatus && openClawStatus.phase !== 'starting' ? (
-    <div className="pointer-events-none absolute inset-x-0 top-14 z-30 flex justify-center px-4">
-      <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-amber-200 bg-surface p-4 shadow-lg animate-fade-in-down dark:border-amber-900/60">
-        <div className="flex items-start gap-3">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
-            <ExclamationTriangleIcon className="h-5 w-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium text-foreground">
-              {resolveEngineStatusText(openClawStatus)}
-              {typeof openClawStatus.progressPercent === 'number' && (
-                <span className="ml-1 font-normal text-secondary">
-                  ({Math.round(openClawStatus.progressPercent)}%)
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => onRequestAppSettings?.({ initialTab: 'coworkAgentEngine' })}
-            className="text-xs text-secondary underline-offset-2 transition-colors hover:text-foreground hover:underline"
-          >
-            {i18nService.t('coworkOpenClawGoToSettingsInstall')}
-          </button>
-          <button
-            type="button"
-            onClick={handleRestartGateway}
-            disabled={isRestartingGateway}
-            className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-xs font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60 active:scale-[0.98]"
-          >
-            {isRestartingGateway && (
-              <ArrowPathIcon className="h-3.5 w-3.5 animate-spin" />
-            )}
-            {i18nService.t('coworkOpenClawRestartGateway')}
-          </button>
-        </div>
-      </div>
+    <div role="status" className="workspace-engine-status flex flex-wrap items-center justify-center gap-x-2 gap-y-1 px-3 py-2 text-xs text-muted">
+      <ExclamationTriangleIcon className="h-3.5 w-3.5 shrink-0 text-muted" />
+      <span>{openClawStatus.phase === 'not_installed'
+        ? i18nService.t('workspaceEngineMissing') : resolveEngineStatusText(openClawStatus)}
+        {typeof openClawStatus.progressPercent === 'number' && ` (${Math.round(openClawStatus.progressPercent)}%)`}
+      </span>
+      <button type="button" onClick={() => onRequestAppSettings?.({ initialTab: 'coworkAgentEngine' })}
+        className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-surface-raised">
+        {i18nService.t('coworkOpenClawGoToSettingsInstall')}
+      </button>
+      {openClawStatus.phase !== 'not_installed' && <button type="button" onClick={handleRestartGateway} disabled={isRestartingGateway}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-surface-raised disabled:opacity-50">
+        {isRestartingGateway && <ArrowPathIcon className="h-3 w-3 animate-spin" />}
+        {i18nService.t('coworkOpenClawRestartGateway')}
+      </button>}
     </div>
   ) : null;
 
@@ -927,41 +824,22 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         </div>
       ) : (
         <>
-          {/* Engine status banner for non-blocking states */}
-          {engineStatusBanner}
-
-          {/* Header */}
           {homeHeader}
 
           {/* Main content */}
           <div className="relative z-10 flex-1 overflow-y-auto min-h-0">
-            <div className="relative flex min-h-full w-full min-w-[320px] flex-col items-center px-4 py-8">
-              {/* Flexible spacers (2:3) keep the welcome block at the optical
-                  center on tall windows; min-h preserves breathing room before
-                  the page starts scrolling on short windows. */}
-              <div aria-hidden="true" className="w-full min-h-[56px] flex-[2_0_0px]" />
-              {/* Welcome Section - staggered entrance animation */}
-              <div data-skin-home-copy="true" className="w-full max-w-3xl text-center">
-                <HomeSkinEmblem
-                  className="mx-auto h-12 w-12 animate-fade-in-up"
-                />
-                <h2
-                  className="mt-4 text-2xl font-semibold leading-[var(--lobster-leading-2xl)] tracking-normal text-foreground animate-fade-in-up"
-                  style={{ animationDelay: '70ms', animationFillMode: 'both' }}
-                >
-                  {i18nService.t(resolveHomeGreetingKey())}
-                </h2>
-                <p
-                  className="mt-2 text-[length:var(--lobster-text-promptLarge)] font-normal leading-[var(--lobster-leading-promptLarge)] text-secondary animate-fade-in-up"
-                  style={{ animationDelay: '120ms', animationFillMode: 'both' }}
-                >
-                  {i18nService.t('coworkHomeTagline')}
-                </p>
+            <div className="workspace-home relative mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-center px-8 pb-[12vh] pt-10">
+              <div data-skin-home-copy="true" className="w-full text-center animate-fade-in-up">
+                <img src="logo.svg" alt="" className="workspace-home-emblem mx-auto mb-5 h-12 w-12" />
+                <h1 className="text-[28px] font-medium leading-[1.35] tracking-[-0.03em] text-foreground">
+                  {selectedProject?.name || i18nService.t('projectWelcome')}
+                </h1>
+                {selectedProject && <p className="mt-3 text-sm text-secondary">{i18nService.t('projectStartChat')}</p>}
               </div>
 
               {/* Prompt Input Area - Large version with folder selector */}
               <div
-                className="relative z-30 mt-9 w-full max-w-3xl animate-fade-in-up"
+                className="relative z-30 mt-7 w-full animate-fade-in-up"
                 style={{ animationDelay: '180ms', animationFillMode: 'both' }}
               >
                 <CoworkPromptInput
@@ -974,12 +852,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   placeholder={i18nService.t('coworkPlaceholder')}
                   size="large"
                   workingDirectory={currentAgentWorkingDirectory}
-                  onWorkingDirectoryChange={async (dir: string) => {
-                    await agentService.updateAgent(currentAgentId, { workingDirectory: dir });
-                  }}
-                  showFolderSelector={true}
+                  homeContext={<ProjectSelector />}
+                  showFolderSelector={false}
                   showModelSelector={true}
-                  showAgentSelector={true}
+                  showAgentSelector={false}
                   onManageSkills={() => onShowSkills?.()}
                   onManageKits={() => onShowKits?.()}
                   onGoalCommand={handleStartGoalSession}
@@ -990,29 +866,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 />
               </div>
 
-              {/* Quick Actions */}
-              <div
-                className="relative z-0 mt-8 flex w-full max-w-3xl flex-col items-center animate-fade-in-up"
-                style={{ animationDelay: '260ms', animationFillMode: 'both' }}
-              >
-                <QuickActionBar
-                  actions={quickActions}
-                  selectedActionId={selectedActionId}
-                  onActionSelect={handleActionSelect}
-                />
-                {selectedAction && (
-                  <div className="mt-4 w-full">
-                    <PromptPanel
-                      action={selectedAction}
-                      onPromptSelect={handleQuickActionPromptSelect}
-                      onClose={handleQuickActionDeselect}
-                    />
-                  </div>
-                )}
-                <CreditsResetCampaignFloat />
-              </div>
+              <div className="mt-5">{engineStatusBanner}</div>
+              {PRODUCT_FEATURES.promotions && <CreditsResetCampaignFloat />}
 
-              <div aria-hidden="true" className="w-full min-h-[24px] flex-[3_0_0px]" />
             </div>
           </div>
         </>

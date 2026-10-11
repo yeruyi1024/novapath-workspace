@@ -18,6 +18,7 @@ import {
 } from '../shared/library/constants';
 import type { LibrarySessionRef } from '../shared/library/types';
 import { OpenClawEnginePhase } from '../shared/openclawEngine/constants';
+import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../shared/product';
 import { ProviderAuthType, ProviderName, ProviderRegistry } from '../shared/providers';
 import { SIDEBAR_TASK_FILTER_ENABLED } from './components/agentSidebar/SidebarTaskFilterButton';
 import { CoworkView } from './components/cowork';
@@ -64,6 +65,7 @@ import {
 } from './components/update/appUpdateInteractionState';
 import AppUpdateModal from './components/update/AppUpdateModal';
 import { shouldShowAppUpdateNotice } from './components/update/appUpdateNoticeState';
+import WelcomeDialog from './components/WelcomeDialog';
 import WindowsAppTitleBar from './components/window/WindowsAppTitleBar';
 import { defaultConfig, getProviderDisplayName, ShortcutAction } from './config';
 import { selectIsEnterpriseAccount } from './features/enterpriseAccount/selectors';
@@ -85,6 +87,7 @@ import { scheduledTaskService } from './services/scheduledTask';
 import { isTextEditingSafeShortcut, matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { applyTypographyPreferences } from './services/typography';
+import { workspaceProjects } from './services/workspaceProjects';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
@@ -236,7 +239,7 @@ const App: React.FC = () => {
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTaskFilterActive, setIsTaskFilterActive] = useState(false);
-  const [hasUnreadCompletedTasks, setHasUnreadCompletedTasks] = useState(false);
+  const [hasUnreadCompletedTasks] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(244);
   const initialOpenClawEngineStatusRef = useRef(coworkService.getOpenClawEngineStatusSnapshot());
   const [isEngineStartupOverlayVisible, setIsEngineStartupOverlayVisible] = useState(
@@ -256,7 +259,6 @@ const App: React.FC = () => {
   });
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showUpdateInstallConfirm, setShowUpdateInstallConfirm] = useState(false);
-  const [isUpdateCardExpanded, setIsUpdateCardExpanded] = useState(false);
   const [isUserInitiatedUpdateFlowActive, setIsUserInitiatedUpdateFlowActive] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState<boolean | null>(null);
   const [trialTaskCreatedSignal, setTrialTaskCreatedSignal] = useState(0);
@@ -910,6 +912,7 @@ const App: React.FC = () => {
   }, [isSidebarCollapsed, mainView]);
 
   const handleNewChat = useCallback(() => {
+    workspaceProjects.select(null);
     setTrialTaskCreatedSignal(value => value + 1);
     // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
     const shouldClearInput = mainView === 'cowork' && !currentSessionId;
@@ -1011,9 +1014,11 @@ const App: React.FC = () => {
     };
   }, [showToast, stopUserInitiatedUpdateFlow]);
 
-  const handleShowLogin = useCallback(() => {
-    showToast(i18nService.t('featureInDevelopment'));
-  }, [showToast]);
+  useEffect(() => {
+    const openModelSettings = () => handleShowSettings({ initialTab: 'model' });
+    window.addEventListener(CoworkUiEvent.OpenModelSettings, openModelSettings);
+    return () => window.removeEventListener(CoworkUiEvent.OpenModelSettings, openModelSettings);
+  }, [handleShowSettings]);
 
   const runUpdateCheck = useCallback(async (): Promise<boolean> => {
     try {
@@ -1524,11 +1529,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartAiSkinFromSettings = (text: string, kitId: string) => {
-    handleCloseSettings();
-    openHomeWithKit(kitId, text);
-  };
-
   const isShortcutInputActive = () => {
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement)) return false;
@@ -1877,7 +1877,7 @@ const App: React.FC = () => {
     if (!isInitialized) return;
 
     // Enterprise mode: completely skip update detection
-    if (enterpriseConfig?.disableUpdate) return;
+    if (!PRODUCT_SERVICES.updateUrl || enterpriseConfig?.disableUpdate) return;
 
     let cancelled = false;
     let lastCheckTime = 0;
@@ -2001,7 +2001,6 @@ const App: React.FC = () => {
       updateState={appUpdateState}
       onUpdate={handleConfirmUpdate}
       onShowDetails={handleOpenUpdateModal}
-      onExpandedChange={setIsUpdateCardExpanded}
     />
   ) : null;
   const canUseWindowsTopBarActions = isInitialized && !initError && !isUpdateInteractionBlocked;
@@ -2096,7 +2095,7 @@ const App: React.FC = () => {
     <SkinProvider>
       <SkinPresentationScope
         enabled
-        className="h-screen overflow-hidden flex flex-col bg-surface-raised"
+        className="workspace-shell h-screen overflow-hidden flex flex-col bg-background"
       >
       {toastMessage && (
         <Toast
@@ -2107,21 +2106,21 @@ const App: React.FC = () => {
           onClose={() => setToastMessage(null)}
         />
       )}
-      <SubscriptionTrialCampaign
+      {PRODUCT_FEATURES.promotions && <SubscriptionTrialCampaign
         privacyAgreed={privacyAgreed}
         taskCreatedSignal={trialTaskCreatedSignal}
-        enabled={privacyAgreed === true && !isOverlayActive && hasResolvedEngineStartupOverlayState && !isEngineStartupOverlayVisible}
-      />
-      <StartupCreditCampaign
-        enabled={privacyAgreed === true && !isEnterpriseAccount}
-      />
+        enabled={PRODUCT_FEATURES.promotions && privacyAgreed === true && !isOverlayActive && hasResolvedEngineStartupOverlayState && !isEngineStartupOverlayVisible}
+      />}
+      {PRODUCT_FEATURES.promotions && <StartupCreditCampaign
+        enabled={PRODUCT_FEATURES.promotions && privacyAgreed === true && !isEnterpriseAccount}
+      />}
       {windowsStandaloneTitleBar}
+      {window.electron.platform === 'linux' && <div className="workspace-linux-titlebar draggable flex shrink-0 items-center px-4 text-xs text-muted">{i18nService.t('productName')}</div>}
       <div
         className="relative flex flex-1 min-h-0 overflow-hidden"
         aria-busy={isUpdateInteractionBlocked}
       >
         <Sidebar
-          onShowLogin={handleShowLogin}
           onShowSettings={handleShowSettings}
           activeView={mainView}
           onShowSkills={handleShowSkills}
@@ -2132,21 +2131,14 @@ const App: React.FC = () => {
           onNewChat={handleNewChat}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={handleToggleSidebar}
-          isTaskFilterActive={isTaskFilterActive}
-          hasUnreadCompletedTasks={hasUnreadCompletedTasks}
-          onToggleTaskFilter={handleToggleTaskFilter}
-          onTaskFilterSummaryChange={setHasUnreadCompletedTasks}
           onWidthChange={setSidebarWidth}
           updateNotice={!isSidebarCollapsed && !isUpdateInteractionBlocked ? updateCard : null}
-          hideAdBanner={isUpdateCardExpanded}
-          hideLogin={enterpriseConfig?.ui?.login === 'hide'}
-          isEngineStartupOverlayVisible={isEngineStartupOverlayVisible}
         />
-        <div className={`flex-1 min-w-0 transition-[padding] duration-200 ease-out ${isSidebarCollapsed ? 'pl-1.5' : ''}`}>
+        <div className="workspace-main flex-1 min-w-0">
           <div
             data-skin-cowork-frame={mainView === 'cowork' ? 'true' : undefined}
             data-skin-management-frame={mainView !== 'cowork' ? 'true' : undefined}
-            className="relative h-full min-h-0 rounded-xl border border-border bg-background overflow-hidden"
+            className="relative h-full min-h-0 bg-background overflow-hidden"
           >
             {mainView !== 'cowork' && (
               <SkinBackdrop variant={SkinBackdropVariant.Management} />
@@ -2194,6 +2186,8 @@ const App: React.FC = () => {
               />
             ) : (
               <CoworkView
+                onShowLibrary={handleShowLibrary}
+                onShowScheduledTasks={handleShowScheduledTasks}
                 onRequestAppSettings={handleShowSettings}
                 onShowSkills={handleShowSkills}
                 onShowKits={handleShowKits}
@@ -2213,7 +2207,7 @@ const App: React.FC = () => {
             <AppUpdateBlockingPanel updateState={appUpdateState} />
           </AppUpdateInteractionOverlay>
         )}
-        {shouldShowNewUserOnboarding && (
+        {shouldShowNewUserOnboarding && (PRODUCT_FEATURES.account ? (
           <FirstRunLoginIntroduction onStartExperience={handleNewUserOnboardingStartExperience}>
             <NewUserOnboardingOverlay
               step={newUserOnboardingStep}
@@ -2222,7 +2216,15 @@ const App: React.FC = () => {
               onStartExperience={handleNewUserOnboardingStartExperience}
             />
           </FirstRunLoginIntroduction>
-        )}
+        ) : (
+          <WelcomeDialog
+            onCustomModel={() => {
+              finishNewUserOnboarding('skip');
+              handleShowSettings({ initialTab: 'model' });
+            }}
+            onContinue={() => finishNewUserOnboarding('skip')}
+          />
+        ))}
       </div>
 
       <EngineFailureOverlay
@@ -2234,7 +2236,6 @@ const App: React.FC = () => {
       {showSettings && (
         <Settings
           onClose={handleCloseSettings}
-          onStartAiSkin={handleStartAiSkinFromSettings}
           initialTab={settingsOptions.initialTab}
           initialTabRequestId={settingsOptions.requestId}
           notice={settingsOptions.notice}

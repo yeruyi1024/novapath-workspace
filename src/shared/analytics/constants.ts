@@ -1,5 +1,7 @@
+import { PRODUCT_SERVICES } from '../product';
+
 export const LogReporterEndpoint = {
-  YoudaoAnalyzer: 'https://rlogs.youdao.com/rlog.php',
+  YoudaoAnalyzer: PRODUCT_SERVICES.analyticsUrl,
 } as const;
 
 export const LogReporterProduct = {

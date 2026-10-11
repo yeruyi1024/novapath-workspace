@@ -114,6 +114,8 @@ export interface AppConfig {
   };
   providers?: Record<string, ProviderConfig>;
   providerModelMigrationVersions?: Record<string, number>;
+  // Identity of the user-configured StarPath gateway; never reuse another provider slot.
+  platformProviderId?: string;
   // 主题配置
   theme: 'light' | 'dark' | 'system';
   // Optional for configs created before exact default theme persistence was introduced.
@@ -193,17 +195,13 @@ export const defaultConfig: AppConfig = {
   useSystemProxy: false,
   artifactAutoPreviewEnabled: true,
   sqliteAutoBackupEnabled: false,
-  usageAnalyticsEnabled: true,
+  usageAnalyticsEnabled: false,
   notificationSettings: defaultNotificationSettings,
   browserWebAccess: defaultBrowserWebAccessConfig,
   app: {
     port: 3000,
     isDevelopment: process.env.NODE_ENV === 'development',
-    // Default to production (official) services. Source-launched dev builds run
-    // with NODE_ENV=development, but must not auto-target the internal-only test
-    // endpoints (*.inner.youdao.com) — external/open-source users can't reach
-    // them. Flip test mode via the hidden switch in Settings → About when the
-    // internal endpoints are actually needed.
+    // Retained for compatibility; service destinations come from product.json.
     testMode: false,
   },
   shortcuts: {
@@ -254,7 +252,6 @@ export const CONFIG_KEYS = {
   APP_CONFIG: 'app_config',
   AUTH: 'auth_state',
   CONVERSATIONS: 'conversations',
-  PROVIDERS_EXPORT_KEY: 'providers_export_key',
   SKILLS: 'skills',
 };
 

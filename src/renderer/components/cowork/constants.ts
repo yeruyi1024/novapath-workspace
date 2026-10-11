@@ -1,4 +1,5 @@
 export const CoworkUiEvent = {
+  OpenModelSettings: 'cowork:open-model-settings',
   OpenShareOptions: 'cowork:open-share-options',
   SelectSubagent: 'cowork:select-subagent',
   FocusInput: 'cowork:focus-input',

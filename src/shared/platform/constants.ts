@@ -1,3 +1,4 @@
+import { PRODUCT_SERVICES } from '../product';
 /**
  * IM Platform Constants — Single Source of Truth
  *
@@ -39,7 +40,7 @@ const DEFINITIONS = [
     channelAliases: [],
     logo: 'weixin.png',
     guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E5%BE%AE%E4%BF%A1-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'dingtalk',
@@ -49,7 +50,7 @@ const DEFINITIONS = [
     channelAliases: ['dingtalk'],
     logo: 'dingding.png',
     guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E9%92%89%E9%92%89-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'feishu',
@@ -59,7 +60,7 @@ const DEFINITIONS = [
     channelAliases: [],
     logo: 'feishu.png',
     guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E9%A3%9E%E4%B9%A6-im-%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'wecom',
@@ -69,7 +70,7 @@ const DEFINITIONS = [
     channelAliases: ['wecom-openclaw-plugin'],
     logo: 'wecom.png',
     guideUrl:
-      'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%E6%9C%BA%E5%99%A8%E4%BA%BA%E9%85%8D%E7%BD%AE',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'qq',
@@ -78,7 +79,7 @@ const DEFINITIONS = [
     channel: 'qqbot',
     channelAliases: [],
     logo: 'qq_bot.jpeg',
-    guideUrl: 'https://lobsterai.youdao.com/#/docs/lobsterai_im_bot_config_guide/qqqq-bot',
+    guideUrl: PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'nim',
@@ -116,7 +117,7 @@ const DEFINITIONS = [
     channelAliases: [],
     logo: 'telegram.svg',
     guideUrl:
-      'https://lobsterai.youdao.com/#/en/docs/lobsterai_im_bot_config_guide/telegram-bot-configuration',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'discord',
@@ -126,7 +127,7 @@ const DEFINITIONS = [
     channelAliases: [],
     logo: 'discord.svg',
     guideUrl:
-      'https://lobsterai.youdao.com/#/en/docs/lobsterai_im_bot_config_guide/discord-bot-configuration',
+      PRODUCT_SERVICES.docsUrl,
   },
   {
     id: 'email',

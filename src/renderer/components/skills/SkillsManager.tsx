@@ -10,6 +10,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import type { SkillSecurityReport as SkillSecurityReportData } from '../../../main/libs/skillSecurity/skillSecurityTypes';
 import { ENABLE_OPENCLAW_SKILL_SYNC } from '../../../shared/featureFlags';
+import { PRODUCT_SERVICES } from '../../../shared/product';
 import { i18nService } from '../../services/i18n';
 import { compareVersions,resolveLocalizedText, skillService } from '../../services/skill';
 import { RootState } from '../../store';
@@ -33,6 +34,7 @@ import {
   getMarketplaceSkillAnalyticsParams,
   reportSkillAction,
 } from './analytics';
+import { COMMON_BUNDLED_SKILL_ORDER } from './bundledSkillNames';
 import SkillIconTile from './SkillIconTile';
 import SkillSecurityReport from './SkillSecurityReport';
 import { SKILL_TAB_LABEL_KEYS, SKILL_TAB_ORDER, SkillTab } from './skillTabs';
@@ -81,13 +83,14 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat,
   const skills = useSelector((state: RootState) => state.skill.skills);
 
   const [skillSearchQuery, setSkillSearchQuery] = useState('');
+  const [builtInScope, setBuiltInScope] = useState<'common' | 'all'>('common');
   const [skillDownloadSource, setSkillDownloadSource] = useState('');
   const [skillActionError, setSkillActionError] = useState('');
   const [isDownloadingSkill, setIsDownloadingSkill] = useState(false);
   const [isAddSkillMenuOpen, setIsAddSkillMenuOpen] = useState(false);
   const [isRemoteImportOpen, setIsRemoteImportOpen] = useState(false);
   const [importTab, setImportTab] = useState<ImportSourceType>('github');
-  const [activeTab, setActiveTab] = useState<SkillTab>(SKILL_TAB_ORDER[0]);
+  const [activeTab, setActiveTab] = useState<SkillTab>(PRODUCT_SERVICES.skillStoreUrl ? SkillTab.Marketplace : SkillTab.BuiltIn);
   const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
   const [marketTags, setMarketTags] = useState<MarketTag[]>([]);
   const [activeMarketTag, setActiveMarketTag] = useState('all');
@@ -236,6 +239,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat,
     [skills],
   );
   const builtInSkills = useMemo(() => skills.filter(skill => skill.isBuiltIn), [skills]);
+  const commonBuiltInSkills = useMemo(() => COMMON_BUNDLED_SKILL_ORDER.flatMap(id =>
+    builtInSkills.filter(skill => skill.id === id || skill.name === id)), [builtInSkills]);
 
   const isSkillSearchActive = skillSearchQuery.trim().length > 0;
   const isInstalledTab = activeTab === SkillTab.Mine || activeTab === SkillTab.BuiltIn;
@@ -1284,7 +1289,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat,
 
         {/* Tabs */}
         <div className="flex items-center border-b border-border">
-          {SKILL_TAB_ORDER.map((tab) => {
+          {SKILL_TAB_ORDER.filter((tab) => tab !== SkillTab.Marketplace || PRODUCT_SERVICES.skillStoreUrl).map((tab) => {
             const count = getSkillTabCount(tab);
             return (
               <button
@@ -1461,9 +1466,21 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({ readOnly, onCreateByChat,
       )}
 
       {activeTab === SkillTab.BuiltIn && !isSkillSearchActive && (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
-          {builtInSkills.map((skill) => renderInstalledSkillCard(skill, false))}
-        </div>
+        <section>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs leading-5 text-secondary">{i18nService.t('skillsCommonHint')}</p>
+            <div role="group" aria-label={i18nService.t('skillsBuiltInScope')} className="flex shrink-0 gap-1 rounded-lg bg-surface p-1">
+              {(['common', 'all'] as const).map(scope => <button key={scope} type="button" aria-pressed={builtInScope === scope}
+                onClick={() => setBuiltInScope(scope)} className={`rounded-md px-3 py-1.5 text-xs transition-colors ${builtInScope === scope ? 'bg-background text-foreground shadow-subtle' : 'text-secondary hover:text-foreground'}`}>
+                {i18nService.t(scope === 'common' ? 'skillsCommon' : 'skillsAllBuiltIn')}
+                <span className="ml-1.5 text-muted">{scope === 'common' ? commonBuiltInSkills.length : builtInSkills.length}</span>
+              </button>)}
+            </div>
+          </div>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+            {(builtInScope === 'common' ? commonBuiltInSkills : builtInSkills).map(skill => renderInstalledSkillCard(skill, false))}
+          </div>
+        </section>
       )}
 
       {activeTab === SkillTab.Marketplace && (

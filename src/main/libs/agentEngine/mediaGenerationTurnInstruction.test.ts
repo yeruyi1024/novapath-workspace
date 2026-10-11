@@ -50,7 +50,7 @@ describe('buildMediaGenerationTurnInstruction', () => {
     expect(instruction).toContain('(count=1)');
     expect(instruction).toContain('There is no lobsterai_image_generate status step');
     expect(instruction).toContain('lobsterai_skin_manage');
-    expect(instruction).not.toContain('LobsterAI media generation tools - NOT AVAILABLE');
+    expect(instruction).not.toContain('StarPath media generation tools - NOT AVAILABLE');
   });
 
   test('uses the LobsterAI image route for auto media selection', () => {
@@ -68,7 +68,7 @@ describe('buildMediaGenerationTurnInstruction', () => {
   test('preserves the media-skill fallback when LobsterAI tools are unavailable', () => {
     const instruction = buildMediaGenerationTurnInstruction(undefined, true);
 
-    expect(instruction).toContain('LobsterAI media generation tools - NOT AVAILABLE');
+    expect(instruction).toContain('StarPath media generation tools - NOT AVAILABLE');
     expect(instruction).toContain('You may use it');
   });
 });

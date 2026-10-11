@@ -217,6 +217,7 @@ export function registerKitHandlers(deps: KitHandlerDeps): void {
   // Fetch kit store catalog from overmind
   ipcMain.handle('kits:fetchStore', async () => {
     const url = getKitStoreUrl();
+    if (!url) return { success: true, data: skinPackKitLifecycle.buildOfflineStoreResponse(getAdditionalBuiltInKits()) };
     console.log(`[KitStore] fetching from: ${url}`);
     try {
       const https = await import('https');

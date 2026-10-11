@@ -19,6 +19,12 @@ import {
 } from './artifactParser';
 
 describe('normalizeArtifactFilePath', () => {
+  test('preserves native filename characters and decodes URL paths only once', () => {
+    expect(normalizeArtifactFilePath('/work/方案 #1 100%20.pptx')).toBe('/work/方案 #1 100%20.pptx');
+    expect(normalizeArtifactFilePath('file:///work/%E6%96%B9%E6%A1%88%20%231%20100%2520.pptx'))
+      .toBe('/work/方案 #1 100%20.pptx');
+    expect(normalizeArtifactFilePath('file://server/share/My%20Deck.pptx')).toBe('//server/share/My Deck.pptx');
+  });
   test('strips MEDIA prefix from paths parsed as bare file paths', () => {
     expect(normalizeArtifactFilePath('MEDIA:/Users/admin/work/test/test0623/generated-video.mp4'))
       .toBe('/Users/admin/work/test/test0623/generated-video.mp4');
@@ -61,6 +67,10 @@ describe('normalizeFilePathForDedup', () => {
 });
 
 describe('parseFileLinksFromMessage', () => {
+  test('preserves encoded hash and percent characters in a reply file reference', () => {
+    const artifacts = parseFileLinksFromMessage('[演示](file:///work/report%2520%23.pptx)', 'msg1', 'sess1');
+    expect(artifacts[0].filePath).toBe('/work/report%20#.pptx');
+  });
   test('strips leading / from Windows file:// link path', () => {
     const content = '文件：[hello.pptx](file:///D:/workspace/hello.pptx)';
     const artifacts = parseFileLinksFromMessage(content, 'msg1', 'sess1');

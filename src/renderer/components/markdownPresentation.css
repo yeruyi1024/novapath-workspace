@@ -1,0 +1,58 @@
+/* Shared reply/document presentation, using the active theme palette. */
+.markdown-content .markdown-quote {
+  margin-inline: 0;
+  border: 1px solid var(--lobster-border);
+  border-left: 3px solid var(--lobster-primary);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--lobster-primary) 4%, var(--lobster-surface));
+  padding: 12px 18px;
+  color: var(--lobster-text-secondary);
+  font-style: normal;
+  overflow-wrap: anywhere;
+}
+.markdown-content .markdown-quote > :first-child { margin-top: 0; }
+.markdown-content .markdown-quote > :last-child { margin-bottom: 0; }
+.markdown-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--lobster-border);
+  border-radius: 12px;
+  background: var(--lobster-surface);
+}
+.markdown-content .markdown-table { width: 100%; margin: 0; border-collapse: separate; border-spacing: 0; font-size: 0.92em; line-height: 1.65; }
+.markdown-content .markdown-table-heading {
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--lobster-primary) 5%, var(--lobster-surface));
+  color: var(--lobster-text-primary);
+  font-weight: 600;
+  opacity: 1;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--lobster-border);
+}
+.markdown-content .markdown-table-cell { padding: 12px 16px; vertical-align: top; color: var(--lobster-text-primary); border-bottom: 1px solid var(--lobster-border); min-width: 100px; overflow-wrap: anywhere; }
+.markdown-table-body > tr:last-child > td { border-bottom: 0; }
+.markdown-table-body > tr:nth-child(even) { background: color-mix(in srgb, var(--lobster-surface-raised) 40%, var(--lobster-surface)); }
+.markdown-table-body > tr:hover { background: color-mix(in srgb, var(--lobster-primary) 4%, var(--lobster-surface)); }
+.markdown-content .markdown-file-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  margin-inline: 2px;
+  border: 1px solid color-mix(in srgb, var(--lobster-primary) 20%, var(--lobster-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--lobster-primary) 5%, var(--lobster-surface));
+  color: var(--lobster-primary);
+  text-decoration: none;
+  vertical-align: baseline;
+  cursor: pointer;
+}
+.markdown-file-link > svg { width: 14px; height: 14px; flex-shrink: 0; align-self: center; }
+.markdown-file-link > span { min-width: 0; overflow-wrap: anywhere; }
+.markdown-content .markdown-file-link:hover { background: color-mix(in srgb, var(--lobster-primary) 10%, var(--lobster-surface)); }
+.markdown-file-link:focus-visible, .markdown-table-scroll:focus-visible { outline: 2px solid var(--lobster-primary); outline-offset: 3px; }
+@media (max-width: 640px) {
+  .markdown-content .markdown-table-heading, .markdown-content .markdown-table-cell { padding: 10px 12px; }
+}

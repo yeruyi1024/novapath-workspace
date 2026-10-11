@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
-import dreamingLobsterSrc from '../../assets/dreaming-lobster.png';
 import { i18nService } from '../../services/i18n';
 import type { DreamDiaryData, DreamingEntry, DreamingPhaseInfo, DreamingStatusData } from '../../types/cowork';
 
@@ -21,17 +20,6 @@ const FREQUENCY_PRESETS = [
 
 const CUSTOM_VALUE = '__custom__';
 const DREAMING_INSIGHT_ROTATION_MS = 10_000;
-
-const DREAMING_SCENE_STARS = [
-  { top: '18%', left: '14%', size: 3, opacity: 0.55, tone: 'soft', delay: '0s' },
-  { top: '55%', left: '7%', size: 2, opacity: 0.42, tone: 'soft', delay: '1.1s' },
-  { top: '24%', left: '72%', size: 2, opacity: 0.32, tone: 'soft', delay: '0.7s' },
-  { top: '66%', left: '94%', size: 2, opacity: 0.28, tone: 'soft', delay: '1.7s' },
-  { top: '88%', left: '80%', size: 2, opacity: 0.45, tone: 'soft', delay: '0.3s' },
-  { top: '84%', left: '25%', size: 2, opacity: 0.34, tone: 'accent', delay: '1.5s' },
-  { top: '42%', left: '31%', size: 3, opacity: 0.55, tone: 'accent', delay: '0.9s' },
-  { top: '39%', left: '89%', size: 2, opacity: 0.26, tone: 'soft', delay: '2s' },
-] as const;
 
 // ── Diary parser (mirrors OpenClaw's parseDiaryEntries) ──────────────
 
@@ -165,39 +153,6 @@ function describeEntryOrigin(entry: DreamingEntry): string {
 type DreamingContentTab = 'scene' | 'diary' | 'advanced';
 type AdvancedSort = 'recent' | 'signals';
 
-function DreamingStarsLayer() {
-  return (
-    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-      {DREAMING_SCENE_STARS.map((star) => (
-        <span
-          key={`${star.top}-${star.left}`}
-          className={`dreaming-scene-star dreaming-scene-star-${star.tone} absolute rounded-full`}
-          style={{
-            top: star.top,
-            left: star.left,
-            width: `${star.size}px`,
-            height: `${star.size}px`,
-            opacity: star.opacity,
-            animationDelay: star.delay,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DreamingMascot() {
-  return (
-    <div className="dreaming-mascot" aria-label={i18nService.t('coworkDreamingHeaderTitle')}>
-      <div className="dreaming-mascot-glow" aria-hidden="true" />
-      <img className="dreaming-mascot-image" src={dreamingLobsterSrc} alt="" draggable={false} />
-      <span className="dreaming-z dreaming-z-one" aria-hidden="true">z</span>
-      <span className="dreaming-z dreaming-z-two" aria-hidden="true">Z</span>
-      <span className="dreaming-z dreaming-z-three" aria-hidden="true">Z</span>
-    </div>
-  );
-}
-
 function SceneTab({ status, fallbackCron }: { status: DreamingStatusData; fallbackCron: string }) {
   const currentLanguage = i18nService.getLanguage();
   const insightMessages = getDreamingInsightMessages();
@@ -227,47 +182,36 @@ function SceneTab({ status, fallbackCron }: { status: DreamingStatusData; fallba
   }, [status.enabled, insightMessages.length]);
 
   return (
-    <div className="dreaming-scene relative h-[320px] overflow-hidden rounded-xl border border-border">
-      <DreamingStarsLayer />
-      <div className="dreaming-scene-orb absolute right-[9%] top-[10%] h-12 w-12 rounded-full" aria-hidden="true" />
-      <div className="dreaming-scene-orb-haze absolute right-[13%] top-[14%] h-3 w-3 rounded-full blur-sm" aria-hidden="true" />
-
-      {status.enabled && (
-        <div className="dreaming-insight-bubble absolute left-[8%] top-[8%] z-10 max-w-[min(23rem,42%)] rounded-xl border px-4 py-2.5 text-sm font-medium italic leading-5 backdrop-blur-sm [overflow-wrap:anywhere]">
-          {insightMessage}
-        </div>
-      )}
-
-      <div className="absolute left-1/2 top-[41%] z-10 -translate-x-1/2 -translate-y-1/2">
-        <DreamingMascot />
-      </div>
-
-      <div className="absolute bottom-[62px] left-0 right-0 z-10 flex flex-col items-center text-center">
-        <div className="dreaming-scene-title text-xs font-semibold uppercase tracking-[0.18em]">
-          DREAMING {status.enabled ? i18nService.t('coworkDreamingStatusActive') : i18nService.t('coworkDreamingStatusIdle')}
-        </div>
-        <div className={`mt-2 flex items-center gap-2 text-xs ${status.enabled ? 'dreaming-status-active' : 'dreaming-status-idle'}`}>
-          <span className={`h-2 w-2 rounded-full ${status.enabled ? 'dreaming-status-dot-active' : 'dreaming-status-dot-idle'}`} />
-          <span>
-            {status.promotedToday} {i18nService.t('coworkDreamingPromoted')}
-            {showNextRun ? ` · ${i18nService.t('coworkDreamingNextSweep')} ${nextRun}` : ''}
-          </span>
+    <div className="flex min-h-[230px] flex-col rounded-xl border border-border bg-surface-raised p-6">
+      <div className="flex items-center gap-3">
+        <img src="logo.svg" alt="" width={36} height={36} draggable={false} className="h-9 w-9 shrink-0" />
+        <div className="min-w-0">
+          <div className="text-sm font-medium text-foreground">{i18nService.t('coworkDreamingHeaderTitle')}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary">
+            <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${status.enabled ? 'bg-primary' : 'bg-muted'}`} />
+            <span>{status.enabled ? i18nService.t('coworkDreamingStatusActive') : i18nService.t('coworkDreamingStatusIdle')}</span>
+          </div>
         </div>
       </div>
 
+      <div className="my-6 flex-1 text-sm leading-6 text-secondary">
+        {status.enabled && <p className="mb-2 text-foreground [overflow-wrap:anywhere]">{insightMessage}</p>}
+        <p className="text-xs">
+          {status.promotedToday} {i18nService.t('coworkDreamingPromoted')}
+          {showNextRun ? ` · ${i18nService.t('coworkDreamingNextSweep')} ${nextRun}` : ''}
+        </p>
+      </div>
+
       {status.enabled && (
-        <div className="absolute bottom-4 left-0 right-0 z-10 flex flex-wrap justify-center gap-3 px-4">
+        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
           {phaseEntries.map(({ key, labelKey }) => {
             const phase = phases?.[key];
             const enabled = phase?.enabled !== false;
             return (
-              <div
-                key={key}
-                className="dreaming-phase-card inline-flex min-w-[96px] items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs"
-              >
-                <span className={`h-2 w-2 rounded-full ${enabled ? 'dreaming-status-dot-active' : 'dreaming-status-dot-idle'}`} />
-                <span className="dreaming-phase-label font-semibold">{i18nService.t(labelKey)}</span>
-                <span className="dreaming-phase-time">{formatPhaseRunLabel(phase, fallbackCron)}</span>
+              <div key={key} className="inline-flex items-center gap-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
+                <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${enabled ? 'bg-primary' : 'bg-muted'}`} />
+                <span className="font-medium text-foreground">{i18nService.t(labelKey)}</span>
+                <span className="text-secondary">{formatPhaseRunLabel(phase, fallbackCron)}</span>
               </div>
             );
           })}

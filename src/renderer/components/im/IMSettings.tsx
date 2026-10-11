@@ -20,7 +20,6 @@ import { RootState } from '../../store';
 import { clearError,setDingTalkConfig, setDingTalkInstanceConfig, setDiscordConfig, setDiscordInstanceConfig, setEmailInstanceConfig, setFeishuConfig, setFeishuInstanceConfig, setNeteaseBeeChanConfig, setNimConfig, setNimInstanceConfig, setPopoInstanceConfig, setQQConfig, setQQInstanceConfig, setTelegramInstanceConfig, setTelegramOpenClawConfig, setWecomConfig, setWecomInstanceConfig, setWeixinConfig } from '../../store/slices/imSlice';
 import type { EmailInstanceConfig, IMConnectivityCheck, IMConnectivityTestResult, IMGatewayConfig, WeixinOpenClawConfig } from '../../types/im';
 import { MAX_DINGTALK_INSTANCES, MAX_DISCORD_INSTANCES, MAX_EMAIL_INSTANCES, MAX_FEISHU_INSTANCES, MAX_NIM_INSTANCES, MAX_POPO_INSTANCES, MAX_QQ_INSTANCES, MAX_TELEGRAM_INSTANCES, MAX_WECOM_INSTANCES } from '../../types/im';
-import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
 import ComposeIcon from '../icons/ComposeIcon';
 import EditIcon from '../icons/EditIcon';
@@ -90,6 +89,8 @@ const checkLevelColorClass: Record<IMConnectivityCheck['level'], string> = {
   warn: 'text-yellow-700 dark:text-yellow-300',
   fail: 'text-red-600 dark:text-red-400',
 };
+
+const REMOTE_CONNECTION_PLATFORMS: Platform[] = ['weixin', 'dingtalk', 'feishu', 'wecom'];
 
 const MULTI_INSTANCE_PLATFORMS = new Set<Platform>([
   'dingtalk',
@@ -880,7 +881,7 @@ const IMSettings: React.FC = () => {
 
   const handleEmailGetApiKey = async () => {
     if (!activeEmailInstanceId) return;
-    const apiKeyUrl = 'https://claw.163.com/projects/dashboard/?channel=LobsterAI#/api-keys';
+    const apiKeyUrl = 'https://claw.163.com/projects/dashboard/#/api-keys';
     try {
       await window.electron.shell.openExternal(apiKeyUrl);
     } catch {
@@ -1056,9 +1057,7 @@ const IMSettings: React.FC = () => {
   const emailConnected = status.email.instances.some(i => i.connected);
 
   // Compute visible platforms based on language
-  const platforms = useMemo<Platform[]>(() => {
-    return getVisibleIMPlatforms(language) as Platform[];
-  }, [language]);
+  const platforms = REMOTE_CONNECTION_PLATFORMS;
 
   // Ensure activePlatform is always in visible platforms when language changes
   useEffect(() => {
@@ -1883,7 +1882,7 @@ const IMSettings: React.FC = () => {
               <h3 className="truncate text-[15px] font-medium leading-5 text-foreground">
                 {i18nService.t('imChannelBotsTitle').replace('{platform}', i18nService.t(platform))}
               </h3>
-              <p className="mt-0.5 whitespace-nowrap text-xs text-green-600 dark:text-green-400">
+              <p className="mt-1 text-xs text-secondary">
                 {i18nService.t('imInstanceSummary')
                   .replace('{connected}', String(connectedCount))
                   .replace('{total}', String(instances.length))}
@@ -2044,7 +2043,7 @@ const IMSettings: React.FC = () => {
             <button
               type="button"
               onClick={() => void addInstanceForPlatform(platform)}
-              className="flex min-h-[82px] flex-col items-center justify-center rounded-lg border border-dashed border-border-subtle bg-surface text-secondary transition-colors hover:border-primary/50 hover:bg-surface-raised hover:text-primary"
+              className="flex min-h-[100px] flex-col items-center justify-center rounded-xl border border-dashed border-primary/25 bg-primary-muted/30 text-secondary transition-colors hover:border-primary/50 hover:bg-surface-raised hover:text-primary"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-raised">
                 <PlusIcon className="h-4 w-4" />
@@ -2079,9 +2078,9 @@ const IMSettings: React.FC = () => {
     : null;
 
   return (
-    <div className="flex h-full gap-3">
+    <div className="@container flex h-full min-h-0 flex-col gap-6">
       {/* Platform List - Left Side */}
-      <div className="w-44 flex-shrink-0 space-y-1.5 overflow-y-auto border-r border-border pr-3">
+      <div className="grid shrink-0 grid-cols-2 gap-2 rounded-2xl border border-border-subtle bg-surface-raised/50 p-2 @[600px]:grid-cols-4">
         {platforms.map((platform) => {
           const logo = PlatformRegistry.logo(platform);
           const isActive = activePlatform === platform;
@@ -2099,10 +2098,10 @@ const IMSettings: React.FC = () => {
                   setActiveInstanceForPlatform(platform, null);
                 }
               }}
-              className={`flex w-full items-center rounded-xl border p-2 text-left transition-colors ${
+              className={`flex min-h-14 w-full items-center rounded-xl border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                 isActive
-                  ? 'border-primary bg-primary-muted shadow-subtle'
-                  : 'border-transparent bg-surface hover:bg-surface-raised'
+                  ? 'border-primary/25 bg-primary-muted shadow-subtle'
+                  : 'border-transparent bg-transparent hover:bg-surface'
               }`}
             >
               <div className="mr-2 flex h-7 w-7 flex-shrink-0 items-center justify-center">
@@ -2145,7 +2144,7 @@ const IMSettings: React.FC = () => {
       </div>
 
       {/* Platform Settings - Right Side */}
-      <div className="min-w-0 flex-1 space-y-4 overflow-y-auto pl-3 pr-4 [scrollbar-gutter:stable]">
+      <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 [scrollbar-gutter:stable]">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
         {(activePlatform === 'weixin' || activePlatform === 'netease-bee') && (
           <div className="flex items-center gap-3 border-b border-border-subtle pb-4">

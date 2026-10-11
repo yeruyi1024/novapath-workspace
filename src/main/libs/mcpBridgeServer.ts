@@ -340,7 +340,7 @@ export class McpBridgeServer {
 
         this.pendingAskUser.set(requestId, { requestId, resolve, timer });
 
-        // Notify LobsterAI to show the modal
+        // Notify StarPath to show the modal
         if (this.onAskUserCallback) {
           this.onAskUserCallback({
             requestId,
@@ -433,7 +433,7 @@ export class McpBridgeServer {
       if (!this.onBrowserToolCallback) {
         res.writeHead(503, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          content: [{ type: 'text', text: 'LobsterAI in-app browser is not ready.' }],
+          content: [{ type: 'text', text: 'StarPath in-app browser is not ready.' }],
           isError: true,
         }));
         return;
@@ -454,7 +454,7 @@ export class McpBridgeServer {
       if (!res.writableEnded) {
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
-          content: [{ type: 'text', text: `LobsterAI browser error: ${message}` }],
+          content: [{ type: 'text', text: `StarPath browser error: ${message}` }],
           isError: true,
         }));
       }

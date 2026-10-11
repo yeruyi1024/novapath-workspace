@@ -78,7 +78,7 @@ import { OpenClawConfigImpact } from './openclawConfigImpact';
 import type { OpenClawEngineManager } from './openclawEngineManager';
 import { repairHeartbeatFile, stripProactiveHeartbeatSection } from './openclawHeartbeatRepair';
 import { withManagedOpenClawModelPolicy, withoutOpenClawWriteMetadata } from './openclawManagedModelPolicy';
-import { getMainAgentWorkspacePath } from './openclawMemoryFile';
+import { ensureDefaultIdentity, getMainAgentWorkspacePath } from './openclawMemoryFile';
 import { resolveOpenClawCatalogModelMaxTokens } from './openclawModelCatalog';
 
 const gwDiagTs = (): string => {
@@ -90,9 +90,11 @@ const gwDiagTs = (): string => {
   return `[GW-RESTART-DIAG] ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}${sign}${p(Math.floor(abs / 60))}:${p(abs % 60)}`;
 };
 import { findBundledExtensionsDir, findThirdPartyExtensionsDir, hasBundledOpenClawExtension, hasRuntimeBundledOpenClawExtension, resolveOpenClawExtensionPluginId } from './openclawLocalExtensions';
+import { omitUnavailableOptionalChannels } from './openclawOptionalChannels';
 import { buildQQAccountConfig, OpenClawQQPlugin, QQ_APPROVALS_DISABLED } from './openclawQQConfig';
 import { withRequiredOpenClawSessionStoreOwner } from './openclawSessionStoreOwner';
 import { getOpenClawTokenProxyPort } from './openclawTokenProxy';
+import { STARPATH_RESPONSE_POLICY } from './starpathResponsePolicy';
 import { getActiveSystemProxyUrl, isSystemProxyEnabled } from './systemProxy';
 
 export type AskUserCallbackConfig = {
@@ -341,10 +343,10 @@ const MANAGED_SKILL_ENTRY_OVERRIDES: Record<string, { enabled: boolean }> = {
   'feishu-cron-reminder': {
     enabled: false,
   },
-  // LobsterAI configures MCP servers via openclaw.json mcp.servers field.
+  // StarPath configures MCP servers via openclaw.json mcp.servers field.
   // The bundled mcporter skill tries to discover MCP servers via its own CLI,
   // finds none, and produces confusing "no MCP servers" output. Disable it so
-  // users are routed through LobsterAI's MCP layer instead.
+  // users are routed through StarPath's MCP layer instead.
   'mcporter': {
     enabled: false,
   },
@@ -373,10 +375,10 @@ const MANAGED_WEB_SEARCH_POLICY_PROMPT = [
   '- Do not use `web_fetch` to fetch Google/Bing search result pages as a search substitute; use `browser` or an available search skill instead.',
   '- If you need search discovery, dynamic pages, or interactive browsing, use the built-in `browser` tool.',
   '- For login-required, JavaScript-heavy, or anti-automation pages, use `browser` instead of `web_fetch`.',
-  '- Only use the LobsterAI `web-search` skill when local command execution is available. Native channel sessions may deny `exec`, so prefer `browser` or `web_fetch` there.',
+  '- Only use the StarPath `web-search` skill when local command execution is available. Native channel sessions may deny `exec`, so prefer `browser` or `web_fetch` there.',
   '- Exception: the `imap-smtp-email` skill must always use `exec` to run its scripts, even in native channel sessions. Do not skip it because of exec restrictions.',
   '',
-  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the LobsterAI `web-search` skill.',
+  'Do not claim you searched the web unless you actually used `browser`, `web_fetch`, or the StarPath `web-search` skill.',
 ].join('\n');
 
 const BUNDLED_BROWSER_PLUGIN_ID = 'browser';
@@ -384,13 +386,13 @@ const BUNDLED_BROWSER_PLUGIN_ID = 'browser';
 const MANAGED_BROWSER_POLICY_PROMPT = [
   '## Browser Policy',
   '',
-  'LobsterAI does not support sandbox browser execution in this version.',
+  'StarPath does not support sandbox browser execution in this version.',
   '- For every `browser` tool call, set `target="host"` explicitly.',
-  '- Do not use `target="sandbox"` or `target="node"` unless a future LobsterAI version explicitly enables it.',
+  '- Do not use `target="sandbox"` or `target="node"` unless a future StarPath version explicitly enables it.',
   '- If a browser call fails because the sandbox browser is unavailable, retry the same action with `target="host"`.',
-  '- The `lobster-in-app` profile is LobsterAI\'s own browser bridge. If it is unavailable, report an internal LobsterAI browser startup failure; never tell the user to enable Chrome remote debugging or launch Chrome with debugging flags.',
+  '- The `lobster-in-app` profile is StarPath\'s own browser bridge. If it is unavailable, report an internal StarPath browser startup failure; never tell the user to enable Chrome remote debugging or launch Chrome with debugging flags.',
   `- When a page requires a password and \`${BrowserCredentialMcpServer.ModelToolName}\` is available, call it before asking the user to sign in manually. The tool can use an encrypted saved login without revealing its password to you.`,
-  '- If no saved login is available, ask the user to sign in directly in the visible LobsterAI browser. Never ask the user to send a password in chat, and never search files, memory, or logs for passwords.',
+  '- If no saved login is available, ask the user to sign in directly in the visible StarPath browser. Never ask the user to send a password in chat, and never search files, memory, or logs for passwords.',
 ].join('\n');
 
 const MANAGED_EXEC_SAFETY_PROMPT = [
@@ -437,7 +439,7 @@ const resolveSkillCreationPath = (): string => {
 const buildManagedSkillCreationPrompt = (skillsDirPath: string): string => [
   '## Skill Creation',
   '',
-  'When the user asks you to create a new skill, you MUST place it under the LobsterAI skills directory:',
+  'When the user asks you to create a new skill, you MUST place it under the StarPath skills directory:',
   '',
   `  ${skillsDirPath}/<skill-name>/SKILL.md`,
   '',
@@ -466,7 +468,7 @@ const MANAGED_DELIVERABLE_LINKS_PROMPT = [
 const MANAGED_MATH_FORMAT_PROMPT = [
   '## Math Formula Formatting',
   '',
-  'The LobsterAI app chat renders TeX formulas with KaTeX.',
+  'The StarPath app chat renders TeX formulas with KaTeX.',
   '',
   '- In app chat sessions, write every mathematical formula or expression in TeX:',
   '  `$...$` inline, and `$$` on its own lines around display blocks.',
@@ -3240,7 +3242,13 @@ export class OpenClawConfigSync {
 
     // Explicit ownership has no global default agent. Preserve the former
     // main-agent fallback for every configured channel, after specific routes.
-    const bindings = this.currentBindingsObj.bindings ?? [];
+    managedConfig = omitUnavailableOptionalChannels({
+      ...managedConfig, bindings: this.currentBindingsObj.bindings ?? [],
+    }, [
+      ...preinstalledPlugins.map(plugin => plugin.pluginId),
+      ...this.getUserPlugins().map(plugin => plugin.pluginId),
+    ]);
+    const bindings = (managedConfig.bindings ?? []) as Array<Record<string, unknown>>;
     for (const channel of Object.keys((managedConfig.channels as Record<string, unknown>) ?? {})) {
       const hasChannelOwner = bindings.some(binding => {
         const match = binding.match as Record<string, unknown>;
@@ -3251,6 +3259,7 @@ export class OpenClawConfigSync {
       }
     }
     if (bindings.length > 0) managedConfig.bindings = bindings;
+    else delete managedConfig.bindings;
     const bindingsJson = JSON.stringify(bindings);
     const bindingsChanged = this.previousBindingsJson !== undefined
       && bindingsJson !== this.previousBindingsJson;
@@ -3822,6 +3831,11 @@ export class OpenClawConfigSync {
 
     try {
       ensureDir(workspaceDir);
+      if (workspaceDir === getMainAgentWorkspacePath(this.engineManager.getStateDir())) {
+        // Normal startup also reaches this path, before OpenClaw can seed its
+        // blank identity template. Keep custom assistant workspaces untouched.
+        ensureDefaultIdentity(workspaceDir);
+      }
       const agentsMdPath = path.join(workspaceDir, 'AGENTS.md');
 
       // Build the managed section
@@ -3836,6 +3850,7 @@ export class OpenClawConfigSync {
       // Skills are now loaded by OpenClaw natively via skills.load.extraDirs
       // in openclaw.json, so we no longer embed the skills routing prompt here.
 
+      sections.push(STARPATH_RESPONSE_POLICY);
       sections.push(MANAGED_WEB_SEARCH_POLICY_PROMPT);
       sections.push(MANAGED_BROWSER_POLICY_PROMPT);
       sections.push(MANAGED_EXEC_SAFETY_PROMPT);
@@ -4223,6 +4238,10 @@ export class OpenClawConfigSync {
     if (asConfigRecord(agentDefaults?.modelPolicy)) {
       mergedConfig = withManagedOpenClawModelPolicy(mergedConfig, mergedConfig);
     }
+    mergedConfig = omitUnavailableOptionalChannels(mergedConfig, [
+      ...readPreinstalledPlugins().map(plugin => plugin.pluginId),
+      ...this.getUserPlugins().map(plugin => plugin.pluginId),
+    ]);
     const nextContent = `${JSON.stringify(mergedConfig, null, 2)}\n`;
 
     // Preserve migration semantics while ignoring write provenance.

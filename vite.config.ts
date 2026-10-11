@@ -12,6 +12,30 @@ const devPort = Number(process.env.PORT ?? '') || 5175;
 const katexVersion = process.env.npm_package_dependencies_katex?.replace(/^[~^]/, '') || '0.16.0';
 const pdfJsAssetRoot = path.resolve(__dirname, 'node_modules/pdfjs-dist');
 const pdfJsPublicPath = '/pdfjs/';
+const electronDevReadyPath = path.resolve(__dirname, 'dist-electron/.vite-electron-ready');
+const pendingElectronBuilds = new Set(['main', 'preload', 'browserAnnotationPreload', 'agentBrowserCredentialPreload', 'manualCredentialCapturePreload']);
+const failedElectronBuilds = new Set<string>();
+
+function electronDevReadinessPlugin(entry: string): Plugin {
+  return {
+    name: `electron-dev-readiness:${entry}`,
+    apply: (_config, environment) => environment.mode === 'development',
+    buildStart() {
+      pendingElectronBuilds.add(entry);
+      failedElectronBuilds.delete(entry);
+      fs.rmSync(electronDevReadyPath, { force: true });
+    },
+    buildEnd(error) {
+      if (error) failedElectronBuilds.add(entry);
+    },
+    closeBundle() {
+      pendingElectronBuilds.delete(entry);
+      if (pendingElectronBuilds.size > 0 || failedElectronBuilds.size > 0) return;
+      fs.mkdirSync(path.dirname(electronDevReadyPath), { recursive: true });
+      fs.writeFileSync(electronDevReadyPath, 'ready\n');
+    },
+  };
+}
 const pdfJsAssetDirs = [
   { route: `${pdfJsPublicPath}cmaps/`, source: path.join(pdfJsAssetRoot, 'cmaps'), output: 'cmaps' },
   { route: `${pdfJsPublicPath}standard_fonts/`, source: path.join(pdfJsAssetRoot, 'standard_fonts'), output: 'standard_fonts' },
@@ -86,6 +110,7 @@ export default defineConfig({
         // 主进程入口文件
         entry: 'src/main/main.ts',
         vite: {
+          plugins: [electronDevReadinessPlugin('main')],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
@@ -111,6 +136,7 @@ export default defineConfig({
         // 预加载脚本入口文件
         entry: 'src/main/preload.ts',
         vite: {
+          plugins: [electronDevReadinessPlugin('preload')],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
@@ -123,6 +149,7 @@ export default defineConfig({
         // Sandboxed webview preload used only for browser annotations.
         entry: 'src/main/browserAnnotationPreload.ts',
         vite: {
+          plugins: [electronDevReadinessPlugin('browserAnnotationPreload')],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
@@ -135,6 +162,7 @@ export default defineConfig({
         // Sandboxed preload used only by the isolated saved-credential login view.
         entry: 'src/main/browserCredentials/agentBrowserCredentialPreload.ts',
         vite: {
+          plugins: [electronDevReadinessPlugin('agentBrowserCredentialPreload')],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
@@ -147,6 +175,7 @@ export default defineConfig({
         // Sandboxed preload that observes manual login submissions without exposing secrets to pages.
         entry: 'src/main/browserCredentials/manualCredentialCapturePreload.ts',
         vite: {
+          plugins: [electronDevReadinessPlugin('manualCredentialCapturePreload')],
           build: {
             sourcemap: true,
             outDir: 'dist-electron',
@@ -199,6 +228,9 @@ export default defineConfig({
         '**/.work/**',
         '**/artifacts/**',
         '**/dist-electron/**',
+        '**/resources/document-runtime/**',
+        '**/*.test.*',
+        '**/tests/**',
       ],
     },
   },

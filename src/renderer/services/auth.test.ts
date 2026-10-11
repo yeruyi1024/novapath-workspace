@@ -4,13 +4,14 @@ import {
   AuthSessionStatus,
 } from '@shared/auth/constants';
 import { LobsterAIRequestCapability, ProviderName } from '@shared/providers';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import {
   EnterpriseMemberRole,
   EnterpriseQuotaReason,
 } from '../../shared/enterpriseAccount/constants';
 import type { EnterpriseAccountContext } from '../../shared/enterpriseAccount/types';
+import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../../shared/product';
 import { setEnterpriseAccountContext } from '../features/enterpriseAccount/enterpriseAccountSlice';
 import { store } from '../store';
 import { setLoggedIn, setLoggedOut } from '../store/slices/authSlice';
@@ -265,11 +266,21 @@ describe('auth-scoped renderer requests', () => {
 });
 
 describe('login diagnostics', () => {
+  beforeEach(() => {
+    PRODUCT_FEATURES.account = true;
+    PRODUCT_SERVICES.apiBaseUrl = 'https://api.example.com';
+    PRODUCT_SERVICES.portalBaseUrl = 'https://console.example.com/portal#';
+  });
+  afterEach(() => {
+    PRODUCT_FEATURES.account = false;
+    PRODUCT_SERVICES.apiBaseUrl = '';
+    PRODUCT_SERVICES.portalBaseUrl = '';
+  });
   test('persists renderer lifecycle logs without including the login URL', async () => {
     const fromRenderer = vi.fn();
     const loginResult = {
       success: true,
-      redirectUrl: 'https://lobsterai.youdao.com/portal#/login?source=electron',
+      redirectUrl: 'https://console.example.com/portal#/login?source=electron',
     };
     const login = vi.fn().mockResolvedValue(loginResult);
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -279,7 +290,7 @@ describe('login diagnostics', () => {
         api: {
           fetch: vi.fn().mockResolvedValue({
             ok: true,
-            data: { data: { value: 'https://lobsterai.youdao.com/portal#/login' } },
+            data: { data: { value: 'https://console.example.com/portal#/login' } },
           }),
         },
         auth: { login },
@@ -289,7 +300,7 @@ describe('login diagnostics', () => {
 
     await expect(authService.login()).resolves.toEqual(loginResult);
 
-    expect(login).toHaveBeenCalledWith('https://lobsterai.youdao.com/portal#/login');
+    expect(login).toHaveBeenCalledWith('https://console.example.com/portal#/login');
     expect(fromRenderer).toHaveBeenCalledWith(
       'info',
       'AuthService',
@@ -300,7 +311,7 @@ describe('login diagnostics', () => {
       'AuthService',
       expect.stringMatching(/^login attempt \d+ handed off to the system browser$/),
     );
-    expect(fromRenderer.mock.calls.flat().join(' ')).not.toContain('lobsterai.youdao.com');
+    expect(fromRenderer.mock.calls.flat().join(' ')).not.toContain('console.example.com');
   });
 
   test('returns the IPC failure result without throwing and records a warning', async () => {
@@ -313,7 +324,7 @@ describe('login diagnostics', () => {
         api: {
           fetch: vi.fn().mockResolvedValue({
             ok: true,
-            data: { data: { value: 'https://lobsterai.youdao.com/portal#/login' } },
+            data: { data: { value: 'https://console.example.com/portal#/login' } },
           }),
         },
         auth: { login: vi.fn().mockResolvedValue({ success: false, error: 'open failed' }) },
@@ -1126,4 +1137,23 @@ describe('auth state restoration', () => {
     expect(store.getState().enterpriseAccount.context).toBeNull();
     expect(store.getState().auth.ownerAccountKey).toBe('personal:next@example.com');
   });
+});
+
+test('unconfigured distribution never invokes login or fetch even if a login control is reached', async () => {
+  const login = vi.fn();
+  const fetch = vi.fn();
+  vi.stubGlobal('window', { electron: { auth: { login }, api: { fetch } } });
+  expect(await authService.login()).toMatchObject({ success: false });
+  expect(login).not.toHaveBeenCalled();
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+test('local workspace initialization does not restore an upstream account or fetch a catalog', async () => {
+  const getUser = vi.fn();
+  const getPricingCatalog = vi.fn();
+  vi.stubGlobal('window', { electron: { auth: { getUser, getPricingCatalog } } });
+  await authService.init();
+  expect(getUser).not.toHaveBeenCalled();
+  expect(getPricingCatalog).not.toHaveBeenCalled();
+  expect(store.getState().auth.isLoggedIn).toBe(false);
 });

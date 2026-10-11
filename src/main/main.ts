@@ -598,6 +598,7 @@ import {
 import { registerVoiceInputPermissionHandler } from './permissions/voiceInputPermission';
 import { patchEnabledNspClawguard } from './plugins/nspClawguardCompatibility';
 import { isHiddenUserPluginId } from './plugins/pluginManager';
+import { getProductDataPaths } from './productDataPath';
 import type { SkillChangeBatch } from './skills/skillChangeDiagnostics';
 import { SkillManager } from './skills/skillManager';
 import { getSkillServiceManager } from './skills/skillServices';
@@ -1965,7 +1966,7 @@ const savePngWithDialog = async (
 
 const configureUserDataPath = (): void => {
   const appDataPath = app.getPath('appData');
-  const preferredUserDataPath = path.join(appDataPath, APP_NAME);
+  const preferredUserDataPath = getProductDataPaths(appDataPath).userDataPath;
   const currentUserDataPath = app.getPath('userData');
 
   if (currentUserDataPath !== preferredUserDataPath) {
@@ -1979,7 +1980,7 @@ let startupDataMigrationRestoreResult: DataMigrationLastRestoreResult | null = n
 try {
   startupDataMigrationRestoreResult = performPendingDataMigrationRestoreSync({
     userDataPath: app.getPath('userData'),
-    rollbackRootPath: path.join(app.getPath('appData'), `${APP_NAME}-migration-rollbacks`),
+    rollbackRootPath: getProductDataPaths(app.getPath('appData')).rollbackRootPath,
   });
 } catch (error) {
   console.error('[DataMigration] pending restore failed before logger initialization:', error);
@@ -2172,7 +2173,7 @@ const initStore = async (): Promise<SqliteStore> => {
     // immediately. The timeout acts as a safety net for unexpected OS-level
     // blocking during store initialization and recovery.
     storeInitPromise = Promise.race([
-      SqliteStore.create(app.getPath('userData')),
+      SqliteStore.create(app.getPath('userData'), safeStorage),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Store initialization timed out after 15s')), 15_000),
       ),
@@ -4856,7 +4857,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
   if (isDev) {
-    console.warn('[Main] Development startup skipped: another LobsterAI instance is already running. Quit that instance and restart electron:dev to load the current source.');
+    console.warn('[Main] Development startup skipped: another StarPath instance is already running. Quit that instance and restart electron:dev to load the current source.');
   }
   app.quit();
 } else {
@@ -8847,7 +8848,7 @@ if (!gotTheLock) {
       console.error('[DataMigration] backup failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to back up LobsterAI data',
+        error: error instanceof Error ? error.message : 'Failed to back up application data',
       };
     }
   });
@@ -8885,7 +8886,7 @@ if (!gotTheLock) {
 
       const restoreResult = performDataMigrationRestoreSync({
         userDataPath: app.getPath('userData'),
-        rollbackRootPath: path.join(app.getPath('appData'), `${APP_NAME}-migration-rollbacks`),
+        rollbackRootPath: getProductDataPaths(app.getPath('appData')).rollbackRootPath,
         archivePath,
       });
       const success = restoreResult?.status === DataMigrationRestoreStatus.Success;
@@ -8906,11 +8907,11 @@ if (!gotTheLock) {
         success,
         scheduledRestart: rendererReleased,
         rollbackPath: restoreResult?.rollbackPath,
-        error: success ? undefined : restoreResult?.error || 'Failed to import LobsterAI data backup',
+        error: success ? undefined : restoreResult?.error || 'Failed to import application data backup',
       };
     } catch (error) {
       isCleanupInProgress = false;
-      const message = error instanceof Error ? error.message : 'Failed to import LobsterAI data backup';
+      const message = error instanceof Error ? error.message : 'Failed to import application data backup';
       console.error('[DataMigration] restore scheduling failed:', error);
       if (rendererReleased) {
         dialog.showErrorBox(t('dataMigrationRestoreDialogTitle'), message);
@@ -8970,7 +8971,7 @@ if (!gotTheLock) {
       return { success: true, state: await action() };
     } catch (error) {
       console.error('[AgentBrowserHost] In-app browser action failed:', error);
-      const message = error instanceof Error ? error.message : 'LobsterAI in-app browser action failed.';
+      const message = error instanceof Error ? error.message : 'In-app browser action failed.';
       return {
         success: false,
         state: {
@@ -9071,7 +9072,7 @@ if (!gotTheLock) {
           const host = getAgentBrowserHost();
           const currentState = host.getState();
           const currentTab = currentState.tabs.find(tab => tab.pageId === currentState.selectedPageId);
-          if (!currentTab) throw new Error('No LobsterAI browser page is open.');
+          if (!currentTab) throw new Error('No in-app browser page is open.');
           const nextFactor = action === AgentBrowserHostMenuAction.ZoomOut
             ? currentTab.zoomFactor - AgentBrowserZoom.Step
             : action === AgentBrowserHostMenuAction.ZoomIn
