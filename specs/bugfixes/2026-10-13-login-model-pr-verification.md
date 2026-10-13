@@ -1,6 +1,6 @@
 # 登录、真实模型调用与 PR 同步验收
 
-状态：原始生产版当前账户恢复及真实调用验收通过，已推送个人仓库并更新公司 PR #1；GitHub CI 已启动，结果另记。
+状态：原始生产版当前账户恢复及真实调用验收通过，已推送个人仓库并更新公司 PR #1；修复后 GitHub CI 全部通过。
 
 ## 目标与边界
 
@@ -41,3 +41,9 @@
 - 将规则限定为仓库根目录 `/artifacts/`，保留生成产物忽略；补齐 `PreviewErrorBoundary.tsx`、其测试、`PreviewFileBreadcrumb.tsx` 和 `previewFileBreadcrumb.css`。核对其他被忽略的产品目录，剩余仅依赖、日志、缓存和 web-search 构建输出。没有改 CI 门槛或降低测试断言。
 - 补齐后验证严格 lint、相关预览测试和从 Git 提交内容导出的独立构建，再推送个人仓库重新运行同一 CI。失败记录继续保留，不把首轮测试标记为通过。
 - 三个补齐 TS 文件严格 lint、两文件 8 项预览测试通过；暂存 Git tree 导出的隔离 checkout 完成 renderer build 与 Electron compile。四个文件与已验证 macOS 包的源码逐字节一致，本次只修复远端源码完整性，不重建用户活动生产 app。
+
+### 最终 CI 结果
+
+- 修复提交 `98ad38950704882880b1a41b73013bc9582538c4` 已推送个人 `origin/main`，公司 PR 跟随更新。[CI #2](https://github.com/lelinhomafx4021-creator/shilijia-agent/actions/runs/38393339385) 在 Ubuntu 24.04、Node 24.20.0 / npm 11.17.0 全部通过：锁定依赖、改动 lint、renderer/Main 编译、锁定技能依赖、完整 Vitest、CI/发行契约、编译产物检查。
+- 远端编译耗时 2 分 36 秒、测试 2 分 3 秒；浏览器曾保留运行中的实时状态，刷新页面后确认实际已完成。首轮失败及修复记录不删除。最终文档补记不改变这次已验证的代码及安装包源文件。
+- 已完成本轮客户端交付与个人仓库/公司 PR 同步；当前生产桌面保持打开。PR 未合并、安装包未正式发布；首次密码输入、真实短信/支付、Windows/Linux 原生安装及发行签名/公证仍待验收。
