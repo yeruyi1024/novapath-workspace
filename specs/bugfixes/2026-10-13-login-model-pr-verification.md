@@ -1,6 +1,6 @@
 # 登录、真实模型调用与 PR 同步验收
 
-状态：原始生产版当前账户恢复及真实调用验收通过，准备同步个人仓库和 PR。
+状态：原始生产版当前账户恢复及真实调用验收通过，已推送个人仓库并更新公司 PR #1；GitHub CI 已启动，结果另记。
 
 ## 目标与边界
 
@@ -28,3 +28,16 @@
 - 在该生产桌面发送：“生产版验收：请只回复‘生产版登录与模型调用成功’，不要调用工具或修改任何文件。”；实际收到对应回复，状态“已完成”，停止按钮恢复为发送按钮。模型仍为 deepseek-v4.1-flash，没有复制密码/验证码/令牌或额外写入配置来伪造验收。
 - 生产启动日志受控标记未出现加载失败、初始化失败、renderer 退出或误重编译。生产桌面保持打开供用户查看；测试截图裁去私有侧栏历史。
 - 该证据覆盖原始包、当前账户的真实登录恢复和当前平台密钥的真实调用，不冒充新账号首次密码输入、短信送达、支付或跨平台验证。独立空资料登录窗口已退出；用户明确要求使用生产版本，后续以原始生产 app 为准。
+
+## 远端同步与 CI
+
+- 代码提交 `c40722788e248c0ea5bb1b86cbaba8f74072966b` 已推送个人 `origin/main`；[公司 PR #1](https://github.com/yeruyi1024/novapath-workspace/pull/1) 标题、中文模板说明及四张脱敏 GitHub 附件已更新，四张图片均确认完整加载。没有推送公司分支、合并或发布。
+- 用户要求按公司规范决定 CI；依现有验收规范保留 `.github/workflows/ci.yml` 原规则，启用个人 fork 的工作流并手动运行 `main` 当前代码。该流程仅有 `contents: read`，执行锁定依赖安装、改动 TS lint、renderer/Main 编译、技能依赖、完整测试和发行契约，不触发发行或部署。
+- [本次 GitHub CI](https://github.com/lelinhomafx4021-creator/shilijia-agent/actions/runs/38384404025) 对应代码提交 `c4072278`。个人仓库 CI 与公司 PR 的检查分别报告；连接器读取公司检查返回 404，改由实际 GitHub 页面核对，不用旧分支打包记录替代本次结果。
+
+### 首轮 CI 失败与修复
+
+- 首轮 CI 的 168 文件 lint 通过，编译阶段报告 `PreviewErrorBoundary` 和 `PreviewFileBreadcrumb` 模块不存在，其后测试未执行。`.gitignore` 的未限定 `artifacts/` 误匹配 `src/renderer/components/artifacts/`，使原本本地验证存在的四个新增源码/测试/样式文件未进入代码提交；本地包不受缺失影响，远端洁净 checkout 无法编译。
+- 将规则限定为仓库根目录 `/artifacts/`，保留生成产物忽略；补齐 `PreviewErrorBoundary.tsx`、其测试、`PreviewFileBreadcrumb.tsx` 和 `previewFileBreadcrumb.css`。核对其他被忽略的产品目录，剩余仅依赖、日志、缓存和 web-search 构建输出。没有改 CI 门槛或降低测试断言。
+- 补齐后验证严格 lint、相关预览测试和从 Git 提交内容导出的独立构建，再推送个人仓库重新运行同一 CI。失败记录继续保留，不把首轮测试标记为通过。
+- 三个补齐 TS 文件严格 lint、两文件 8 项预览测试通过；暂存 Git tree 导出的隔离 checkout 完成 renderer build 与 Electron compile。四个文件与已验证 macOS 包的源码逐字节一致，本次只修复远端源码完整性，不重建用户活动生产 app。

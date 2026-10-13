@@ -61,5 +61,5 @@ openspec/
 # Local CI workspaces and generated artifacts
 .ci-openclaw/
 .ci-artifacts/
-artifacts/
+/artifacts/
 logs/
