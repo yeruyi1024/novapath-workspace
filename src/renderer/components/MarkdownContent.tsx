@@ -540,34 +540,34 @@ const createMarkdownComponents = (
     : <>{children}</>,
   code: (props: any) => <CodeBlock {...props} inline />,
   table: ({ node: _node, className: _className, children, ...props }: any) => (
-    <div className={`${spacing === 'compact' ? 'my-2' : 'my-4'} overflow-x-auto rounded-xl border border-border bg-surface/30 shadow-sm`}>
-      <table className="border-collapse w-full text-xs text-left" {...props}>
+    <div className={`${spacing === 'compact' ? 'my-2' : 'my-4'} overflow-x-auto rounded-xl border border-border`}>
+      <table className="border-collapse w-full" {...props}>
         {children}
       </table>
     </div>
   ),
   thead: ({ node: _node, className: _className, children, ...props }: any) => (
-    <thead className="border-b border-border bg-surface-raised/80 font-medium text-secondary" {...props}>
+    <thead className="bg-surface-raised" {...props}>
       {children}
     </thead>
   ),
   tbody: ({ node: _node, className: _className, children, ...props }: any) => (
-    <tbody className="divide-y divide-border/60" {...props}>
+    <tbody className="divide-y divide-border" {...props}>
       {children}
     </tbody>
   ),
   tr: ({ node: _node, className: _className, children, ...props }: any) => (
-    <tr className="transition-colors hover:bg-surface-raised/40 even:bg-surface-raised/20" {...props}>
+    <tr className="divide-x divide-border" {...props}>
       {children}
     </tr>
   ),
   th: ({ node: _node, className: _className, children, align, style, ...props }: any) => (
-    <th className="px-4 py-2.5 align-middle text-left font-medium text-foreground whitespace-nowrap" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
+    <th className="px-4 py-2 align-top text-left font-semibold text-foreground" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
       {children}
     </th>
   ),
   td: ({ node: _node, className: _className, children, align, style, ...props }: any) => (
-    <td className="px-4 py-2.5 align-middle text-foreground/90" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
+    <td className="px-4 py-2 align-top text-foreground" style={{ ...style, textAlign: align ?? style?.textAlign }} {...props}>
       {children}
     </td>
   ),

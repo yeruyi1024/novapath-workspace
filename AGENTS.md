@@ -80,6 +80,13 @@ Extension maintenance and document capability boundaries are recorded in
   file links. Keep branding and the surrounding workspace separate. See
   `specs/refactors/2026-10-12-official-answer-chain.md`. Change these behaviors
   only for a separately requested, documented and verified upstream fix.
+- Ordinary conversation input/output and plugin, skill and MCP execution must
+  retain official 2026.9.23 behavior: message/attachment payloads, tool arguments
+  and results, send/stop/retry, streaming/history, Markdown/code/table rendering
+  and file links. UI, branding, account and settings changes must not replace
+  these contracts or add answer-style prompts. Keep company adapters and the
+  already approved product/packaging differences separate. See
+  `specs/bugfixes/2026-10-13-official-conversation-extension-parity.md`.
 - Before coding, state the problem, scope, acceptance criteria, and validation.
   Record substantial changes in a focused spec under `specs/`; update its final
   status and remaining work. Do not rely on chat history as the specification.
