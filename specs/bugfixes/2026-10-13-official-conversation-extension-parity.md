@@ -1,6 +1,6 @@
 # 普通问答、输入输出与扩展官方一致性
 
-状态：官方源码对照、表格恢复、定向回归、隔离构建与随包插件验收完成；远端 CI 结果另记。
+状态：官方源码对照、表格恢复、定向回归、隔离构建与随包插件验收完成；代码已推送个人仓库，公司 PR #1 已更新，GitHub CI 通过。
 
 ## 问题、范围与基线
 
@@ -21,10 +21,19 @@
 - 修复前问答、附件/草稿、流式/历史、工具事件、插件/技能/MCP/SDK 等 31 文件定向测试：30 文件通过、1 文件跳过；599 项通过、1 项跳过。跳过为环境条件未满足的既有测试，未修改断言或增加跳过。
 - 表格恢复后复查中央模块与官方一致，执行 Markdown/消息显示回归、改动文件严格 lint 和隔离 renderer build。
 - 最终 20/20 核心生产模块逐字一致；AST 对照确认输入载荷组装、键盘、粘贴、拖放处理与官方一致。`handleSubmit` 剩余差异为现有语音忙状态和公司模型权限入口，发送数据组装及工具路由保留。
+
+| 逐字对照组 | 生产模块 |
+| --- | --- |
+| 回答与历史（5） | MarkdownContent、AssistantMessageItem、messageDisplayUtils、openclawAssistantText、openclawHistory |
+| 发送与协议（5） | renderer/services/cowork、coworkCapabilitySelection、coworkEngineRouter、coworkOpenAICompatProxy、coworkFormatTransform |
+| 输入与技能路由（5） | selectedSkillRoutingPrompt、skillSystemPrompt、clipboardAttachments、UserMessageContent、shared/cowork/imageAttachments |
+| 插件和 MCP（5） | pluginManager、pluginInstallPublisher、mcpRuntime、mcpStore、mcpLaunchResolverManager |
+
 - 表格恢复后的 3 文件 62 项回归及两个改动 TS 文件严格 lint 通过；Git HEAD 的隔离 checkout 仅叠加恢复的 Markdown 源码，renderer build 与 Electron compile 通过。完整测试 557 文件通过、16 文件跳过；5,911 项通过、163 项跳过，无失败。该隔离目录未带开发 runtime，与此前开发目录 5,926/148 的环境不同，分别记录。
 - 显式指定已有隔离 macOS 测试包的运行时后，修正夹具的真实微信插件修复集成测试通过：先启动、旧记录修复、原始 SQLite 备份、包内 SDK 握手、启用后连续两次启动；临时 gateway/资料已正常退出和清理。没有修改或重建活动生产 runtime、安装外部扩展或连接真实微信账号。
 - 真实 MarkdownContent 的隔离静态渲染样例已检查浅深色、480px 窄窗、中文/英文表格、左右居中对齐、代码、公式、引用和原始文件链接；无页面横向溢出。样例首次缺少 DOM 主题环境导致 CodeBlock SSR 失败，补齐样例 DOM 后通过，未改生产组件。截图 `docs/pr-screenshots/2026-10-13/official-conversation-output.jpg` 是组件样例，不冒充真实模型端到端。
 - 原始生产包的当前账户登录恢复及真实模型回答已在上一轮验证；本轮自动测试不安装真实第三方插件、不替用户登录外部服务、不发送邮件或真实短信。远程插件的具体账号/服务、Windows/Linux 原生安装仍需按对应服务验收。
+- 本轮代码提交 `677b0714cf10ecbc9986bbaf804293e0223ddd2e` 已推送个人 `origin/main`；[公司 PR #1](https://github.com/yeruyi1024/novapath-workspace/pull/1) 同步正文与 GitHub 截图附件。[GitHub CI #3](https://github.com/lelinhomafx4021-creator/shilijia-agent/actions/runs/38410120611) 全部通过，总耗时 5 分 1 秒；Ubuntu 完整测试 557 文件/5,911 项通过、163 项跳过，lint、编译、技能依赖、发行契约和输出门槛通过。最后仅补记验收文档，不改已验证代码、不重复全库测试。
 
 ## 后续约束
 
