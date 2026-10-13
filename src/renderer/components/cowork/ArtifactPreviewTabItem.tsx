@@ -59,16 +59,17 @@ const ArtifactPreviewTabItem: React.FC<ArtifactPreviewTabItemProps> = ({
       data-artifact-preview-active={active ? 'true' : undefined}
       onMouseDown={handleMouseDown}
       onAuxClick={handleAuxClick}
-      className={`artifact-preview-tab non-draggable group relative flex h-7 min-w-[44px] max-w-[190px] flex-1 items-center rounded-lg text-xs transition-colors [container-type:inline-size] ${
+      className={`artifact-preview-tab non-draggable group relative flex h-8 min-w-[44px] max-w-[190px] flex-1 items-center rounded-lg text-xs transition-colors [container-type:inline-size] ${
         active
-          ? 'bg-surface-raised text-foreground shadow-sm'
+          ? 'bg-surface text-foreground'
           : 'text-secondary hover:bg-surface hover:text-foreground'
       }`}
     >
       <button
         type="button"
         onClick={onActivate}
-        className="artifact-preview-tab__activate flex h-full min-w-0 flex-1 items-center gap-1.5 px-2 text-left"
+        aria-pressed={active}
+        className="artifact-preview-tab__activate flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-lg px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/45"
         title={label}
       >
         <span className="artifact-preview-tab__icon flex shrink-0 items-center">{icon}</span>
@@ -78,11 +79,11 @@ const ArtifactPreviewTabItem: React.FC<ArtifactPreviewTabItemProps> = ({
       <button
         type="button"
         onClick={handleCloseClick}
-        className="artifact-preview-tab__close absolute right-1.5 top-1/2 flex h-3.5 w-3.5 -translate-y-1/2 items-center justify-center rounded-full text-transparent transition-colors group-hover:bg-muted group-hover:text-background focus-visible:bg-muted focus-visible:text-background hover:!bg-foreground hover:!text-background"
+        className="artifact-preview-tab__close absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-transparent transition-colors group-hover:text-secondary focus-visible:bg-surface-raised focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 hover:!bg-surface-raised hover:!text-foreground"
         title={closeLabel}
         aria-label={closeLabel}
       >
-        <ArtifactTabCloseIcon className="h-2.5 w-2.5" />
+        <ArtifactTabCloseIcon className="h-3 w-3" />
       </button>
     </div>
   );

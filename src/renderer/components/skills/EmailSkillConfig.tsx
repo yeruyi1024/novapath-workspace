@@ -225,6 +225,9 @@ const EmailSkillConfig: React.FC = () => {
   const isMountedRef = useRef(true);
   const persistQueueRef = useRef(Promise.resolve());
   const persistPendingCountRef = useRef(0);
+  const editRevisionRef = useRef(0);
+  const [persisting, setPersisting] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -265,9 +268,12 @@ const EmailSkillConfig: React.FC = () => {
     nextConfig: EmailSkillAccountsConfig,
     analyticsChangedKeys = '',
   ) => {
+    const savedRevision = editRevisionRef.current;
     const normalized = normalizeConfig(nextConfig);
     if (isMountedRef.current) {
       setConfig(normalized);
+      setPersisting(true);
+      setHasSaved(false);
     }
     persistPendingCountRef.current += 1;
     console.debug('[EmailSkillConfig] persisting email accounts config', {
@@ -284,6 +290,8 @@ const EmailSkillConfig: React.FC = () => {
     persistPendingCountRef.current = Math.max(0, persistPendingCountRef.current - 1);
     if (isMountedRef.current) {
       setPersistError(success ? null : i18nService.t('emailConfigError'));
+      setPersisting(persistPendingCountRef.current > 0);
+      if (success && savedRevision === editRevisionRef.current) setHasSaved(true);
     }
     if (success) {
       console.debug('[EmailSkillConfig] persisted email accounts config', {
@@ -312,6 +320,8 @@ const EmailSkillConfig: React.FC = () => {
 
   const updateActiveAccount = useCallback((patch: Partial<EmailSkillAccountConfig>) => {
     if (!activeAccount) return;
+    editRevisionRef.current += 1;
+    setHasSaved(false);
     setConfig(prev => ({
       ...prev,
       accounts: prev.accounts.map(account =>
@@ -538,6 +548,21 @@ const EmailSkillConfig: React.FC = () => {
     return <div className="p-4 text-xs text-secondary">{i18nService.t('loading')}...</div>;
   }
 
+  if (loadError) {
+    return <div className="space-y-3 p-4" role="alert">
+      <p className="text-sm text-error">{loadError}</p>
+      <button type="button" className="rounded-lg border border-border px-3 py-2 text-sm" onClick={() => {
+        setLoading(true);
+        void skillService.getEmailAccountsConfig(SKILL_ID).then(loaded => {
+          if (!isMountedRef.current) return;
+          setConfig(normalizeConfig(loaded));
+          setLoadError(null);
+        }).catch(() => { if (isMountedRef.current) setLoadError(i18nService.t('emailConfigLoadError')); })
+          .finally(() => { if (isMountedRef.current) setLoading(false); });
+      }}>{i18nService.t('retry')}</button>
+    </div>;
+  }
+
   const activeResult = activeAccount ? connectivityResults[activeAccount.id] : null;
   const connectivityPassed = activeResult?.verdict === 'pass';
   const currentPreset = activeAccount?.provider ? PROVIDER_PRESETS[activeAccount.provider] : null;
@@ -549,7 +574,7 @@ const EmailSkillConfig: React.FC = () => {
     const message = loadError || persistError;
     if (!message) return null;
     return (
-      <div className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+      <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-600 dark:text-red-400">
         {message}
       </div>
     );
@@ -558,6 +583,16 @@ const EmailSkillConfig: React.FC = () => {
   const renderAccountOverview = () => (
     <div className="space-y-4">
       {renderErrorBanner()}
+
+      {config.accounts.length > 0 && <label className="block text-xs text-secondary">
+        {i18nService.t('emailDefaultAccount')}
+        <select aria-label={i18nService.t('emailDefaultAccount')} className={`${inputClassName} mt-2`}
+          value={config.defaultAccountId} onChange={event => {
+            void persistConfig({ ...config, defaultAccountId: event.target.value }, 'default_account');
+          }}>
+          {config.accounts.map(account => <option key={account.id} value={account.id} disabled={!account.enabled}>{getAccountDisplayName(account)}</option>)}
+        </select>
+      </label>}
 
       {config.accounts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-10 text-center">
@@ -699,6 +734,7 @@ const EmailSkillConfig: React.FC = () => {
           <div>
             <label className={labelClassName}>{i18nService.t('emailAccountName')}</label>
             <input
+              aria-label={i18nService.t('emailAccountName')}
               type="text"
               value={account.name}
               onChange={e => updateActiveAccount({ name: e.target.value })}
@@ -709,6 +745,7 @@ const EmailSkillConfig: React.FC = () => {
           <div>
             <label className={labelClassName}>{i18nService.t('emailProvider')}</label>
             <select
+              aria-label={i18nService.t('emailProvider')}
               value={account.provider ?? ''}
               onChange={e => handleProviderChange(e.target.value)}
               onBlur={() => void persistActiveAccount()}
@@ -727,6 +764,7 @@ const EmailSkillConfig: React.FC = () => {
               {i18nService.t('emailAddress')}<span className="text-red-500 ml-0.5">*</span>
             </label>
             <input
+              aria-label={i18nService.t('emailAddress')}
               type="email"
               value={account.email}
               onChange={e => updateActiveAccount({ email: e.target.value })}
@@ -741,6 +779,7 @@ const EmailSkillConfig: React.FC = () => {
             </label>
             <div className="relative">
               <input
+                aria-label={i18nService.t('emailPassword')}
                 type={showPassword ? 'text' : 'password'}
                 value={account.password ?? ''}
                 onChange={e => updateActiveAccount({ password: e.target.value })}
@@ -752,6 +791,7 @@ const EmailSkillConfig: React.FC = () => {
                 {account.password && (
                   <button
                     type="button"
+                    aria-label={i18nService.t('emailClearAuthorization')}
                     onClick={() => {
                       updateActiveAccount({ password: '' });
                       void persistActiveAccount({ password: '' });
@@ -763,6 +803,8 @@ const EmailSkillConfig: React.FC = () => {
                 )}
                 <button
                   type="button"
+                  aria-label={i18nService.t(showPassword ? 'emailHideAuthorization' : 'emailShowAuthorization')}
+                  aria-pressed={showPassword}
                   onClick={() => setShowPassword(!showPassword)}
                   className="rounded p-0.5 text-secondary transition-colors hover:text-primary"
                 >
@@ -808,7 +850,8 @@ const EmailSkillConfig: React.FC = () => {
                 <div>
                   <label className={labelClassName}>{i18nService.t('emailImapHost')}</label>
                   <input
-                    type="text"
+                    aria-label={i18nService.t('emailImapHost')}
+              type="text"
                     value={account.imapHost ?? ''}
                     onChange={e => updateActiveAccount({ imapHost: e.target.value })}
                     onBlur={() => void persistActiveAccount()}
@@ -818,7 +861,8 @@ const EmailSkillConfig: React.FC = () => {
                 <div>
                   <label className={labelClassName}>{i18nService.t('emailImapPort')}</label>
                   <input
-                    type="number"
+                    aria-label={i18nService.t('emailImapPort')}
+              type="number"
                     value={account.imapPort ?? 993}
                     onChange={e => updateActiveAccount({ imapPort: parseInt(e.target.value, 10) || 993 })}
                     onBlur={() => void persistActiveAccount()}
@@ -828,7 +872,8 @@ const EmailSkillConfig: React.FC = () => {
                 <div>
                   <label className={labelClassName}>{i18nService.t('emailSmtpHost')}</label>
                   <input
-                    type="text"
+                    aria-label={i18nService.t('emailSmtpHost')}
+              type="text"
                     value={account.smtpHost ?? ''}
                     onChange={e => updateActiveAccount({ smtpHost: e.target.value })}
                     onBlur={() => void persistActiveAccount()}
@@ -838,7 +883,8 @@ const EmailSkillConfig: React.FC = () => {
                 <div>
                   <label className={labelClassName}>{i18nService.t('emailSmtpPort')}</label>
                   <input
-                    type="number"
+                    aria-label={i18nService.t('emailSmtpPort')}
+              type="number"
                     value={account.smtpPort ?? 587}
                     onChange={e => updateActiveAccount({ smtpPort: parseInt(e.target.value, 10) || 587 })}
                     onBlur={() => void persistActiveAccount()}
@@ -850,7 +896,8 @@ const EmailSkillConfig: React.FC = () => {
               <div>
                 <label className={labelClassName}>{i18nService.t('emailMailbox')}</label>
                 <input
-                  type="text"
+                  aria-label={i18nService.t('emailMailbox')}
+              type="text"
                   value={account.mailbox ?? 'INBOX'}
                   onChange={e => updateActiveAccount({ mailbox: e.target.value })}
                   onBlur={() => void persistActiveAccount()}
@@ -995,6 +1042,10 @@ const EmailSkillConfig: React.FC = () => {
 
   return (
     <div>
+      <p className="mb-3 text-xs leading-5 text-secondary">{i18nService.t('emailAutoSaveHint')}</p>
+      <p role="status" aria-live="polite" className="mb-3 text-xs text-secondary">
+        {persisting ? i18nService.t('emailSaving') : hasSaved && !persistError ? i18nService.t('emailSaved') : ''}
+      </p>
       {activeAccount ? renderAccountDetail(activeAccount) : renderAccountOverview()}
 
       {pendingDeleteAccount && (

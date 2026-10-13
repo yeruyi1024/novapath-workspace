@@ -1,7 +1,7 @@
 {
   "zh": {
     "pptx": {
-      "label": "制作幻灯片",
+      "label": "PPT 演示",
       "prompts": {
         "pptx-work-report": {
           "label": "工作汇报",
@@ -26,7 +26,7 @@
       }
     },
     "data-analysis": {
-      "label": "数据分析",
+      "label": "Excel 表格",
       "prompts": {
         "excel-summary": {
           "label": "Excel 汇总统计",
@@ -51,7 +51,7 @@
       }
     },
     "doc-writing": {
-      "label": "文档写作",
+      "label": "Word 文档",
       "prompts": {
         "doc-meeting-minutes": {
           "label": "会议纪要整理",
@@ -99,11 +99,36 @@
           "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填)\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意)\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块)\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障)\n- 单选题:使用频率(每天/每周/每月/偶尔)\n- 文本题:您的建议或意见(大文本框)\n- 提交按钮,提交后显示感谢页面\n\n设计风格:\n清爽简洁、白色背景、蓝绿色主色调、每道题之间有足够间距、带进度条显示填写进度。适合手机端操作。"
         }
       }
+    },
+    "pdf": {
+      "label": "PDF 文档",
+      "prompts": {
+        "pdf-summary": {
+          "label": "阅读与总结",
+          "description": "提取重点、页码与原文依据",
+          "prompt": "请阅读我提供的 PDF，归纳主要内容与结论，并标注对应页码。扫描页先识别文字；无法读取的内容明确说明，不猜测。"
+        },
+        "pdf-extract": {
+          "label": "提取文字与表格",
+          "description": "把 PDF 内容整理为可编辑文件",
+          "prompt": "请提取我提供的 PDF 中的文字与表格，保留页码和来源。根据内容整理为 Word 或 Excel 文件，并在回答中引用文件的完整或相对路径。"
+        },
+        "pdf-merge": {
+          "label": "合并与整理",
+          "description": "按指定顺序整理 PDF 页面",
+          "prompt": "请按我指定的顺序合并 PDF，并根据要求提取或重新排列页面。保留原文件，将结果另存为新 PDF，在回答中引用文件的完整或相对路径。"
+        },
+        "pdf-create": {
+          "label": "制作 PDF",
+          "description": "生成排版清楚的正式文档",
+          "prompt": "请根据我提供的内容制作一份 PDF，排版简洁专业，确保中文字体正常，并检查导出后的文字和页面。保存结果，在回答中引用文件的完整或相对路径。"
+        }
+      }
     }
   },
   "en": {
     "pptx": {
-      "label": "Create Slides",
+      "label": "PowerPoint",
       "prompts": {
         "pptx-work-report": {
           "label": "Work Report",
@@ -128,7 +153,7 @@
       }
     },
     "data-analysis": {
-      "label": "Data Analysis",
+      "label": "Excel",
       "prompts": {
         "excel-summary": {
           "label": "Excel Summary",
@@ -153,7 +178,7 @@
       }
     },
     "doc-writing": {
-      "label": "Write Documents",
+      "label": "Word",
       "prompts": {
         "doc-meeting-minutes": {
           "label": "Meeting Minutes",
@@ -199,6 +224,31 @@
           "label": "Survey Questionnaire",
           "description": "Online form and questionnaire collection page",
           "prompt": "Help me create a customer satisfaction survey questionnaire webpage.\n\nQuestionnaire title: \"Your Feedback is Important to Us\"\n\nQuestionnaire content:\n- Basic information: Name (optional), Contact (optional)\n- Single choice: Overall satisfaction (Very satisfied/Satisfied/Neutral/Dissatisfied/Very dissatisfied)\n- Single choice: Would you recommend to friends (1-10 rating slider)\n- Multiple choice: What aspects do you value most (Product quality/Service attitude/Response speed/Value for money/After-sales support)\n- Single choice: Usage frequency (Daily/Weekly/Monthly/Occasionally)\n- Text question: Your suggestions or opinions (large text box)\n- Submit button, show thank you page after submission\n\nDesign style:\nFresh and simple, white background, blue-green main color, sufficient spacing between questions, with progress bar showing completion. Suitable for mobile operation."
+        }
+      }
+    },
+    "pdf": {
+      "label": "PDF",
+      "prompts": {
+        "pdf-summary": {
+          "label": "Read and summarize",
+          "description": "Key findings with page references",
+          "prompt": "Read my PDF, summarize its main findings, and cite page numbers. Recognize text in scanned pages where possible. Clearly report unreadable content without guessing."
+        },
+        "pdf-extract": {
+          "label": "Extract text and tables",
+          "description": "Turn PDF content into editable files",
+          "prompt": "Extract text and tables from my PDF with page references. Save the content as Word or Excel as appropriate and include complete or relative file links in your reply."
+        },
+        "pdf-merge": {
+          "label": "Merge and organize",
+          "description": "Arrange pages in the specified order",
+          "prompt": "Merge my PDFs in the specified order and extract or rearrange pages as requested. Preserve the originals, save a new PDF, and include a complete or relative file link."
+        },
+        "pdf-create": {
+          "label": "Create a PDF",
+          "description": "Produce a polished document",
+          "prompt": "Create a clearly formatted PDF from my content. Verify fonts, extracted text, and rendered pages. Save the result and include a complete or relative file link."
         }
       }
     }

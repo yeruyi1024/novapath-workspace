@@ -12,7 +12,7 @@ import path from 'path';
 export function cpRecursiveSync(
   src: string,
   dest: string,
-  opts: { dereference?: boolean; force?: boolean; errorOnExist?: boolean } = {}
+  opts: { dereference?: boolean; force?: boolean; errorOnExist?: boolean; preserveTimestamps?: boolean } = {}
 ): void {
   const { dereference = false, force = false } = opts;
   const stat = dereference ? fs.statSync(src) : fs.lstatSync(src);
@@ -33,6 +33,8 @@ export function cpRecursiveSync(
       fs.mkdirSync(destDir, { recursive: true });
     }
     fs.copyFileSync(src, dest);
+    // Compiled skill freshness depends on source/build times, not copy order.
+    if (opts.preserveTimestamps) fs.utimesSync(dest, stat.atime, stat.mtime);
   } else if (stat.isSymbolicLink()) {
     if (fs.existsSync(dest)) {
       if (!force) return;

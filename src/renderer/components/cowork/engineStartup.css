@@ -21,6 +21,7 @@ html.dark .starpath-startup {
   --startup-muted: #b4b4b4;
   --startup-accent: #a8adff;
 }
+.starpath-startup-titlebar { position: absolute; inset: 0 0 auto; }
 .starpath-startup-content { width: min(360px, calc(100% - 48px)); text-align: center; }
 .starpath-startup-brand { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .starpath-startup-logo { display: block; width: 40px; height: 40px; user-select: none; -webkit-user-drag: none; }
@@ -41,4 +42,19 @@ html[lang="en"] .starpath-startup-copy-en { display: inline; }
 }
 @media (prefers-reduced-motion: reduce) {
   .starpath-startup-dot { animation: none; opacity: 0.6; }
+}
+
+.starpath-startup-retry {
+  margin-inline-start: 12px;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.starpath-startup-retry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }

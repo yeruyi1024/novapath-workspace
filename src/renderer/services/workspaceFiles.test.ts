@@ -66,4 +66,9 @@ describe('workspace local files', () => {
     statFile.mockResolvedValue({ success: false });
     await expect(loadLocalFileArtifact('/missing.pptx')).rejects.toThrow();
   });
+  test.each(['darwin', 'linux'] as const)('preserves a trailing backslash in a POSIX project name on %s', platform => {
+    const directory = '/work/project' + String.fromCharCode(92);
+    expect(resolveWorkspacePath('deck.pptx', directory, platform)).toBe(directory + '/deck.pptx');
+  });
+
 });

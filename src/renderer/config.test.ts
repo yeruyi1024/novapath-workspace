@@ -73,8 +73,14 @@ test('getProviderDisplayName: custom provider with undefined displayName uses de
   expect(getProviderDisplayName('custom_2', { displayName: undefined })).toBe('Custom2');
 });
 
-test('defaultConfig uses OpenAI-compatible DeepSeek defaults', () => {
-  expect(defaultConfig.api.baseUrl).toBe('https://api.deepseek.com');
+test('defaultConfig routes exclusively through the company gateway while retaining inactive legacy metadata', () => {
+  expect(defaultConfig.api.baseUrl).toBe('https://gateway.ai.shilijia.xyz/v1');
+  expect(defaultConfig.api.key).toBe('');
+  expect(defaultConfig.model.availableModels).toEqual([]);
+  expect(defaultConfig.model.defaultModel).toBe('');
+  expect(defaultConfig.platformProviderId).toBe('custom_0');
+  expect(defaultConfig.providers?.custom_0).toMatchObject({ baseUrl: defaultConfig.api.baseUrl, apiKey: '', enabled: false });
+  expect(Object.values(defaultConfig.providers ?? {}).every(provider => !provider.enabled)).toBe(true);
   expect(defaultConfig.providers?.[ProviderName.DeepSeek]?.apiFormat).toBe(ApiFormat.OpenAI);
   expect(defaultConfig.providers?.[ProviderName.Xiaomi]?.apiFormat).toBe(ApiFormat.OpenAI);
 });

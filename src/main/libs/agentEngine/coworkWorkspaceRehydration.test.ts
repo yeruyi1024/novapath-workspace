@@ -63,7 +63,7 @@ test('workspace rehydration bridge includes bounded capsule and git state', asyn
     commandRunner,
   });
 
-  expect(bridge).toContain('[StarPath workspace state after context compaction]');
+  expect(bridge).toContain('[NovaPath workspace state after context compaction]');
   expect(bridge).toContain('Recently touched files:');
   expect(bridge).toContain('src/main/libs/agentEngine/openclawRuntimeAdapter.ts');
   expect(bridge).toContain('Git status:');

@@ -55,6 +55,7 @@ import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import { ModelAccessPromptKind, ModelAccessPromptModal } from '../ModelSelector';
 import { ProjectSelector } from '../projects/ProjectControls';
 import { useWorkspaceProjects } from '../projects/useWorkspaceProjects';
+import OfficeQuickActions from '../quick-actions/OfficeQuickActions';
 import type { SettingsOpenOptions } from '../Settings';
 import SkinAmbientEffects from '../skin/SkinAmbientEffects';
 import SkinBackdrop, { SkinBackdropVariant } from '../skin/SkinBackdrop';
@@ -741,13 +742,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
       </div>
       <div className="non-draggable flex items-center gap-2">
-        <div className="workspace-header-signature flex shrink-0 items-center gap-2 text-xs text-muted" aria-hidden="true">
-          <svg className="h-4 w-8 text-primary" viewBox="0 0 32 16" fill="none">
-            <path d="M20 1C21.5 5 23 6.5 27 8C23 9.5 21.5 11 20 15C18.5 11 17 9.5 13 8C17 6.5 18.5 5 20 1Z" fill="currentColor" />
-            <path d="M5 5L7 8L5 11L3 8Z" fill="currentColor" opacity=".35" />
-          </svg>
-          <span>{i18nService.t('starpathWorkspace')}</span>
-        </div>
         {PRODUCT_FEATURES.promotions && !isEnterpriseAccount && startupCreditEntry.available && (
           <button
             type="button"
@@ -828,10 +822,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
           {/* Main content */}
           <div className="relative z-10 flex-1 overflow-y-auto min-h-0">
-            <div className="workspace-home relative mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-center px-8 pb-[12vh] pt-10">
+            <div className="workspace-home relative mx-auto flex min-h-full w-full max-w-[760px] flex-col justify-start px-8">
               <div data-skin-home-copy="true" className="w-full text-center animate-fade-in-up">
-                <img src="logo.svg" alt="" className="workspace-home-emblem mx-auto mb-5 h-12 w-12" />
-                <h1 className="text-[28px] font-medium leading-[1.35] tracking-[-0.03em] text-foreground">
+                <img src="logo.svg" alt="" className="workspace-home-emblem mx-auto mb-4 h-10 w-10" />
+                <h1 className="workspace-home-title text-[26px] font-medium leading-[1.4] tracking-[-0.03em] text-foreground">
                   {selectedProject?.name || i18nService.t('projectWelcome')}
                 </h1>
                 {selectedProject && <p className="mt-3 text-sm text-secondary">{i18nService.t('projectStartChat')}</p>}
@@ -839,7 +833,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
               {/* Prompt Input Area - Large version with folder selector */}
               <div
-                className="relative z-30 mt-7 w-full animate-fade-in-up"
+                className="relative z-30 mt-6 w-full animate-fade-in-up"
                 style={{ animationDelay: '180ms', animationFillMode: 'both' }}
               >
                 <CoworkPromptInput
@@ -866,7 +860,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 />
               </div>
 
-              <div className="mt-5">{engineStatusBanner}</div>
+              <OfficeQuickActions
+                disabled={!isEngineReady || isStreaming}
+                onManageSkills={() => onShowSkills?.()}
+                onPromptSelect={(prompt) => {
+                  const input = promptInputRef.current;
+                  if (!input?.getValue().trim()) input?.setValue(prompt, 'template');
+                  input?.focus();
+                }}
+              />
+
+              {engineStatusBanner && <div className="mt-5">{engineStatusBanner}</div>}
               {PRODUCT_FEATURES.promotions && <CreditsResetCampaignFloat />}
 
             </div>

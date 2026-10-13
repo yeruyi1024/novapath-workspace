@@ -37,6 +37,7 @@ import { cleanupStaleGatewayLocks, GatewayLockCleanupAction } from './openclawGa
 import { buildOpenClawGatewayShutdownBridge, spawnOpenClawGatewayProcess, stopOpenClawGatewayProcess } from './openclawGatewayProcess';
 import { cleanupStaleThirdPartyPluginsFromBundledDir, listLocalOpenClawExtensionIds,syncLocalOpenClawExtensionsIntoRuntime } from './openclawLocalExtensions';
 import { migrateAllFtsOnlyMemoryIndexes } from './openclawMemoryIndexMigration';
+import { disableRetiredDreaming } from './openclawMemoryPolicy';
 import { migrateLegacySessionStorageWithDoctor } from './openclawSessionLegacyMigration';
 import { extractOpenClawBindingSchemaFailure, extractOpenClawCliFailure, hasLegacyOpenClawDiscovery, isOpenClawBindingSchemaFailure, runOpenClawStartupCompatibility } from './openclawStartupCompatibility';
 import { migrateLegacyStateBeforeStartup, stopStartupStateMigrations } from './openclawStartupStateMigration';
@@ -1847,15 +1848,19 @@ export class OpenClawEngineManager extends EventEmitter {
   private ensureConfigFile(): boolean {
     ensureDir(path.dirname(this.configPath));
     if (!fs.existsSync(this.configPath)) {
-      fs.writeFileSync(this.configPath, JSON.stringify({ gateway: { mode: 'local' } }, null, 2) + '\n', 'utf8');
+      const config = { gateway: { mode: 'local' } };
+      disableRetiredDreaming(config);
+      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
       return false;
     }
     // Ensure gateway.mode is set even if config already exists
     try {
       const raw = fs.readFileSync(this.configPath, 'utf8');
       const config = JSON.parse(raw);
-      if (!config.gateway?.mode) {
-        config.gateway = { ...config.gateway, mode: 'local' };
+      const dreamingChanged = disableRetiredDreaming(config);
+      const gatewayModeMissing = !config.gateway?.mode;
+      if (gatewayModeMissing) config.gateway = { ...config.gateway, mode: 'local' };
+      if (dreamingChanged || gatewayModeMissing) {
         fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2) + '\n', 'utf8');
       }
       return hasLegacyOpenClawDiscovery(config);

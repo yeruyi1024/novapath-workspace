@@ -1,9 +1,8 @@
-import { BoltIcon, ChevronRightIcon, Cog6ToothIcon, FolderIcon, FolderPlusIcon, MagnifyingGlassIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
+import { BoltIcon, ChevronRightIcon, FolderIcon, FolderPlusIcon, MagnifyingGlassIcon, PlusIcon, PuzzlePieceIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 import { AgentId } from '@shared/agent';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import { PRODUCT } from '../../shared/product';
 import { agentService } from '../services/agent';
 import { coworkService } from '../services/cowork';
 import { i18nService } from '../services/i18n';
@@ -18,6 +17,7 @@ import CoworkSearchModal from './cowork/CoworkSearchModal';
 import CoworkSessionItem from './cowork/CoworkSessionItem';
 import ComposeIcon from './icons/ComposeIcon';
 import SidebarToggleIcon from './icons/SidebarToggleIcon';
+import PlatformAccountButton from './login/PlatformAccountButton';
 import { ProjectCreateDialog } from './projects/ProjectControls';
 import { ProjectMoveDialog } from './projects/ProjectMoveDialog';
 import { useWorkspaceProjects } from './projects/useWorkspaceProjects';
@@ -162,9 +162,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
           {toolsOpen && <div id="workspace-tools" className="mb-2 mt-1 space-y-0.5">{tools.map(({ label, action, icon: Icon, active }) => <button key={label} type="button" onClick={action}
             aria-current={active ? 'page' : undefined} className={`flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-xs hover:bg-surface-raised ${active ? 'bg-surface-raised text-foreground' : 'text-secondary'}`}><Icon className="h-3.5 w-3.5" />{i18nService.t(label)}</button>)}</div>}
         </div>
-        <button type="button" onClick={onShowSettings} className="flex h-10 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13px] text-secondary hover:bg-surface-raised">
-          <img src="logo.svg" alt="" className="h-6 w-6 shrink-0" /><span className="flex-1 text-left font-medium text-foreground">{PRODUCT.name}</span><Cog6ToothIcon className="h-4 w-4" /><span className="sr-only">{i18nService.t('settings')}</span>
-        </button>
+        <PlatformAccountButton onShowSettings={onShowSettings} />
       </div>
     </aside>
     {editing && <ProjectCreateDialog project={editing} onClose={() => setEditing(null)} />}

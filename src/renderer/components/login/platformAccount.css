@@ -1,0 +1,197 @@
+.platform-sidebar-account {
+  padding-top: 9px;
+  border-top: 1px solid var(--lobster-border-subtle);
+}
+
+.platform-sidebar-subscription,
+.platform-sidebar-profile {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  border-radius: 10px;
+  transition: background-color 150ms ease;
+}
+
+.platform-sidebar-subscription {
+  min-height: 36px;
+  margin-bottom: 5px;
+  padding: 8px 11px;
+  border: 1px solid var(--lobster-border-subtle);
+  background: var(--lobster-surface);
+  color: var(--lobster-foreground);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.platform-sidebar-profile { min-height: 52px; padding: 9px 8px; }
+.platform-sidebar-brand { min-height: 46px; padding-inline: 10px; }
+.platform-sidebar-brand:focus-visible { outline: 2px solid var(--lobster-primary); outline-offset: 2px; }
+.platform-sidebar-subscription:hover,
+.platform-sidebar-profile:hover { background: var(--lobster-surface-raised); }
+
+.platform-account-avatar {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--lobster-border-subtle);
+  border-radius: 50%;
+  background: var(--lobster-primary-muted);
+  color: var(--lobster-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.platform-account-avatar-large { width: 56px; height: 56px; flex-basis: 56px; font-size: 22px; }
+
+.platform-account-overlay {
+  position: fixed;
+  z-index: 10060;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 30%);
+  backdrop-filter: blur(5px);
+}
+
+.platform-account-dialog {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100dvh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--lobster-border-subtle);
+  border-radius: 20px;
+  background: var(--lobster-background);
+  color: var(--lobster-foreground);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 16%);
+}
+
+.platform-account-dialog-content {
+  display: flex;
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
+  outline: none;
+}
+
+.platform-profile-dialog { max-width: 480px; }
+.platform-profile-dialog .platform-account-header { border-bottom: 1px solid var(--lobster-border-subtle); }
+
+.platform-account-header,
+.platform-account-footer { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 16px; }
+.platform-account-header { padding: 22px 28px 18px; }
+.platform-account-footer { padding: 16px 28px; border-top: 1px solid var(--lobster-border-subtle); background: var(--lobster-surface); }
+
+.platform-account-icon-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; padding: 8px; border-radius: 8px; color: var(--lobster-text-secondary); }
+.platform-account-icon-button:hover { background: var(--lobster-surface-raised); color: var(--lobster-foreground); }
+
+.platform-account-tabs { display: flex; flex-shrink: 0; gap: 24px; padding: 0 28px; border-bottom: 1px solid var(--lobster-border-subtle); }
+.platform-account-tabs button { position: relative; display: inline-flex; min-width: 0; align-items: center; gap: 7px; padding: 13px 2px; color: var(--lobster-text-secondary); font-size: 13px; }
+.platform-account-tabs button:hover { color: var(--lobster-foreground); }
+.platform-account-tabs button[aria-selected="true"] { color: var(--lobster-primary); font-weight: 500; }
+.platform-account-tabs button[aria-selected="true"]::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; border-radius: 2px; background: var(--lobster-primary); content: ''; }
+
+.platform-account-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.platform-account-panel { padding: 28px; }
+.platform-account-panel[hidden] { display: none; }
+
+.platform-profile-identity { display: flex; align-items: center; gap: 16px; margin-bottom: 32px; }
+.platform-account-status { display: inline-flex; max-width: 100%; flex-shrink: 0; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 6px; background: var(--lobster-primary-muted); color: var(--lobster-primary); font-size: 11px; line-height: 1.5; }
+.platform-account-status-neutral { background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); }
+
+.platform-account-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.platform-account-section-heading h3 { font-size: 13px; font-weight: 600; }
+.platform-profile-details { overflow: hidden; border: 1px solid var(--lobster-border-subtle); border-radius: 12px; background: var(--lobster-surface); }
+.platform-profile-details > div { display: grid; grid-template-columns: minmax(90px, 1fr) minmax(0, 2fr); gap: 16px; padding: 15px 18px; border-bottom: 1px solid var(--lobster-border-subtle); font-size: 13px; line-height: 1.5; }
+.platform-profile-details > div:last-child { border-bottom: 0; }
+.platform-profile-details dt { color: var(--lobster-text-secondary); }
+.platform-profile-details dd { overflow-wrap: anywhere; text-align: right; }
+
+.platform-profile-subscription-link { display: flex; width: 100%; align-items: center; gap: 14px; margin-top: 24px; padding: 18px; border: 1px solid var(--lobster-border-subtle); border-radius: 12px; background: var(--lobster-surface); transition: background-color 150ms ease, border-color 150ms ease; }
+.platform-profile-subscription-link:hover { border-color: var(--lobster-primary); background: var(--lobster-surface-raised); }
+.platform-account-feature-icon { display: inline-flex; width: 36px; height: 36px; flex: 0 0 36px; align-items: center; justify-content: center; border-radius: 9px; background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); }
+.platform-profile-subscription-link .platform-account-feature-icon { background: var(--lobster-primary-muted); color: var(--lobster-primary); }
+.platform-profile-security { display: flex; align-items: flex-start; gap: 10px; margin-top: 24px; padding: 2px; color: var(--lobster-text-secondary); }
+.platform-profile-security > svg { margin-top: 2px; }
+
+.platform-account-text-button { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 6px; padding: 6px 4px; border-radius: 6px; color: var(--lobster-text-secondary); font-size: 12px; line-height: 1.5; }
+.platform-account-text-button:hover:not(:disabled) { color: var(--lobster-foreground); background: var(--lobster-surface-raised); }
+.platform-account-text-button:disabled { opacity: 0.5; }
+.platform-account-button { display: inline-flex; min-height: 36px; align-items: center; justify-content: center; padding: 8px 18px; border: 1px solid var(--lobster-border-subtle); border-radius: 8px; background: var(--lobster-surface-raised); font-size: 12px; font-weight: 500; }
+.platform-account-button:hover:not(:disabled) { border-color: var(--lobster-text-muted); }
+.platform-account-button:disabled { cursor: default; color: var(--lobster-text-secondary); }
+
+.platform-account-notice { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--lobster-border-subtle); border-radius: 10px; background: var(--lobster-surface); font-size: 12px; line-height: 1.75; }
+.platform-subscriptions-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.platform-subscriptions-sync { min-height: 20px; margin-top: 8px; margin-bottom: 24px; font-size: 11px; line-height: 1.8; }
+.platform-subscriptions-empty { display: flex; align-items: center; gap: 14px; padding: 20px; border: 1px dashed var(--lobster-border-subtle); border-radius: 12px; background: var(--lobster-surface); }
+.platform-subscription-list { display: grid; gap: 12px; }
+.platform-subscription-card { min-width: 0; padding: 18px; border: 1px solid var(--lobster-border-subtle); border-radius: 12px; background: var(--lobster-surface); }
+.platform-subscription-heading { display: flex; align-items: center; gap: 12px; }
+.platform-subscription-dates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lobster-border-subtle); font-size: 12px; line-height: 1.7; }
+.platform-subscription-dates dt { color: var(--lobster-text-secondary); font-size: 11px; }
+.platform-subscription-dates dd { margin-top: 3px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.platform-available-plans { margin-top: 28px; scroll-margin-top: 20px; }
+.platform-plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.platform-plan-card { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; padding: 22px; border: 1px solid var(--lobster-border-subtle); border-radius: 14px; background: var(--lobster-surface); }
+.platform-plan-card[data-subscribed] { border-color: color-mix(in srgb, var(--lobster-primary) 40%, var(--lobster-border-subtle)); }
+.platform-plan-card-heading { display: flex; width: 100%; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.platform-plan-card-heading h4 { min-width: 0; overflow-wrap: anywhere; font-size: 14px; font-weight: 600; line-height: 1.6; }
+.platform-plan-description { margin-top: 10px; overflow-wrap: anywhere; color: var(--lobster-text-secondary); font-size: 12px; line-height: 1.8; }
+.platform-plan-price { display: flex; max-width: 100%; flex-wrap: wrap; align-items: baseline; gap: 7px; margin-top: 24px; overflow-wrap: anywhere; font-size: 30px; font-weight: 600; line-height: 1.2; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.platform-plan-currency { color: var(--lobster-text-secondary); font-size: 11px; font-weight: 400; letter-spacing: normal; }
+.platform-plan-duration { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; color: var(--lobster-text-secondary); font-size: 12px; line-height: 1.7; }
+.platform-plan-card-footer { width: 100%; margin-top: auto; padding-top: 24px; text-align: center; }
+.platform-plan-card-footer .platform-account-button { width: 100%; }
+.platform-plan-card-footer p { margin-top: 8px; }
+.platform-subscription-history { margin-top: 28px; border-top: 1px solid var(--lobster-border-subtle); }
+.platform-subscription-history summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 2px; border-radius: 4px; color: var(--lobster-text-secondary); font-size: 12px; cursor: pointer; list-style: none; }
+.platform-subscription-history summary::-webkit-details-marker { display: none; }
+.platform-subscription-history[open] summary > svg { transform: rotate(180deg); }
+.platform-subscriptions-account-hint { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--lobster-border-subtle); color: var(--lobster-text-muted); font-size: 11px; line-height: 1.8; }
+.platform-plan-skeleton { display: grid; min-height: 210px; align-content: start; gap: 18px; padding: 22px; border: 1px solid var(--lobster-border-subtle); border-radius: 14px; }
+.platform-plan-skeleton span { width: 65%; height: 14px; border-radius: 4px; background: var(--lobster-surface-raised); }
+.platform-plan-skeleton span:nth-child(2) { width: 40%; height: 32px; margin-top: 14px; }
+.platform-plan-skeleton span:last-child { width: 90%; margin-top: 20px; }
+
+.platform-sidebar-account button:focus-visible,
+.platform-account-dialog button:focus-visible,
+.platform-account-dialog summary:focus-visible,
+.platform-account-panel:focus-visible,
+.platform-available-plans:focus-visible {
+  outline: 2px solid var(--lobster-primary);
+  outline-offset: 3px;
+}
+
+@media (max-width: 639px) {
+  .platform-account-overlay { padding: 12px; }
+  .platform-account-dialog, .platform-account-dialog-content { max-height: calc(100dvh - 24px); }
+  .platform-account-header { padding: 18px 20px 14px; }
+  .platform-account-tabs { gap: 20px; padding: 0 20px; }
+  .platform-account-panel { padding: 22px 20px; }
+  .platform-account-footer { padding: 14px 20px; }
+  .platform-plan-grid { grid-template-columns: minmax(0, 1fr); }
+  .platform-plan-card { padding: 20px; }
+  .platform-profile-identity { flex-wrap: wrap; gap: 12px; }
+  .platform-profile-identity .platform-account-status { margin-left: 68px; }
+  .platform-subscriptions-intro { flex-wrap: wrap; gap: 8px; }
+  .platform-subscriptions-empty { flex-wrap: wrap; padding: 16px; }
+}
+
+@media (max-width: 399px) {
+  .platform-account-tabs { gap: 16px; }
+  .platform-account-tabs button { font-size: 12px; }
+  .platform-account-tabs button svg { display: none; }
+  .platform-subscription-heading { flex-wrap: wrap; }
+  .platform-subscription-heading .platform-account-status { margin-left: 48px; }
+  .platform-profile-details > div { grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 12px 15px; }
+  .platform-profile-details dd { text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-sidebar-subscription, .platform-sidebar-profile, .platform-profile-subscription-link { transition: none; }
+}

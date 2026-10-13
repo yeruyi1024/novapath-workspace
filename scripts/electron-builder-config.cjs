@@ -5,6 +5,7 @@ const path = require('path');
 const config = require('../electron-builder.json');
 const product = require('../src/shared/product/product.json');
 config.productName = product.name;
+config.executableName = product.englishName;
 config.appId = product.appId;
 config.linux = {
   ...config.linux,
@@ -112,6 +113,11 @@ for (const platformName of ['mac', 'win', 'linux']) {
     from: `resources/document-runtime/${platformName}-\${arch}`,
     to: 'document-runtime',
     filter: ['**/*', '!**/__pycache__/**'],
+  });
+  config[platformName].extraResources.push({
+    from: `resources/asr-runtime/${platformName}-\${arch}`,
+    to: 'asr-runtime',
+    filter: ['**/*', '!model.bin'],
   });
 }
 

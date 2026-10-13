@@ -80,6 +80,26 @@
           "id": "web-survey"
         }
       ]
+    },
+    {
+      "id": "pdf",
+      "icon": "DocumentTextIcon",
+      "color": "#E0646B",
+      "skillMapping": "pdf",
+      "prompts": [
+        {
+          "id": "pdf-summary"
+        },
+        {
+          "id": "pdf-extract"
+        },
+        {
+          "id": "pdf-merge"
+        },
+        {
+          "id": "pdf-create"
+        }
+      ]
     }
   ]
 }

@@ -8,6 +8,8 @@ const { Arch } = require('builder-util');
 const { OPENCLAW_BUNDLE_ASSET_TARGETS } = require('./openclaw-bundle-assets.cjs');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
 const { ensureDocumentRuntime } = require('./setup-document-runtime.cjs');
+const { ensureLocalAsrRuntime } = require('./setup-local-asr-runtime.cjs');
+const { verifyBundledSkillLicenses } = require('./verify-bundled-skill-licenses.cjs');
 const { pruneUnselectedBuildPlugins } = require('./ensure-openclaw-plugins.cjs');
 const { ensurePortableGit } = require('./setup-mingit.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
@@ -708,7 +710,9 @@ function writeWindowsPayloadSizeFragment(context) {
 }
 
 async function beforePack(context) {
+  verifyBundledSkillLicenses();
   await ensureDocumentRuntime(resolveOpenClawRuntimeTargetId(context));
+  await ensureLocalAsrRuntime(resolveOpenClawRuntimeTargetId(context), { includeModel: false });
   configureBetterSqlite3MacPayload(context);
   ensureBundledOpenClawRuntime(context);
   // Install skill dependencies first (for all platforms)

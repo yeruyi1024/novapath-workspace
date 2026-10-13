@@ -10,6 +10,7 @@ import {
 } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
 import { normalizeShellFilePath } from './shellAppsCache';
+import { resolveWorkspacePath } from './workspacePath';
 
 /**
  * Normalize a local artifact path from markdown, MEDIA tokens, or tool metadata.
@@ -55,24 +56,13 @@ export function normalizeProjectDirectoryForDedup(projectDirectory: string): str
  * session working directory.
  */
 export function toAbsoluteArtifactPath(filePath: string, cwd?: string): string {
-  let rawPath = filePath;
-  if (rawPath.startsWith('file:///')) {
-    rawPath = rawPath.slice(7);
-  } else if (rawPath.startsWith('file://')) {
-    rawPath = rawPath.slice(7);
-  } else if (rawPath.startsWith('file:/')) {
-    rawPath = rawPath.slice(5);
+  try {
+    return resolveWorkspacePath(filePath, cwd?.trim());
+  } catch {
+    // Detection can encounter incomplete references; preserve them for display.
+    // Actual file loading validates again and never guesses a process cwd.
+    return filePath;
   }
-  // Strip leading / before Windows drive letter (e.g. /D:/path from file:///D:/path)
-  if (/^\/[A-Za-z]:/.test(rawPath)) {
-    rawPath = rawPath.slice(1);
-  }
-  if (rawPath.startsWith('/') || /^[A-Za-z]:/.test(rawPath) || rawPath.startsWith('~')) {
-    return rawPath;
-  }
-  const base = cwd?.trim().replace(/[\\/]+$/, '');
-  if (!base) return rawPath;
-  return `${base}/${rawPath.replace(/^\.\//, '')}`;
 }
 
 /**

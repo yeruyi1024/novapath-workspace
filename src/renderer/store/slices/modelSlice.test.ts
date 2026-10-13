@@ -65,6 +65,19 @@ describe('clearAgentSelectedModel', () => {
 });
 
 describe('setAvailableModels', () => {
+  test('has no invented default model before a platform key is configured', () => {
+    const state = modelReducer(undefined, { type: 'init' });
+    expect(state.availableModels).toEqual([]);
+    expect(state.defaultSelectedModel).toEqual({ id: '', name: '', accessible: false });
+  });
+
+  test('clearing the last key removes stale selected models and per-agent overrides', () => {
+    let state = modelReducer(undefined, setAvailableModels([modelA]));
+    state = modelReducer(state, setSelectedModel({ agentId: 'main', model: modelA }));
+    state = modelReducer(state, setAvailableModels([]));
+    expect(state.defaultSelectedModel).toEqual({ id: '', name: '', accessible: false });
+    expect(state.selectedModelByAgent).toEqual({});
+  });
   test('re-matches per-agent models when available models change', () => {
     // Set up: agent has modelA selected
     let state = modelReducer(undefined, setSelectedModel({ agentId: 'agent-1', model: modelA }));

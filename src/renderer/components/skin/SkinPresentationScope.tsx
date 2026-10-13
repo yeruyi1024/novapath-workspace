@@ -3,7 +3,7 @@ import './skinPresentation.css';
 import React, { type CSSProperties } from 'react';
 
 import type { SkinPresentation } from '../../../shared/skin/presentation';
-import { useSkin } from '../../providers/SkinProvider';
+import { useSkin } from '../../providers/skinContext';
 
 type SkinPresentationStyle = CSSProperties & Record<`--lobster-skin-${string}`, string>;
 

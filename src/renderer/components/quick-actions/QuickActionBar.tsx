@@ -1,30 +1,16 @@
 import React from 'react';
 
 import type { LocalizedQuickAction } from '../../types/quickAction';
-import AcademicCapIcon from '../icons/AcademicCapIcon';
-import ChartBarIcon from '../icons/ChartBarIcon';
-import DevicePhoneMobileIcon from '../icons/DevicePhoneMobileIcon';
-import DocumentTextIcon from '../icons/DocumentTextIcon';
-import GlobeAltIcon from '../icons/GlobeAltIcon';
-import PresentationChartBarIcon from '../icons/PresentationChartBarIcon';
+import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
 
 interface QuickActionBarProps {
   actions: LocalizedQuickAction[];
+  disabled?: boolean;
   selectedActionId?: string | null;
   onActionSelect: (actionId: string) => void;
 }
 
-// 图标映射
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  PresentationChartBarIcon,
-  GlobeAltIcon,
-  DevicePhoneMobileIcon,
-  DocumentTextIcon,
-  ChartBarIcon,
-  AcademicCapIcon,
-};
-
-const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedActionId, onActionSelect }) => {
+const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedActionId, onActionSelect, disabled }) => {
   if (actions.length === 0) {
     return null;
   }
@@ -32,7 +18,6 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedAction
   return (
     <div data-skin-quick-actions="true" className="flex flex-wrap items-center justify-center gap-2">
       {actions.map((action) => {
-        const IconComponent = iconMap[action.icon];
         const isSelected = action.id === selectedActionId;
 
         return (
@@ -40,20 +25,21 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedAction
             key={action.id}
             type="button"
             aria-pressed={isSelected}
+            disabled={disabled}
             onClick={() => onActionSelect(action.id)}
-            className={`group flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-[length:var(--lobster-text-sidebarCompact)] font-normal leading-5 transition-all duration-200 ease-out active:translate-y-0 active:scale-[0.97] ${
+            className={`group flex items-center gap-2 rounded-lg border px-3 py-2 text-xs leading-5 transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
               isSelected
-                ? 'border-[color-mix(in_srgb,var(--lobster-primary)_50%,transparent)] bg-primary-muted text-primary'
-                : 'border-border-subtle bg-surface text-secondary hover:border-primary/30 hover:bg-surface-raised hover:text-foreground '
+                ? 'border-primary/30 bg-primary-muted text-primary'
+                : 'border-transparent bg-transparent text-secondary hover:border-border-subtle hover:bg-surface-raised hover:text-foreground'
             }`}
           >
-            {IconComponent && (
-              <IconComponent
-                className={`h-3.5 w-3.5 transition-colors duration-200 ${
-                  isSelected ? 'text-primary' : 'text-secondary group-hover:text-primary'
-                }`}
+            <span aria-hidden="true">
+              <FileTypeIcon
+                fileName={`document.${action.skillMapping}`}
+                className="h-4 w-4 transition-colors"
+                monochrome={!isSelected}
               />
-            )}
+            </span>
             <span>{action.label}</span>
           </button>
         );

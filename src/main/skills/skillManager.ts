@@ -16,6 +16,7 @@ import { appendPythonRuntimeToEnv } from '../libs/pythonRuntime';
 import { mergeReports,scanMultipleSkillDirs } from '../libs/skillSecurity/skillSecurityScanner';
 import type { SecurityReportAction,SkillSecurityReport } from '../libs/skillSecurity/skillSecurityTypes';
 import { SqliteStore } from '../sqliteStore';
+import { recoverBundledSkillReplacementSync, replaceBundledSkillSync } from './bundledSkillReplacement';
 import {
   createSkillChangeBatch,
   type SkillChangeBatch,
@@ -411,6 +412,7 @@ const SKILL_FILE_NAME = 'SKILL.md';
 const SKILLS_CONFIG_FILE = 'skills.config.json';
 const SKILL_STATE_KEY = 'skills_state';
 const WATCH_DEBOUNCE_MS = 250;
+const WATCH_RECONCILE_INTERVAL_MS = 2000;
 
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
@@ -1404,6 +1406,7 @@ const isWebSearchSkillBroken = (skillRoot: string): boolean => {
 export class SkillManager {
   private watchers: fs.FSWatcher[] = [];
   private notifyTimer: NodeJS.Timeout | null = null;
+  private watchReconcileTimer: NodeJS.Timeout | null = null;
   private changeListeners: Array<(batch: SkillChangeBatch) => void> = [];
   private readonly watchDiagnostics = new SkillWatchDiagnostics();
   private watchSnapshot: SkillWatchSnapshot | null = null;
@@ -1522,6 +1525,7 @@ export class SkillManager {
           return;
         }
         const targetDir = path.join(userRoot, id);
+        recoverBundledSkillReplacementSync(targetDir);
         const targetExists = fs.existsSync(targetDir);
 
         // Check if skill needs repair
@@ -1548,35 +1552,14 @@ export class SkillManager {
         try {
           console.log(`[skills] syncBundledSkillsToUserData: copying "${id}" from ${dir} to ${targetDir}`);
 
-          // Preserve user-managed email credentials before clean copy
-          let envBackup: Buffer | null = null;
-          let accountsBackup: Buffer | null = null;
-          const envPath = path.join(targetDir, '.env');
-          const accountsPath = path.join(targetDir, 'accounts.json');
-          if (needsCleanCopy && fs.existsSync(envPath)) {
-            envBackup = fs.readFileSync(envPath);
-          }
-          if (needsCleanCopy && fs.existsSync(accountsPath)) {
-            accountsBackup = fs.readFileSync(accountsPath);
-          }
-
-          // Version-based update: delete target dir first to remove stale files
-          // (e.g. old .py scripts, __pycache__, leftover package-lock.json)
           if (needsCleanCopy) {
-            fs.rmSync(targetDir, { recursive: true, force: true });
-          }
-
-          cpRecursiveSync(dir, targetDir, {
-            dereference: true,
-            force: shouldRepair,
-          });
-
-          // Restore user-managed email credentials after clean copy
-          if (envBackup !== null) {
-            fs.writeFileSync(envPath, envBackup);
-          }
-          if (accountsBackup !== null) {
-            fs.writeFileSync(accountsPath, accountsBackup);
+            replaceBundledSkillSync(dir, targetDir, { preserveTimestamps: id === 'web-search' });
+          } else {
+            cpRecursiveSync(dir, targetDir, {
+              dereference: true,
+              force: shouldRepair,
+              preserveTimestamps: id === 'web-search',
+            });
           }
 
           console.log(`[skills] syncBundledSkillsToUserData: copied "${id}" successfully`);
@@ -2408,7 +2391,7 @@ export class SkillManager {
     return { success: true, skills: this.listSkills() };
   }
 
-  startWatching(): void {
+  startWatching(observedSnapshot?: SkillWatchSnapshot): void {
     this.stopWatching();
     const primaryRoot = this.ensureSkillsRoot();
     const roots = this.getSkillRoots(primaryRoot);
@@ -2432,7 +2415,7 @@ export class SkillManager {
 
     let snapshot: SkillWatchSnapshot;
     try {
-      snapshot = readSkillWatchSnapshot(roots, [SKILL_FILE_NAME, SKILLS_CONFIG_FILE]);
+      snapshot = observedSnapshot ?? readSkillWatchSnapshot(roots, [SKILL_FILE_NAME, SKILLS_CONFIG_FILE]);
     } catch (error) {
       console.warn('[skills] Failed to read skill watch snapshot:', error);
       return;
@@ -2474,9 +2457,26 @@ export class SkillManager {
       }
     });
     this.watchSnapshot = snapshot;
+    // A definition can arrive after the scan but before its native watcher attaches.
+    // Reconcile against the observed baseline rather than silently accepting it.
+    const attached = readSkillWatchSnapshot(roots, [SKILL_FILE_NAME, SKILLS_CONFIG_FILE]);
+    if (attached.watchFingerprint !== snapshot.watchFingerprint
+        || attached.contentFingerprint !== snapshot.contentFingerprint) {
+      this.scheduleNotify(SkillWatchScope.Root, 'reattach');
+    }
+    // fs.watch can miss/coalesce directory events on supported systems. Probe only
+    // definition bytes; the fingerprint check suppresses unchanged UI updates.
+    this.watchReconcileTimer = setInterval(() => {
+      this.scheduleNotify(SkillWatchScope.Root, 'reconcile');
+    }, WATCH_RECONCILE_INTERVAL_MS);
+    this.watchReconcileTimer.unref();
   }
 
   stopWatching(): void {
+    if (this.watchReconcileTimer) {
+      clearInterval(this.watchReconcileTimer);
+      this.watchReconcileTimer = null;
+    }
     this.watchDiagnostics.clear();
     this.watchers.forEach(watcher => watcher.close());
     this.watchers = [];
@@ -2505,7 +2505,7 @@ export class SkillManager {
         if (snapshot.readError) throw snapshot.readError;
         const previous = this.watchSnapshot;
         this.watchSnapshot = snapshot;
-        if (snapshot.watchFingerprint !== previous?.watchFingerprint) this.startWatching();
+        if (snapshot.watchFingerprint !== previous?.watchFingerprint) this.startWatching(snapshot);
         if (snapshot.contentFingerprint !== previous?.contentFingerprint) this.notifySkillsChanged(batch);
       } catch (error) {
         // Retain the last readable snapshot; a transient read failure is not a deletion.

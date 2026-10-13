@@ -1,7 +1,7 @@
 {
   "appId": "com.starpath.desktop",
-  "productName": "星途 StarPath",
-  "executableName": "StarPath",
+  "productName": "星途 NovaPath",
+  "executableName": "NovaPath",
   "directories": {
     "output": "release"
   },
@@ -10,6 +10,8 @@
   "files": [
     "package.json",
     "resources/SYSTEM_PROMPT.md",
+    "resources/error.html",
+    "resources/recovery.js",
     {
       "from": "dist",
       "to": "dist",
@@ -34,9 +36,6 @@
     "!**/CHANGELOG.md",
     "!**/CHANGELOG",
     "!**/HISTORY.md",
-    "!**/LICENSE",
-    "!**/LICENSE.md",
-    "!**/LICENSE.txt",
     "!**/.eslintrc*",
     "!**/.prettierrc*",
     "!**/tsconfig.json",
@@ -68,12 +67,16 @@
     },
     {
       "from": "LICENSE",
-      "to": "licenses/LobsterAI-LICENSE.txt"
+      "to": "licenses/upstream-project-LICENSE.txt"
+    },
+    {
+      "from": "resources/THIRD_PARTY_NOTICES.md",
+      "to": "licenses/THIRD_PARTY_NOTICES.md"
     }
   ],
   "protocols": [
     {
-      "name": "星途 StarPath",
+      "name": "星途 NovaPath",
       "schemes": [
         "lobsterai"
       ]
@@ -91,10 +94,10 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "extendInfo": {
       "CFBundleIconName": "icon",
-      "NSMicrophoneUsageDescription": "星途 StarPath 需要访问您的麦克风来录制语音输入并进行语音识别。",
-      "NSCalendarsUsageDescription": "星途 StarPath 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
-      "NSRemindersUsageDescription": "星途 StarPath 需要访问您的提醒事项来帮助您管理待办事项。",
-      "NSAppleEventsUsageDescription": "星途 StarPath 需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
+      "NSMicrophoneUsageDescription": "星途 NovaPath 需要访问您的麦克风来录制语音输入并进行语音识别。",
+      "NSCalendarsUsageDescription": "星途 NovaPath 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
+      "NSRemindersUsageDescription": "星途 NovaPath 需要访问您的提醒事项来帮助您管理待办事项。",
+      "NSAppleEventsUsageDescription": "星途 NovaPath 需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
     },
     "extraResources": [
       {
@@ -106,6 +109,8 @@
           "!**/.env.*",
           "!**/.venv",
           "!**/.venv/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",
@@ -116,9 +121,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -145,9 +147,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -199,6 +198,8 @@
           "!**/.env.*",
           "!**/.venv",
           "!**/.venv/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",
@@ -209,9 +210,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -238,9 +236,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -254,7 +249,7 @@
       }
     ],
     "desktop": {
-      "Name": "星途 StarPath",
+      "Name": "星途 NovaPath",
       "Comment": "AI workspace for projects and conversations",
       "Terminal": "false"
     }

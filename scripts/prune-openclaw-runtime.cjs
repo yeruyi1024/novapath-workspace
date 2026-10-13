@@ -28,10 +28,6 @@ const PATTERNS_TO_DELETE = [
   /^readme(\.(md|txt|rst))?$/i,
   /^changelog(\.(md|txt|rst))?$/i,
   /^history(\.(md|txt|rst))?$/i,
-  /^license(\.(md|txt))?$/i,
-  /^licence(\.(md|txt))?$/i,
-  /^authors(\.(md|txt))?$/i,
-  /^contributors(\.(md|txt))?$/i,
   // Config files not needed at runtime
   /^\.eslintrc/i,
   /^\.prettierrc/i,

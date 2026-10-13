@@ -65,7 +65,6 @@ import { i18nService } from '../../services/i18n';
 import { getInstalledKitSkillIds } from '../../services/kitCapability';
 import { readLocalServiceProjectDirectoryCandidate } from '../../services/localServiceProjectDirectoryCache';
 import { getSubagentWaitPhase, SubagentWaitPhase } from '../../services/subagentWaitState';
-import { resolveWorkspacePath } from '../../services/workspaceFiles';
 import { RootState } from '../../store';
 import {
   selectCurrentMessagesLength,
@@ -149,7 +148,7 @@ import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
 import SidebarSearchIcon from '../icons/SidebarSearchIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import SubagentIcon from '../icons/SubagentIcon';
-import MarkdownContent, { normalizeMarkdownLocalFilePath } from '../MarkdownContent';
+import MarkdownContent from '../MarkdownContent';
 import { type ToastEventDetail } from '../Toast';
 import { resolveAgentModelSelection, useAgentSelectedModel } from './agentModelSelection';
 import ArtifactPreviewTabItem from './ArtifactPreviewTabItem';
@@ -163,7 +162,6 @@ import {
   bucketLength,
   reportConversationNavigationAction,
 } from './conversationAnalytics';
-import ConversationFilePreviewProvider from './ConversationFilePreviewProvider';
 import {
   canScrollElementInWheelDirection,
   isAtConversationSessionBottom,
@@ -1323,7 +1321,7 @@ const stripFileProtocol = (value: string): string => {
 const hasScheme = (value: string): boolean => /^[a-z][a-z0-9+.-]*:/i.test(value);
 
 const isAbsolutePath = (value: string): boolean => (
-  value.startsWith('/') || value.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(value)
+  value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value)
 );
 
 const isRelativePath = (value: string): boolean => !isAbsolutePath(value) && !hasScheme(value);
@@ -1350,17 +1348,22 @@ const parseRootRelativePath = (value: string): string | null => {
 };
 
 const normalizeLocalPath = (
-  value: string,
-  isLink = false,
+  value: string
 ): { path: string; isRelative: boolean; isAbsolute: boolean } | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
 
-  const fileScheme = /^(?:file|localfile):/i.test(trimmed);
+  const fileScheme = /^file:\/\//i.test(trimmed);
   const schemePresent = hasScheme(trimmed);
   if (schemePresent && !fileScheme && !isAbsolutePath(trimmed)) return null;
 
-  const path = fileScheme || isLink ? normalizeMarkdownLocalFilePath(trimmed) : trimmed;
+  let raw = trimmed;
+  if (fileScheme) {
+    raw = stripFileProtocol(raw);
+  }
+  raw = stripHashAndQuery(raw);
+  const decoded = safeDecodeURIComponent(raw);
+  const path = decoded || raw;
   if (!path) return null;
 
   const isAbsolute = isAbsolutePath(path);
@@ -1368,12 +1371,11 @@ const normalizeLocalPath = (
   return { path, isRelative, isAbsolute };
 };
 
-const toAbsolutePathFromCwd = (filePath: string, cwd: string): string | null => {
-  try {
-    return resolveWorkspacePath(filePath, cwd, window.electron.platform as 'win32' | 'darwin' | 'linux');
-  } catch {
-    return null;
+const toAbsolutePathFromCwd = (filePath: string, cwd: string): string => {
+  if (isAbsolutePath(filePath)) {
+    return filePath;
   }
+  return `${cwd.replace(/\/$/, '')}/${filePath.replace(/^\.\//, '')}`;
 };
 
 const EMPTY_ARTIFACTS: Artifact[] = [];
@@ -5004,7 +5006,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       return hrefRootRelative;
     }
 
-    const hrefPath = hrefValue ? normalizeLocalPath(hrefValue, true) : null;
+    const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
     if (hrefPath) {
       if (hrefPath.isRelative && currentSession?.cwd) {
         return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
@@ -6050,7 +6052,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   };
 
   return (
-    <ConversationFilePreviewProvider sessionId={currentSession.id} cwd={currentSession.cwd}>
     <ArtifactFileShareProvider sessionId={currentSession.id}>
       <div className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header — spans full width */}
@@ -6631,12 +6632,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           document.body
         )}
         {!exportImageProgress && shouldShowScrollToBottom && (
-          <div className="pointer-events-none absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center gap-2 px-3">
+          <div className="pointer-events-none absolute bottom-4 right-8 z-20 flex items-center justify-end">
             <button
               type="button"
               onClick={handleScrollToBottom}
               onWheel={handleScrollToBottomWheel}
-              className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground/85 shadow-[0_2px_10px_rgba(15,23,42,0.12)] transition-colors hover:bg-surface-raised hover:text-foreground dark:shadow-[0_2px_14px_rgba(0,0,0,0.36)]"
+              className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface/90 text-foreground/85 shadow-[0_2px_10px_rgba(15,23,42,0.15)] backdrop-blur transition-all hover:scale-105 hover:bg-surface-raised hover:text-foreground dark:shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
               aria-label={i18nService.t('coworkScrollToBottom')}
               title={i18nService.t('coworkScrollToBottom')}
             >
@@ -7024,7 +7025,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       </div>
       </div>
     </ArtifactFileShareProvider>
-    </ConversationFilePreviewProvider>
   );
 };
 

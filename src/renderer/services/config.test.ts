@@ -1,7 +1,7 @@
 import { ProviderName } from '@shared/providers';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { type AppConfig, CODE_FONT_SIZE_MIGRATION_VERSION, CONFIG_KEYS, defaultConfig, FontPreferences, resolveArtifactAutoPreviewEnabled, ShortcutAction, UI_FONT_SIZE_MIGRATION_VERSION } from '../config';
+import { type AppConfig, CODE_FONT_SIZE_MIGRATION_VERSION, CONFIG_KEYS, defaultConfig, FontPreferences, resolveArtifactAutoPreviewEnabled, RetiredSettingsShortcut, ShortcutAction, UI_FONT_SIZE_MIGRATION_VERSION } from '../config';
 
 const makeLegacyConfigWithoutMiniMaxAddedModels = (): AppConfig => ({
   ...defaultConfig,
@@ -208,7 +208,7 @@ test('platform-only settings survive reload without reactivating retained legacy
   await reloaded.configService.init();
   expect(reloaded.configService.getConfig()).toMatchObject({
     platformProviderId: 'custom_30',
-    api: { key: 'platform-key', baseUrl: 'https://gateway.example/v1' },
+    api: { key: 'platform-key', baseUrl: 'https://gateway.ai.shilijia.xyz/v1' },
     model: { defaultModel: 'platform-model', defaultModelProvider: 'custom_30' },
     providers: {
       openai: { enabled: false, apiKey: legacy.apiKey },
@@ -391,6 +391,25 @@ describe('configService artifact auto-preview persistence', () => {
 });
 
 describe('configService shortcut migrations', () => {
+  test('retires email and dreaming bindings without changing active custom shortcuts', async () => {
+    const storedConfig: AppConfig = {
+      ...defaultConfig,
+      shortcuts: {
+        ...defaultConfig.shortcuts!,
+        [RetiredSettingsShortcut.Email]: 'CommandOrControl+Alt+E',
+        [RetiredSettingsShortcut.Dreaming]: 'CommandOrControl+Alt+D',
+        [ShortcutAction.OpenSettingsMemory]: 'CommandOrControl+Alt+M',
+      },
+    };
+    const { configService, storeData } = await loadConfigServiceWithStoredConfig(storedConfig);
+    await configService.init();
+    for (const config of [configService.getConfig(), storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig]) {
+      expect(config.shortcuts).not.toHaveProperty(RetiredSettingsShortcut.Email);
+      expect(config.shortcuts).not.toHaveProperty(RetiredSettingsShortcut.Dreaming);
+      expect(config.shortcuts?.[ShortcutAction.OpenSettingsMemory]).toBe('CommandOrControl+Alt+M');
+    }
+  });
+
   test('normalizes prior agent default shortcuts to unset', async () => {
     const storedConfig: AppConfig = {
       ...defaultConfig,
@@ -469,8 +488,9 @@ describe('configService provider migrations', () => {
 
     const savedConfig = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
     expect(savedConfig.providers?.[ProviderName.Minimax].models?.map(model => model.id)).toContain('MiniMax-M3');
-    expect(savedConfig.model.defaultModel).toBe('MiniMax-M3');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Minimax);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Minimax].enabled).toBe(false);
   });
 
   test('fills DeepSeek V4 context windows when saving partial config updates', async () => {
@@ -512,8 +532,9 @@ describe('configService provider migrations', () => {
       { id: 'mimo-v2-pro', name: 'MiMo V2 Pro', supportsImage: false, contextWindow: 128_000 },
       { id: 'mimo-v2-flash', name: 'MiMo V2 Flash', supportsImage: false, contextWindow: 64_000 },
     ]);
-    expect(savedConfig.model.defaultModel).toBe('mimo-v2-pro');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Xiaomi);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Xiaomi].enabled).toBe(false);
   });
 
   test('preserves user-configured context windows for known models', async () => {
@@ -919,8 +940,9 @@ describe('configService provider migrations', () => {
 
     const savedConfig = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
     expect(savedConfig.providers?.[ProviderName.Xiaomi].models?.map(model => model.id)).not.toContain(deletedModelId);
-    expect(savedConfig.model.defaultModel).toBe('mimo-v2.5');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Xiaomi);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Xiaomi].enabled).toBe(false);
   });
 
   test('marks provider model migrations when saving provider edits from default config', async () => {

@@ -7,6 +7,7 @@ import { Provider } from 'react-redux';
 import App from './App';
 import AppErrorBoundary from './components/AppErrorBoundary';
 import EngineRepairOverlay from './components/cowork/EngineRepairOverlay';
+import PlatformSessionGate from './components/login/PlatformSessionGate';
 import { store } from './store';
 
 const rootElement = document.getElementById('root');
@@ -19,8 +20,10 @@ try {
     <React.StrictMode>
       <Provider store={store}>
         <AppErrorBoundary>
-          <App />
-          <EngineRepairOverlay />
+          <PlatformSessionGate>
+            <App />
+            <EngineRepairOverlay />
+          </PlatformSessionGate>
         </AppErrorBoundary>
       </Provider>
     </React.StrictMode>

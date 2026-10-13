@@ -2,7 +2,10 @@
 name: "develop-web-game"
 description: "Use when Codex is building or iterating on a web game (HTML/JS) and needs a reliable development + testing loop: implement small changes, run a Playwright-based test script with short input bursts and intentional pauses, inspect screenshots/text, and review console errors with render_game_to_text."
 official: true
+version: 2.0.0
 ---
+
+星途维护说明：本文件已调整助手名称或运行路径说明；上游许可证与版权归属保留在原许可文件中。
 
 
 # Develop Web Game
@@ -12,12 +15,12 @@ Build games in small steps and validate every change. Treat each iteration as: i
 ## Skill paths (set once)
 
 ```bash
-export SKILLS_ROOT="${LOBSTERAI_SKILLS_ROOT:-${SKILLS_ROOT:?Use the skills directory provided by the application}}"
+export SKILLS_ROOT="${SKILLS_ROOT:?Use the skills directory provided by the application}"
 export WEB_GAME_CLIENT="$SKILLS_ROOT/develop-web-game/scripts/web_game_playwright_client.js"
 export WEB_GAME_ACTIONS="$SKILLS_ROOT/develop-web-game/references/action_payloads.json"
 ```
 
-Installed skills resolve from `$LOBSTERAI_SKILLS_ROOT` / `$SKILLS_ROOT`, supplied by the application for the current operating system. Do not guess a platform-specific installation path.
+Installed skills resolve from `$SKILLS_ROOT`, supplied by the application for the current operating system. Do not guess a platform-specific installation path.
 
 ## Workflow
 

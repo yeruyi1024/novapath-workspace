@@ -96,6 +96,7 @@ function buildInitialModels(): Model[] {
 
 // 初始可用模型列表（会在运行时更新）
 export let availableModels: Model[] = buildInitialModels();
+const emptyModel: Model = { id: '', name: '', accessible: false };
 const defaultModelProvider = defaultConfig.model.defaultModelProvider;
 
 interface ModelState {
@@ -157,7 +158,7 @@ const initialState: ModelState = {
   defaultSelectedModel: availableModels.find(
     model => model.id === defaultConfig.model.defaultModel
       && (!defaultModelProvider || model.providerKey === defaultModelProvider)
-  ) || availableModels[0],
+  ) || availableModels[0] || emptyModel,
   selectedModelByAgent: {},
   availableModels: availableModels,
 };
@@ -189,6 +190,8 @@ const modelSlice = createSlice({
           state.availableModels,
           state.defaultSelectedModel,
         );
+      } else {
+        state.defaultSelectedModel = emptyModel;
       }
       // 同步 per-agent 选中模型
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
@@ -204,6 +207,8 @@ const modelSlice = createSlice({
           state.availableModels,
           state.defaultSelectedModel,
         );
+      } else {
+        state.defaultSelectedModel = emptyModel;
       }
       // 同步 per-agent 选中模型
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
@@ -211,6 +216,7 @@ const modelSlice = createSlice({
     clearServerModels: (state) => {
       state.availableModels = state.availableModels.filter(m => !m.isServerModel);
       availableModels = state.availableModels;
+      if (!state.availableModels.length) state.defaultSelectedModel = emptyModel;
       // 如果 defaultSelectedModel 是服务端模型，切换到第一个可用模型
       if (state.defaultSelectedModel.isServerModel && state.availableModels.length > 0) {
         state.defaultSelectedModel = state.availableModels.find(isModelAccessible)

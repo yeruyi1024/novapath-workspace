@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import {
-  createDevelopmentMainWindowLoadRecovery,
+  createMainWindowLoadRecovery,
   MainWindowLoadErrorCode,
 } from './mainWindowLoadRecovery';
 
@@ -10,16 +10,16 @@ const SLOW_LOAD_WARNING_MS = 30_000;
 
 function createHarness() {
   let targetAvailable = true;
-  const loadDevelopmentUrl = vi.fn(() => Promise.resolve());
+  const loadPage = vi.fn(() => Promise.resolve());
   const loadErrorPage = vi.fn(() => Promise.resolve());
   const logger = {
     debug: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
   };
-  const recovery = createDevelopmentMainWindowLoadRecovery({
+  const recovery = createMainWindowLoadRecovery({
     isTargetAvailable: () => targetAvailable,
-    loadDevelopmentUrl,
+    loadPage,
     loadErrorPage,
     logger,
     retryDelayMs: RETRY_DELAY_MS,
@@ -27,7 +27,7 @@ function createHarness() {
   });
 
   return {
-    loadDevelopmentUrl,
+    loadPage,
     loadErrorPage,
     logger,
     recovery,
@@ -38,7 +38,7 @@ function createHarness() {
 }
 
 function failMainFrame(
-  recovery: ReturnType<typeof createDevelopmentMainWindowLoadRecovery>,
+  recovery: ReturnType<typeof createMainWindowLoadRecovery>,
   errorCode = -102,
 ) {
   recovery.handleDidFailLoad({
@@ -57,16 +57,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('development main-window load recovery', () => {
+describe('main-window load recovery', () => {
   test('warns about a slow active load without reloading it', () => {
     const harness = createHarness();
 
     harness.recovery.start();
     vi.advanceTimersByTime(SLOW_LOAD_WARNING_MS);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(1);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
     expect(harness.logger.warn).toHaveBeenCalledWith(
-      `[Main] development window is still loading after ${SLOW_LOAD_WARNING_MS}ms; waiting without reloading`,
+      `[Main] main window is still loading after ${SLOW_LOAD_WARNING_MS}ms; waiting without reloading`,
     );
   });
 
@@ -77,7 +77,7 @@ describe('development main-window load recovery', () => {
     failMainFrame(harness.recovery, MainWindowLoadErrorCode.Aborted);
     vi.advanceTimersByTime(RETRY_DELAY_MS);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(1);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
     expect(harness.loadErrorPage).not.toHaveBeenCalled();
     expect(harness.logger.error).not.toHaveBeenCalled();
   });
@@ -90,7 +90,7 @@ describe('development main-window load recovery', () => {
     failMainFrame(harness.recovery);
     vi.advanceTimersByTime(RETRY_DELAY_MS);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(2);
+    expect(harness.loadPage).toHaveBeenCalledTimes(2);
   });
 
   test('deduplicates a rejected load promise and its did-fail-load event', async () => {
@@ -99,14 +99,14 @@ describe('development main-window load recovery', () => {
       code: 'ERR_CONNECTION_REFUSED',
       errno: -102,
     });
-    harness.loadDevelopmentUrl.mockRejectedValueOnce(connectionError);
+    harness.loadPage.mockRejectedValueOnce(connectionError);
 
     harness.recovery.start();
     await Promise.resolve();
     failMainFrame(harness.recovery);
     vi.advanceTimersByTime(RETRY_DELAY_MS);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(2);
+    expect(harness.loadPage).toHaveBeenCalledTimes(2);
     expect(harness.logger.error).toHaveBeenCalledTimes(1);
   });
 
@@ -121,7 +121,7 @@ describe('development main-window load recovery', () => {
     failMainFrame(harness.recovery);
     failMainFrame(harness.recovery);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(3);
+    expect(harness.loadPage).toHaveBeenCalledTimes(3);
     expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
   });
 
@@ -133,7 +133,7 @@ describe('development main-window load recovery', () => {
     harness.recovery.handleDidFinishLoad();
     vi.advanceTimersByTime(RETRY_DELAY_MS + SLOW_LOAD_WARNING_MS);
 
-    expect(harness.loadDevelopmentUrl).toHaveBeenCalledTimes(1);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
     expect(harness.logger.warn).toHaveBeenCalledTimes(1);
   });
 
@@ -160,7 +160,113 @@ describe('development main-window load recovery', () => {
 
     vi.advanceTimersByTime(RETRY_DELAY_MS + SLOW_LOAD_WARNING_MS);
 
-    expect(disposedHarness.loadDevelopmentUrl).toHaveBeenCalledTimes(1);
-    expect(destroyedHarness.loadDevelopmentUrl).toHaveBeenCalledTimes(1);
+    expect(disposedHarness.loadPage).toHaveBeenCalledTimes(1);
+    expect(destroyedHarness.loadPage).toHaveBeenCalledTimes(1);
   });
+  test('recovers a failed user refresh after the first successful load', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    harness.recovery.handleDidFinishLoad();
+    harness.recovery.handleNavigationStarted();
+    failMainFrame(harness.recovery);
+    vi.advanceTimersByTime(RETRY_DELAY_MS);
+    expect(harness.loadPage).toHaveBeenCalledTimes(2);
+    harness.recovery.handleDidFinishLoad();
+    vi.advanceTimersByTime(SLOW_LOAD_WARNING_MS);
+    expect(harness.loadErrorPage).not.toHaveBeenCalled();
+  });
+
+  test('does not reload a healthy user refresh', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    harness.recovery.handleDidFinishLoad();
+    harness.recovery.handleNavigationStarted();
+    harness.recovery.handleDidFinishLoad();
+    vi.advanceTimersByTime(SLOW_LOAD_WARNING_MS);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failed fallback can be retried against the original page', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      failMainFrame(harness.recovery);
+      vi.advanceTimersByTime(RETRY_DELAY_MS);
+    }
+    expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
+    harness.recovery.handleDidFinishLoad(); // This is the fallback document.
+    harness.recovery.retry();
+    expect(harness.loadPage).toHaveBeenCalledTimes(4);
+    harness.recovery.handleDidFinishLoad();
+    vi.advanceTimersByTime(RETRY_DELAY_MS);
+    expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
+  });
+
+  test('rapid crashes remain bounded even when navigation succeeds between them', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    for (let crash = 0; crash < 3; crash += 1) {
+      harness.recovery.handleDidFinishLoad();
+      harness.recovery.handleRendererGone('crashed');
+      harness.recovery.handleRendererGone('crashed'); // duplicate Electron signal
+      vi.advanceTimersByTime(RETRY_DELAY_MS);
+    }
+    expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
+    expect(harness.loadPage).toHaveBeenCalledTimes(3);
+  });
+
+  test('normal renderer shutdown does not trigger recovery', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    harness.recovery.handleDidFinishLoad();
+    harness.recovery.handleRendererGone('clean-exit');
+    vi.advanceTimersByTime(RETRY_DELAY_MS);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
+  });
+
+  test('a stable page restores its crash recovery budget', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    for (let crash = 0; crash < 4; crash += 1) {
+      harness.recovery.handleDidFinishLoad();
+      vi.advanceTimersByTime(30000);
+      harness.recovery.handleRendererGone('crashed');
+      vi.advanceTimersByTime(RETRY_DELAY_MS);
+    }
+    expect(harness.loadErrorPage).not.toHaveBeenCalled();
+    expect(harness.loadPage).toHaveBeenCalledTimes(5);
+  });
+
+  test('an aborted old navigation cannot suppress the active navigation failure', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    failMainFrame(harness.recovery, MainWindowLoadErrorCode.Aborted);
+    failMainFrame(harness.recovery);
+    vi.advanceTimersByTime(RETRY_DELAY_MS);
+    expect(harness.loadPage).toHaveBeenCalledTimes(2);
+  });
+
+  test('a navigation that never finishes ends in manual recovery, not a reload loop', () => {
+    const harness = createHarness();
+    harness.recovery.start();
+    vi.advanceTimersByTime(90000);
+    expect(harness.loadPage).toHaveBeenCalledTimes(1);
+    expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(180000);
+    expect(harness.loadErrorPage).toHaveBeenCalledTimes(1);
+  });
+
+  test('a stale load promise cannot affect a new manual retry', async () => {
+    const harness = createHarness();
+    let rejectOld: (error: Error) => void = () => {};
+    harness.loadPage.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject; }));
+    harness.recovery.start();
+    harness.recovery.retry();
+    rejectOld(new Error('old navigation'));
+    await Promise.resolve();
+    vi.advanceTimersByTime(RETRY_DELAY_MS);
+    expect(harness.loadPage).toHaveBeenCalledTimes(2);
+    expect(harness.logger.error).not.toHaveBeenCalled();
+  });
+
 });

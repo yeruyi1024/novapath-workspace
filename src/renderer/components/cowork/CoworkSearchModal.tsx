@@ -9,8 +9,8 @@ import { LogReporterAction, reportYdAnalyzer } from '../../services/logReporter'
 import { RootState } from '../../store';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
-import { formatAgentTaskRelativeTime } from '../agentSidebar/time';
 import Modal from '../common/Modal';
+import { formatConversationRelativeTime } from '../sidebar/time';
 import SkinPresentationScope from '../skin/SkinPresentationScope';
 
 const SEARCH_SESSION_LIMIT = 100;
@@ -331,7 +331,7 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                 const isCurrent = session.id === currentSessionId;
                 const isActive = index === activeIndex;
                 const isRunning = session.status === CoworkSessionStatusValue.Running;
-                const relativeTime = formatAgentTaskRelativeTime(session.updatedAt || session.createdAt);
+                const relativeTime = formatConversationRelativeTime(session.updatedAt || session.createdAt);
                 return (
                   <button
                     key={session.id}
@@ -356,8 +356,8 @@ const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
                     {isRunning && (
                       <span
                         className="inline-flex h-3 w-3 shrink-0 items-center justify-center"
-                        title={i18nService.t('myAgentSidebarRunning')}
-                        aria-label={i18nService.t('myAgentSidebarRunning')}
+                        title={i18nService.t('conversationRunning')}
+                        aria-label={i18nService.t('conversationRunning')}
                       >
                         <svg className="h-3 w-3 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
                           <circle

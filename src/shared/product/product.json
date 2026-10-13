@@ -1,6 +1,6 @@
 {
-  "name": "星途 StarPath",
-  "slug": "starpath",
+  "name": "星途 NovaPath",
+  "slug": "novapath",
   "appId": "com.starpath.desktop",
   "supportEmail": "",
   "services": {
@@ -23,7 +23,8 @@
     "promotions": false,
     "analytics": false
   },
-  "englishName": "StarPath",
+  "englishName": "NovaPath",
+  "storageName": "星途 StarPath",
   "shortName": "星途",
   "dataDirectory": "API Console"
 }

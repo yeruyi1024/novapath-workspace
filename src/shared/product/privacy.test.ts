@@ -21,6 +21,7 @@ describe('distribution privacy defaults', () => {
 
   test('resolves every product placeholder', () => {
     expect(formatProductText('{productName} / {productName}')).toBe(`${PRODUCT.name} / ${PRODUCT.name}`);
+    expect(formatProductText('{englishName} / {englishName}')).toBe(`${PRODUCT.englishName} / ${PRODUCT.englishName}`);
   });
 
   test.each([undefined, false, true])('does not send telemetry with a legacy user preference of %s', async (preference) => {

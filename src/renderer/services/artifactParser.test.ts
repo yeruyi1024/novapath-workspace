@@ -981,9 +981,9 @@ describe('parseToolArtifact', () => {
 });
 
 describe('toAbsoluteArtifactPath', () => {
-  test('keeps absolute POSIX and Windows paths unchanged', () => {
+  test('keeps absolute locations and normalizes Windows separators', () => {
     expect(toAbsoluteArtifactPath('/home/user/a.md', '/cwd')).toBe('/home/user/a.md');
-    expect(toAbsoluteArtifactPath('D:\\ws\\a.md', '/cwd')).toBe('D:\\ws\\a.md');
+    expect(toAbsoluteArtifactPath('D:\\ws\\a.md', '/cwd')).toBe('D:/ws/a.md');
   });
 
   test('strips file:// prefixes and Windows leading slash', () => {
@@ -1088,5 +1088,14 @@ describe('parseFilePathsFromText — find command output scenario', () => {
     const content = 'B-01-seedream.png\nB-02-chart.png';
     const artifacts = parseFilePathsFromText(content, 'msg1', 'sess1');
     expect(artifacts).toHaveLength(0);
+  });
+});
+
+
+describe('artifact reference path normalization', () => {
+  test('decodes file URLs exactly once and normalizes relative segments', () => {
+    expect(toAbsoluteArtifactPath('file:///work/My%20Deck%2520.pptx')).toBe('/work/My Deck%20.pptx');
+    expect(toAbsoluteArtifactPath('./slides/../deck.pptx', '/work')).toBe('/work/deck.pptx');
+    expect(toAbsoluteArtifactPath('..\\deck.pptx', 'D:\\work\\slides')).toBe('D:/work/deck.pptx');
   });
 });

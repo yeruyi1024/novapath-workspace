@@ -4,7 +4,7 @@ import {
   SkinAssetSlot,
   SkinPreferredAppearance,
 } from '../../../shared/skin/constants';
-import { useSkin, useSkinAsset } from '../../providers/SkinProvider';
+import { useSkin, useSkinAsset } from '../../providers/skinContext';
 
 export const SkinBackdropVariant = {
   Home: 'home',

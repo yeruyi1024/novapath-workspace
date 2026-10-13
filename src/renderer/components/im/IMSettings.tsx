@@ -2078,9 +2078,9 @@ const IMSettings: React.FC = () => {
     : null;
 
   return (
-    <div className="@container flex h-full min-h-0 flex-col gap-6">
+    <div className="settings-remote-page @container flex min-h-0 flex-col gap-5">
       {/* Platform List - Left Side */}
-      <div className="grid shrink-0 grid-cols-2 gap-2 rounded-2xl border border-border-subtle bg-surface-raised/50 p-2 @[600px]:grid-cols-4">
+      <div className="settings-channel-grid">
         {platforms.map((platform) => {
           const logo = PlatformRegistry.logo(platform);
           const isActive = activePlatform === platform;
@@ -2144,7 +2144,7 @@ const IMSettings: React.FC = () => {
       </div>
 
       {/* Platform Settings - Right Side */}
-      <div className="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto rounded-2xl border border-border-subtle bg-surface p-5 [scrollbar-gutter:stable]">
+      <div className="settings-channel-content min-w-0 space-y-4">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
         {(activePlatform === 'weixin' || activePlatform === 'netease-bee') && (
           <div className="flex items-center gap-3 border-b border-border-subtle pb-4">

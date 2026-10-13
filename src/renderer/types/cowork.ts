@@ -85,6 +85,7 @@ export interface CoworkMessageMetadata {
   isError?: boolean;
   isStreaming?: boolean;
   isFinal?: boolean;
+  responsePhase?: 'commentary' | 'final';
   isThinking?: boolean;
   /** True while the model is still streaming this tool call's arguments. */
   isGenerating?: boolean;
@@ -454,55 +455,6 @@ export interface CoworkConfigResult {
   success: boolean;
   config?: CoworkConfig;
   error?: string;
-}
-
-// ── Dreaming content display types ──────────────────────────────────
-
-export interface DreamingPhaseInfo {
-  enabled: boolean;
-  cron: string;
-  nextRunAtMs?: number;
-}
-
-export interface DreamingEntry {
-  key: string;
-  path: string;
-  startLine: number;
-  endLine: number;
-  snippet: string;
-  recallCount: number;
-  dailyCount: number;
-  groundedCount: number;
-  totalSignalCount: number;
-  lightHits: number;
-  remHits: number;
-  phaseHitCount: number;
-  promotedAt?: string;
-  lastRecalledAt?: string;
-}
-
-export interface DreamingStatusData {
-  enabled: boolean;
-  timezone?: string;
-  shortTermCount: number;
-  groundedSignalCount: number;
-  totalSignalCount: number;
-  promotedToday: number;
-  promotedTotal: number;
-  shortTermEntries: DreamingEntry[];
-  promotedEntries: DreamingEntry[];
-  phases?: {
-    light: DreamingPhaseInfo;
-    deep: DreamingPhaseInfo;
-    rem: DreamingPhaseInfo;
-  };
-}
-
-export interface DreamDiaryData {
-  found: boolean;
-  path: string;
-  content?: string;
-  updatedAtMs?: number;
 }
 
 // Stream event types for IPC communication

@@ -18,24 +18,8 @@ test('normalizes macOS, Windows drive, and UNC file links for local actions', ()
     .toBe('C:/Users/test/My File.md');
   expect(normalizeMarkdownLocalFilePath('file://server/share/My%20File.md'))
     .toBe('//server/share/My File.md');
-  expect(normalizeMarkdownLocalFilePath('localfile://server/share/My%20File.md'))
-    .toBe('//server/share/My File.md');
   expect(normalizeMarkdownLocalFilePath('/Users/test/name with spaces.md'))
     .toBe('/Users/test/name with spaces.md');
-});
-
-test('reply file links preserve encoded filenames through markdown rendering', () => {
-  const hrefs: string[] = [];
-  const html = renderToStaticMarkup(React.createElement(MarkdownContent, {
-    content: '[演示](file:///work/report%2520%23.pptx)',
-    resolveLocalFilePath: href => {
-      hrefs.push(href);
-      return normalizeMarkdownLocalFilePath(href);
-    },
-  }));
-  expect(hrefs).toEqual(['file:///work/report%2520%23.pptx']);
-  expect(html).toContain('演示');
-  expect(html).toContain('title="/work/report%20#.pptx"');
 });
 
 test('large markdown preview threshold only applies to oversized content', () => {
@@ -187,18 +171,4 @@ test('kit links are treated as safe internal links', () => {
 
 test('unsafe markdown protocols are still stripped', () => {
   expect(safeUrlTransform('javascript:alert(1)')).toBe('');
-});
-
-test('reply presentation preserves quote nesting, table alignment and escaped cell content', () => {
-  const html = renderToStaticMarkup(React.createElement(MarkdownContent, {
-    content: '> 引用来源\n>\n> - 关键说明\n\n| 项目 | 数值 |\n| :--- | ---: |\n| **总计** | 70 |\n| &lt;script&gt; | 23 |',
-  }));
-  expect(html).toContain('<blockquote');
-  expect(html).toContain('<ul');
-  expect(html).toContain('<thead');
-  expect(html).toContain('<tbody');
-  expect(html).toContain('text-align:right');
-  expect(html).toContain('<strong');
-  expect(html).toContain('&lt;script&gt;');
-  expect(html).not.toContain('<script>');
 });

@@ -1,6 +1,6 @@
 import './settings/settings.css';
 
-import { ArchiveBoxIcon, ArrowPathIcon, ArrowPathRoundedSquareIcon, ChatBubbleLeftIcon, CheckCircleIcon, CpuChipIcon, CubeIcon, EnvelopeIcon, ExclamationTriangleIcon, GlobeAltIcon, InformationCircleIcon, MagnifyingGlassIcon, SignalIcon, SunIcon, TrashIcon, WrenchScrewdriverIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ArchiveBoxIcon, ArrowPathIcon, ArrowPathRoundedSquareIcon, CheckCircleIcon, CpuChipIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, SignalIcon, TrashIcon, WrenchScrewdriverIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import React, { useCallback,useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -20,7 +20,7 @@ import { OpenClawEnginePhase } from '../../shared/openclawEngine/constants';
 import { PRODUCT,PRODUCT_SERVICES } from '../../shared/product';
 import { ProviderRegistry } from '../../shared/providers';
 import { defaultConfig, FontPreferences, getProviderDisplayName, normalizeFontPreference, resolveArtifactAutoPreviewEnabled, ShortcutAction, type ShortcutConfig } from '../config';
-import { useSkin } from '../providers/SkinProvider';
+import { useSkin } from '../providers/skinContext';
 import { apiService } from '../services/api';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
@@ -31,7 +31,7 @@ import { resolveOpenClawRepairError, resolveOpenClawRepairHistoryWarning } from 
 import { clearPendingPublishingConversionAttribution } from '../services/publishingConversionAttribution';
 import { clearPublishingSubscriptionRecoveryAnalytics } from '../services/publishingSubscriptionRecovery';
 import { formatShortcutForDisplay, getShortcutConflictSignature, isTextEditingSafeShortcut, matchesShortcut } from '../services/shortcuts';
-import { buildPlatformConfigUpdate, getPlatformErrorMessage, PlatformError, type PlatformProviderConfig as ProviderConfig, type PlatformProvidersConfig as ProvidersConfig, resolvePlatformProviderId } from '../services/starpathPlatform';
+import { getPlatformErrorMessage, PlatformError, type PlatformProviderConfig as ProviderConfig, type PlatformProvidersConfig as ProvidersConfig, preparePlatformConfigUpdate, resolvePlatformProviderId } from '../services/starpathPlatform';
 import {
   type ThemeDefaultChangedDetail,
   themeService,
@@ -52,26 +52,24 @@ import type {
 } from '../types/cowork';
 import { OpenClawSessionKeepAlive as OpenClawSessionKeepAliveValues } from '../types/cowork';
 import Modal from './common/Modal';
-import DreamingRecoveryNotice from './cowork/DreamingRecoveryNotice';
-import DreamingSettingsSection from './cowork/DreamingSettingsSection';
-import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
-import ErrorMessage from './ErrorMessage';
 import BrainIcon from './icons/BrainIcon';
 import EditIcon from './icons/EditIcon';
 import MessageCopyIcon from './icons/MessageCopyIcon';
-import PlugIcon from './icons/PlugIcon';
-import PlusCircleIcon from './icons/PlusCircleIcon';
 import IMSettings from './im/IMSettings';
 import PluginsSettings, { type PluginPendingChanges, type PluginsSettingsHandle } from './plugins/PluginsSettings';
 import AppearanceSettings from './settings/AppearanceSettings';
 import BrowserWebAccessSettings from './settings/BrowserWebAccessSettings';
+import MemoryEntriesSettings from './settings/MemoryEntriesSettings';
+import PlatformAccountSettings from './settings/PlatformAccountSettings';
 import { resolveSettingsEscapeAction, SettingsEscapeAction } from './settings/settingsEscape';
-import SettingsNavigation from './settings/SettingsNavigation';
+import SettingsNavigation, { SettingsTab } from './settings/SettingsNavigation';
+import SettingsNavigationIcon from './settings/SettingsNavigationIcon';
+import SettingsNotice from './settings/SettingsNotice';
 import StarPathPlatformSettings from './settings/StarPathPlatformSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
 import ThemedSelect from './ui/ThemedSelect';
 
-type TabType = 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'browserWebAccess' | 'coworkMemory' | 'coworkDreaming' | 'shortcuts' | 'im' | 'email' | 'plugins' | 'about';
+type TabType = typeof SettingsTab.Account | 'email' | 'general' | 'appearance' | 'coworkAgentEngine' | 'model' | 'browserWebAccess' | 'coworkMemory' | 'shortcuts' | 'im' | 'plugins' | 'about';
 
 const waitForNextPaint = (): Promise<void> => new Promise(resolve => {
   window.requestAnimationFrame(() => {
@@ -117,9 +115,7 @@ const SETTINGS_TAB_SHORTCUT_ACTIONS: Partial<Record<ShortcutAction, TabType>> = 
   [ShortcutAction.OpenSettingsModel]: 'model',
   [ShortcutAction.OpenSettingsIm]: 'im',
   [ShortcutAction.OpenSettingsBrowser]: 'browserWebAccess',
-  [ShortcutAction.OpenSettingsEmail]: 'email',
   [ShortcutAction.OpenSettingsMemory]: 'coworkMemory',
-  [ShortcutAction.OpenSettingsDreaming]: 'coworkDreaming',
   [ShortcutAction.OpenSettingsPlugins]: 'plugins',
   [ShortcutAction.OpenSettingsShortcuts]: 'shortcuts',
   [ShortcutAction.OpenSettingsAbout]: 'about',
@@ -129,7 +125,6 @@ const SettingsAnalyticsSource = {
   AgentEngine: 'settings_agent_engine',
   Appearance: 'settings_appearance',
   Browser: 'settings_browser',
-  Dreaming: 'settings_dreaming',
   General: 'settings_general',
   Memory: 'settings_memory',
   Model: 'settings_model',
@@ -152,12 +147,6 @@ type MemorySettingAnalyticsSummary = {
   memoryLlmJudgeEnabled: boolean;
 };
 
-type DreamingSettingAnalyticsSummary = {
-  changedKeys: string;
-  dreamingEnabled: boolean;
-  frequencyType: 'preset' | 'custom';
-};
-
 type ShortcutSettingAnalyticsSummary = {
   changedCount: number;
   configuredCount: number;
@@ -172,14 +161,6 @@ type PluginSettingsAnalyticsSummary = {
   enabledToggleCount: number;
   toggleCount: number;
 };
-
-const DREAMING_FREQUENCY_PRESETS_FOR_ANALYTICS = new Set([
-  '0 3 * * *',
-  '0 0 * * *',
-  '0 0,12 * * *',
-  '0 */6 * * *',
-  '0 3 * * 0',
-]);
 
 const buildBrowserSettingAnalyticsParams = (
   previousConfig: BrowserWebAccessConfig,
@@ -272,39 +253,6 @@ const buildMemorySettingAnalyticsSummary = (
     hasEmbeddingModel: nextConfig.embeddingModel.trim().length > 0,
     memoryEnabled: nextConfig.memoryEnabled,
     memoryLlmJudgeEnabled: nextConfig.memoryLlmJudgeEnabled,
-  };
-};
-
-const resolveDreamingFrequencyType = (frequency: string): 'preset' | 'custom' => (
-  DREAMING_FREQUENCY_PRESETS_FOR_ANALYTICS.has(frequency) ? 'preset' : 'custom'
-);
-
-const buildDreamingSettingAnalyticsSummary = (
-  previousConfig: {
-    dreamingEnabled: boolean;
-    dreamingFrequency: string;
-  },
-  nextConfig: {
-    dreamingEnabled: boolean;
-    dreamingFrequency: string;
-  },
-): DreamingSettingAnalyticsSummary | null => {
-  const changedKeys = new Set<string>();
-  if (previousConfig.dreamingEnabled !== nextConfig.dreamingEnabled) {
-    changedKeys.add('dreaming_enabled');
-  }
-  if (previousConfig.dreamingFrequency !== nextConfig.dreamingFrequency) {
-    changedKeys.add('dreaming_frequency');
-  }
-
-  if (changedKeys.size === 0) {
-    return null;
-  }
-
-  return {
-    changedKeys: Array.from(changedKeys).sort().join(','),
-    dreamingEnabled: nextConfig.dreamingEnabled,
-    frequencyType: resolveDreamingFrequencyType(nextConfig.dreamingFrequency),
   };
 };
 
@@ -437,17 +385,6 @@ const reportMemoryEntryChanged = (
   });
 };
 
-const reportDreamingSettingChanged = (
-  summary: DreamingSettingAnalyticsSummary,
-): void => {
-  console.debug('[Settings] reporting dreaming setting analytics');
-  void reportYdAnalyzer({
-    action: LogReporterAction.DreamingSettingChanged,
-    source: SettingsAnalyticsSource.Dreaming,
-    ...summary,
-  });
-};
-
 const reportPluginSettingsSaved = (
   summary: PluginSettingsAnalyticsSummary,
 ): void => {
@@ -538,9 +475,7 @@ const SETTINGS_TAB_SHORTCUT_COMMANDS: ShortcutCommandDefinition[] = [
   { key: ShortcutAction.OpenSettingsModel, tabLabelKey: 'settingsCustomModel' },
   { key: ShortcutAction.OpenSettingsIm, tabLabelKey: 'imBot' },
   { key: ShortcutAction.OpenSettingsBrowser, tabLabelKey: 'browserWebAccessTab' },
-  { key: ShortcutAction.OpenSettingsEmail, tabLabelKey: 'emailTab' },
   { key: ShortcutAction.OpenSettingsMemory, tabLabelKey: 'coworkMemoryTitle' },
-  { key: ShortcutAction.OpenSettingsDreaming, tabLabelKey: 'coworkMemoryTabDreaming' },
   { key: ShortcutAction.OpenSettingsPlugins, tabLabelKey: 'pluginsTab' },
   { key: ShortcutAction.OpenSettingsAbout, tabLabelKey: 'about' },
 ].map(command => ({
@@ -622,41 +557,6 @@ const getShortcutCommandText = (
     .replace('{slot}', String(command.slot ?? ''))
     .replace('{tab}', command.tabLabelKey ? i18nService.t(command.tabLabelKey) : '');
 };
-
-const SettingsSlidersIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M14 17H5" />
-    <path d="M19 7h-9" />
-    <circle cx="17" cy="17" r="3" />
-    <circle cx="7" cy="7" r="3" />
-  </svg>
-);
-
-const DreamingTabIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    width="34"
-    height="34"
-    viewBox="0 0 34 34"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={className}
-    aria-hidden="true"
-  >
-    <path
-      d="M27.9219 21.9648L29.014 22.4621L29.8552 20.6145L27.831 20.7683L27.9219 21.9648ZM16.0762 5.03516L17.1683 5.53234L18.0095 3.68449L15.9851 3.83862L16.0762 5.03516ZM27.9219 21.9648L26.8297 21.4676C25.1281 25.205 21.3674 27.8 17 27.8V29V30.2C22.3442 30.2 26.9378 27.0221 29.014 22.4621L27.9219 21.9648ZM17 29V27.8C11.0353 27.8 6.2 22.9647 6.2 17H5H3.8C3.8 24.2902 9.70984 30.2 17 30.2V29ZM5 17H6.2C6.2 11.3157 10.5923 6.65614 16.1673 6.23169L16.0762 5.03516L15.9851 3.83862C9.16855 4.35759 3.8 10.0512 3.8 17H5ZM16.0762 5.03516L14.984 4.53798C14.2262 6.20275 13.8 8.052 13.8 10H15H16.2C16.2 8.40537 16.5483 6.8944 17.1683 5.53234L16.0762 5.03516ZM15 10H13.8C13.8 17.2902 19.7098 23.2 27 23.2V22V20.8C21.0353 20.8 16.2 15.9647 16.2 10H15ZM27 22V23.2C27.3413 23.2 27.679 23.1868 28.0128 23.1614L27.9219 21.9648L27.831 20.7683C27.5562 20.7892 27.2791 20.8 27 20.8V22Z"
-      fill="currentColor"
-    />
-  </svg>
-);
 
 export type SettingsOpenOptions = {
   initialTab?: TabType;
@@ -990,18 +890,17 @@ const SettingsToggleRow: React.FC<{
   </div>
 );
 
-// Groups related settings rows into a labeled card (label above a bordered,
-// divider-separated card). Used to categorize the General settings tab.
+// Shared section heading and preference rows for the General page.
 const SettingsGroup: React.FC<{
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }> = ({ title, children, footer }) => (
-  <section className="space-y-2.5">
+  <section className="settings-group">
     <h4 className="settings-section-title">
       {title}
     </h4>
-    <div className="divide-y divide-border border-t border-border">
+    <div className="settings-group-rows">
       {children}
     </div>
     {footer}
@@ -1010,7 +909,7 @@ const SettingsGroup: React.FC<{
 
 // A single padded row inside a SettingsGroup card.
 const SettingsRow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="py-4">{children}</div>
+  <div className="settings-group-row">{children}</div>
 );
 
 const Settings: React.FC<SettingsProps> = ({
@@ -1336,11 +1235,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [embeddingVectorWeight, setEmbeddingVectorWeight] = useState<number>(coworkConfig.embeddingVectorWeight ?? 0.7);
   const [embeddingRemoteBaseUrl, setEmbeddingRemoteBaseUrl] = useState<string>(coworkConfig.embeddingRemoteBaseUrl ?? '');
   const [embeddingRemoteApiKey, setEmbeddingRemoteApiKey] = useState<string>(coworkConfig.embeddingRemoteApiKey ?? '');
-  const [dreamingEnabled, setDreamingEnabled] = useState<boolean>(coworkConfig.dreamingEnabled ?? false);
-  const [dreamingFrequency, setDreamingFrequency] = useState<string>(coworkConfig.dreamingFrequency ?? '0 3 * * *');
-  const [dreamingModel, setDreamingModel] = useState<string>(coworkConfig.dreamingModel ?? '');
-  const [dreamingTimezone, setDreamingTimezone] = useState<string>(coworkConfig.dreamingTimezone ?? '');
-  const [memoryTab, setMemoryTab] = useState<'entries' | 'embedding'>('entries');
   const [openClawSessionKeepAlive, setOpenClawSessionKeepAlive] = useState<OpenClawSessionKeepAlive>(
     coworkConfig.openClawSessionPolicy?.keepAlive || OpenClawSessionKeepAliveValues.ThirtyDays,
   );
@@ -1380,10 +1274,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEmbeddingVectorWeight(coworkConfig.embeddingVectorWeight ?? 0.7);
     setEmbeddingRemoteBaseUrl(coworkConfig.embeddingRemoteBaseUrl ?? '');
     setEmbeddingRemoteApiKey(coworkConfig.embeddingRemoteApiKey ?? '');
-    setDreamingEnabled(coworkConfig.dreamingEnabled ?? false);
-    setDreamingFrequency(coworkConfig.dreamingFrequency ?? '0 3 * * *');
-    setDreamingModel(coworkConfig.dreamingModel ?? '');
-    setDreamingTimezone(coworkConfig.dreamingTimezone ?? '');
     setOpenClawSessionKeepAlive(coworkConfig.openClawSessionPolicy?.keepAlive || OpenClawSessionKeepAliveValues.ThirtyDays);
   }, [
     coworkConfig.agentEngine,
@@ -1401,10 +1291,6 @@ const Settings: React.FC<SettingsProps> = ({
     coworkConfig.embeddingVectorWeight,
     coworkConfig.embeddingRemoteBaseUrl,
     coworkConfig.embeddingRemoteApiKey,
-    coworkConfig.dreamingEnabled,
-    coworkConfig.dreamingFrequency,
-    coworkConfig.dreamingModel,
-    coworkConfig.dreamingTimezone,
   ]);
 
   const refreshTempStorageUsage = useCallback(async () => {
@@ -1702,9 +1588,7 @@ const Settings: React.FC<SettingsProps> = ({
     || embeddingLocalModelPath !== (coworkConfig.embeddingLocalModelPath ?? '')
     || embeddingVectorWeight !== (coworkConfig.embeddingVectorWeight ?? 0.7)
     || embeddingRemoteBaseUrl !== (coworkConfig.embeddingRemoteBaseUrl ?? '')
-    || embeddingRemoteApiKey !== (coworkConfig.embeddingRemoteApiKey ?? '')
-    || dreamingEnabled !== (coworkConfig.dreamingEnabled ?? false)
-    || dreamingFrequency !== (coworkConfig.dreamingFrequency ?? '0 3 * * *');
+    || embeddingRemoteApiKey !== (coworkConfig.embeddingRemoteApiKey ?? '');
   const isOpenClawAgentEngine = coworkAgentEngine === 'openclaw';
 
   const openClawProgressPercent = useMemo(() => {
@@ -1882,8 +1766,8 @@ const Settings: React.FC<SettingsProps> = ({
   }, [openClawDataBackupResult?.path]);
 
   const persistModelSettingsBeforeDataBackup = useCallback(async () => {
-    await configService.updateConfig(buildPlatformConfigUpdate(providers, platformProviderId, defaultModelDraft.id, configService.getConfig().model));
-  }, [defaultModelDraft.id, platformProviderId, providers]);
+    await configService.updateConfig(await preparePlatformConfigUpdate(providers, platformId, defaultModelDraft.id, configService.getConfig(), window.electron.api.fetch));
+  }, [defaultModelDraft.id, platformId, providers]);
 
   const handleOpenClawDataBackup = useCallback(async () => {
     if (isBackingUpOpenClawData) return;
@@ -2093,7 +1977,7 @@ const Settings: React.FC<SettingsProps> = ({
     setError(null);
 
     try {
-      const platformUpdate = buildPlatformConfigUpdate(providers, platformProviderId, defaultModelDraft.id, configService.getConfig().model);
+      const platformUpdate = await preparePlatformConfigUpdate(providers, platformId, defaultModelDraft.id, configService.getConfig(), window.electron.api.fetch, activeTab === 'model');
       const normalizedProviders = platformUpdate.providers ?? providers;
       const normalizedBrowserWebAccess = normalizeBrowserWebAccessConfig({
         ...browserWebAccess,
@@ -2141,14 +2025,6 @@ const Settings: React.FC<SettingsProps> = ({
         embeddingVectorWeight,
         memoryEnabled: coworkMemoryEnabled,
         memoryLlmJudgeEnabled: coworkMemoryLlmJudgeEnabled,
-      };
-      const previousDreamingSettings = {
-        dreamingEnabled: coworkConfig.dreamingEnabled ?? false,
-        dreamingFrequency: coworkConfig.dreamingFrequency ?? '0 3 * * *',
-      };
-      const nextDreamingSettings = {
-        dreamingEnabled,
-        dreamingFrequency,
       };
       const previousNotificationSettings = normalizeNotificationSettings(
         previousConfig.notificationSettings,
@@ -2268,10 +2144,6 @@ const Settings: React.FC<SettingsProps> = ({
           embeddingVectorWeight,
           embeddingRemoteBaseUrl,
           embeddingRemoteApiKey,
-          dreamingEnabled,
-          dreamingFrequency,
-          dreamingModel,
-          dreamingTimezone,
         });
         if (!updated) {
           throw new Error(i18nService.t('coworkConfigSaveFailed'));
@@ -2403,13 +2275,6 @@ const Settings: React.FC<SettingsProps> = ({
         );
         if (memorySettingsSummary) {
           reportMemorySettingChanged(memorySettingsSummary);
-        }
-        const dreamingSettingsSummary = buildDreamingSettingAnalyticsSummary(
-          previousDreamingSettings,
-          nextDreamingSettings,
-        );
-        if (dreamingSettingsSummary) {
-          reportDreamingSettingChanged(dreamingSettingsSummary);
         }
         const shortcutSettingsSummary = buildShortcutSettingAnalyticsSummary(
           previousShortcuts,
@@ -2563,18 +2428,18 @@ const Settings: React.FC<SettingsProps> = ({
   // 渲染标签页
   const sidebarTabs: { key: TabType; label: string; icon: React.ReactNode }[] = (() => {
     const allTabs = [
-      { key: 'general' as TabType,        label: i18nService.t('general'),        icon: <SettingsSlidersIcon className="h-5 w-5" /> },
-      { key: 'appearance' as TabType,     label: i18nService.t('appearance'),     icon: <SunIcon className="h-5 w-5" /> },
-      { key: 'coworkAgentEngine' as TabType, label: i18nService.t('starpathRuntimeSettings'), icon: <CpuChipIcon className="h-5 w-5" /> },
-      { key: 'model' as TabType,          label: i18nService.t('starpathModelSettings'), icon: <CubeIcon className="h-5 w-5" /> },
-      { key: 'im' as TabType,             label: i18nService.t('imBot'),          icon: <ChatBubbleLeftIcon className="h-5 w-5" /> },
-      { key: 'browserWebAccess' as TabType, label: i18nService.t('browserWebAccessTab'), icon: <GlobeAltIcon className="h-5 w-5" /> },
-      { key: 'email' as TabType,          label: i18nService.t('emailTab'),       icon: <EnvelopeIcon className="h-5 w-5" /> },
-      { key: 'coworkMemory' as TabType,   label: i18nService.t('coworkMemoryTitle'), icon: <BrainIcon className="h-5 w-5" /> },
-      { key: 'coworkDreaming' as TabType, label: i18nService.t('coworkMemoryTabDreaming'), icon: <DreamingTabIcon className="h-5 w-5" /> },
-      { key: 'plugins' as TabType,        label: i18nService.t('pluginsTab'),     icon: <PlugIcon className="h-5 w-5" /> },
-      { key: 'shortcuts' as TabType,      label: i18nService.t('shortcuts'),      icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5"><rect x="2" y="4" width="20" height="14" rx="2" /><line x1="6" y1="8" x2="8" y2="8" /><line x1="10" y1="8" x2="12" y2="8" /><line x1="14" y1="8" x2="16" y2="8" /><line x1="6" y1="12" x2="8" y2="12" /><line x1="10" y1="12" x2="14" y2="12" /><line x1="16" y1="12" x2="18" y2="12" /><line x1="8" y1="15.5" x2="16" y2="15.5" /></svg> },
-      { key: 'about' as TabType,          label: i18nService.t('about'),          icon: <InformationCircleIcon className="h-5 w-5" /> },
+      { key: SettingsTab.Account, label: i18nService.t('maasAccountSettings'), icon: <SettingsNavigationIcon name={SettingsTab.Account} /> },
+      { key: 'email' as TabType, label: i18nService.t('emailTab'), icon: <SettingsNavigationIcon name="email" /> },
+      { key: 'general' as TabType, label: i18nService.t('general'), icon: <SettingsNavigationIcon name="general" /> },
+      { key: 'appearance' as TabType, label: i18nService.t('appearance'), icon: <SettingsNavigationIcon name="appearance" /> },
+      { key: 'coworkAgentEngine' as TabType, label: i18nService.t('starpathRuntimeSettings'), icon: <SettingsNavigationIcon name="coworkAgentEngine" /> },
+      { key: 'model' as TabType, label: i18nService.t('starpathModelSettings'), icon: <SettingsNavigationIcon name="model" /> },
+      { key: 'im' as TabType, label: i18nService.t('imBot'), icon: <SettingsNavigationIcon name="im" /> },
+      { key: 'browserWebAccess' as TabType, label: i18nService.t('browserWebAccessTab'), icon: <SettingsNavigationIcon name="browserWebAccess" /> },
+      { key: 'coworkMemory' as TabType, label: i18nService.t('coworkMemoryTitle'), icon: <SettingsNavigationIcon name="coworkMemory" /> },
+      { key: 'plugins' as TabType, label: i18nService.t('pluginsTab'), icon: <SettingsNavigationIcon name="plugins" /> },
+      { key: 'shortcuts' as TabType, label: i18nService.t('shortcuts'), icon: <SettingsNavigationIcon name="shortcuts" /> },
+      { key: 'about' as TabType, label: i18nService.t('about'), icon: <SettingsNavigationIcon name="about" /> },
     ];
     // Filter out tabs hidden by enterprise config
     // Filter out tabs with 'hide' action in enterprise config
@@ -2654,6 +2519,8 @@ const Settings: React.FC<SettingsProps> = ({
 
   const renderTabContent = () => {
     switch(activeTab) {
+      case SettingsTab.Account:
+        return <PlatformAccountSettings />;
       case 'general':
         return (
           <div className="space-y-8">
@@ -2923,9 +2790,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'appearance':
         return renderAppearanceSettings();
-
-      case 'email':
-        return <EmailSkillConfig />;
 
       case 'coworkAgentEngine':
         return (
@@ -3220,10 +3084,6 @@ const Settings: React.FC<SettingsProps> = ({
                   </div>
                 </section>
 
-                {openClawEngineStatus?.dreamingRecovery && (
-                  <DreamingRecoveryNotice summary={openClawEngineStatus.dreamingRecovery} />
-                )}
-
                 {openClawRepairResult && (
                   <div className={`rounded-lg border px-3 py-3 text-sm ${openClawRepairResult.success
                     ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/60 dark:bg-green-950/30 dark:text-green-300'
@@ -3265,254 +3125,71 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         );
 
-      case 'coworkMemory': {
-        const memoryTabs = [
-          { key: 'entries' as const, titleKey: 'coworkMemoryTabEntries' },
-          { key: 'embedding' as const, titleKey: 'coworkMemoryTabEmbedding' },
-        ];
-        const coworkMemoryGroups: Array<{ section?: string; entries: CoworkUserMemoryEntry[] }> = [];
-        for (const entry of coworkMemoryEntries) {
-          const lastGroup = coworkMemoryGroups[coworkMemoryGroups.length - 1];
-          if (lastGroup && (lastGroup.section ?? '') === (entry.section ?? '')) {
-            lastGroup.entries.push(entry);
-          } else {
-            coworkMemoryGroups.push({ section: entry.section, entries: [entry] });
-          }
-        }
+      case 'email':
+        return <EmailSkillConfig />;
+
+      case 'coworkMemory':
         return (
-          <div className="flex flex-col h-full space-y-4">
-            <div
-              className="flex gap-6 border-b border-border shrink-0"
-              role="tablist"
-              aria-label={i18nService.t('coworkMemoryTitle')}
-            >
-              {memoryTabs.map((tab) => (
-                <button
-                  type="button"
-                  key={tab.key}
-                  role="tab"
-                  aria-selected={memoryTab === tab.key}
-                  onClick={() => setMemoryTab(tab.key)}
-                  className={`-mb-px border-b-2 px-0.5 pb-2.5 text-sm font-medium transition-colors ${
-                    memoryTab === tab.key
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-secondary hover:text-foreground'
-                  }`}
-                >
-                  {i18nService.t(tab.titleKey)}
-                </button>
-              ))}
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto">
-              {memoryTab === 'entries' && (
-                <div className="space-y-4 rounded-xl border px-4 py-4 border-border">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium text-foreground">
-                        {i18nService.t('coworkMemoryCrudTitle')}
-                      </div>
-                      <div className="text-xs text-secondary">
-                        {i18nService.t('coworkMemoryManageHint')}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => { void handleEnterCoworkMemoryRawMode(); }}
-                          disabled={coworkMemoryListLoading}
-                          className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg border border-border text-sm text-foreground hover:bg-surface-raised disabled:opacity-60 transition-colors"
-                        >
-                          {i18nService.t('coworkMemoryRawButton')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleOpenCoworkMemoryModal}
-                          className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-sm transition-colors active:scale-[0.98]"
-                        >
-                          <PlusCircleIcon className="h-4 w-4 mr-1.5" />
-                          {i18nService.t('coworkMemoryCrudCreate')}
-                        </button>
-                    </div>
+          <div className="settings-memory-page">
+            <MemoryEntriesSettings entries={coworkMemoryEntries} total={coworkMemoryStats?.total ?? coworkMemoryEntries.length}
+              query={coworkMemoryQuery} loading={coworkMemoryListLoading} expandedIds={coworkMemoryExpandedIds}
+              onQueryChange={setCoworkMemoryQuery} onAdd={handleOpenCoworkMemoryModal}
+              onEdit={handleEditCoworkMemoryEntry} onDelete={entry => { void handleDeleteCoworkMemoryEntry(entry); }}
+              onExpand={toggleCoworkMemoryExpandedId} onEditRaw={() => { void handleEnterCoworkMemoryRawMode(); }} />
+
+            {coworkMemoryRawMode && (
+              <Modal
+                isOpen
+                onClose={() => setCoworkMemoryRawMode(false)}
+                onEscape={() => setCoworkMemoryRawMode(false)}
+                overlayClassName="fixed inset-0 z-[60] flex items-center justify-center bg-black/10 dark:bg-black/50 p-6"
+                className="flex h-[min(720px,calc(100vh-48px))] w-[min(960px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-surface bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.16)]"
+              >
+                <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-4">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {i18nService.t('coworkMemoryRawButton')}
+                    </h2>
+                    <p className="mt-0.5 text-sm text-secondary">
+                      {i18nService.t('coworkMemoryRawHint')}
+                    </p>
                   </div>
-
-                    <>
-                      {coworkMemoryStats && (
-                        <div className="text-xs text-secondary">
-                          {`${i18nService.t('coworkMemoryTotalLabel')}: ${coworkMemoryStats.total}`}
-                        </div>
-                      )}
-
-                      <input
-                        type="text"
-                        value={coworkMemoryQuery}
-                        onChange={(event) => setCoworkMemoryQuery(event.target.value)}
-                        placeholder={i18nService.t('coworkMemorySearchPlaceholder')}
-                        className="w-full rounded-lg border px-3 py-2 text-sm border-border bg-surface"
-                      />
-
-                      <div className="rounded-lg border border-border">
-                        {coworkMemoryListLoading ? (
-                          <div className="px-3 py-3 text-xs text-secondary">
-                            {i18nService.t('loading')}
-                          </div>
-                        ) : coworkMemoryEntries.length === 0 ? (
-                          <div className="px-3 py-3 text-xs text-secondary">
-                            {i18nService.t('coworkMemoryEmpty')}
-                          </div>
-                        ) : (
-                          <div className="divide-y divide-border">
-                            {coworkMemoryGroups.map((group, groupIndex) => (
-                              <React.Fragment key={group.section ?? `ungrouped-${groupIndex}`}>
-                                {group.section && (
-                                  <div className="flex items-baseline gap-1.5 px-3 pb-1.5 pt-3 text-[11px] font-medium text-secondary">
-                                    <span className="truncate">{group.section}</span>
-                                    <span className="font-normal opacity-70">{group.entries.length}</span>
-                                  </div>
-                                )}
-                                {group.entries.map((entry) => {
-                                  const isLongMemoryText =
-                                    entry.text.split('\n').length > 3 || entry.text.length > 240;
-                                  const isMemoryTextExpanded = coworkMemoryExpandedIds.has(entry.id);
-                                  return (
-                                    <div key={entry.id} className="group px-3 py-3 text-xs transition-colors hover:bg-surface-raised/60">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1 min-w-0">
-                                          <div
-                                            className={`text-foreground break-words whitespace-pre-wrap leading-relaxed ${
-                                              isLongMemoryText && !isMemoryTextExpanded ? 'line-clamp-3' : ''
-                                            }`}
-                                          >
-                                            {entry.text}
-                                          </div>
-                                          {isLongMemoryText && (
-                                            <button
-                                              type="button"
-                                              onClick={() => toggleCoworkMemoryExpandedId(entry.id)}
-                                              className="mt-1.5 text-[11px] text-primary hover:underline"
-                                            >
-                                              {i18nService.t(isMemoryTextExpanded ? 'coworkMemoryCollapse' : 'coworkMemoryExpand')}
-                                            </button>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-0.5 flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleEditCoworkMemoryEntry(entry)}
-                                            title={i18nService.t('edit')}
-                                            aria-label={i18nService.t('edit')}
-                                            className="rounded-md p-1.5 text-secondary hover:text-foreground hover:bg-surface-raised transition-colors"
-                                          >
-                                            <EditIcon className="h-4 w-4" />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() => { void handleDeleteCoworkMemoryEntry(entry); }}
-                                            title={i18nService.t('delete')}
-                                            aria-label={i18nService.t('delete')}
-                                            className="rounded-md p-1.5 text-secondary hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-60 transition-colors"
-                                            disabled={coworkMemoryListLoading}
-                                          >
-                                            <TrashIcon className="h-4 w-4" />
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </React.Fragment>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </>
-
-                  {coworkMemoryRawMode && (
-                    <Modal
-                      isOpen
-                      onClose={() => setCoworkMemoryRawMode(false)}
-                      onEscape={() => setCoworkMemoryRawMode(false)}
-                      overlayClassName="fixed inset-0 z-[60] flex items-center justify-center bg-black/10 dark:bg-black/50 p-6"
-                      className="flex h-[min(720px,calc(100vh-48px))] w-[min(960px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-surface bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.16)]"
-                    >
-                      <div className="flex shrink-0 items-start justify-between gap-3 px-5 py-4">
-                        <div className="min-w-0">
-                          <h2 className="text-lg font-semibold text-foreground">
-                            {i18nService.t('coworkMemoryRawButton')}
-                          </h2>
-                          <p className="mt-0.5 text-sm text-secondary">
-                            {i18nService.t('coworkMemoryRawHint')}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setCoworkMemoryRawMode(false)}
-                          title={i18nService.t('close')}
-                          aria-label={i18nService.t('close')}
-                          className="p-2 rounded-lg hover:bg-surface-raised transition-colors"
-                        >
-                          <XMarkIcon className="h-5 w-5 text-secondary" />
-                        </button>
-                      </div>
-                      <textarea
-                        value={coworkMemoryRawText}
-                        onChange={(event) => setCoworkMemoryRawText(event.target.value)}
-                        spellCheck={false}
-                        autoFocus
-                        className="min-h-0 w-full flex-1 resize-none bg-transparent px-5 pt-1 pb-4 text-xs font-mono leading-relaxed text-foreground focus:outline-none"
-                      />
-                      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 px-5 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setCoworkMemoryRawMode(false)}
-                          className="px-3.5 py-1.5 text-sm text-foreground hover:bg-surface-raised rounded-lg border border-border transition-colors"
-                        >
-                          {i18nService.t('cancel')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { void handleSaveCoworkMemoryRaw(); }}
-                          disabled={coworkMemoryRawSaving}
-                          className="px-3.5 py-1.5 text-sm text-white bg-primary hover:bg-primary-hover rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
-                        >
-                          {i18nService.t('save')}
-                        </button>
-                      </div>
-                    </Modal>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setCoworkMemoryRawMode(false)}
+                    title={i18nService.t('close')}
+                    aria-label={i18nService.t('close')}
+                    className="p-2 rounded-lg hover:bg-surface-raised transition-colors"
+                  >
+                    <XMarkIcon className="h-5 w-5 text-secondary" />
+                  </button>
                 </div>
-              )}
-
-              {memoryTab === 'embedding' && (
-                <EmbeddingSettingsSection
-                  embeddingEnabled={embeddingEnabled}
-                  embeddingProvider={embeddingProvider}
-                  embeddingModel={embeddingModel}
-                  embeddingVectorWeight={embeddingVectorWeight}
-                  embeddingRemoteBaseUrl={embeddingRemoteBaseUrl}
-                  embeddingRemoteApiKey={embeddingRemoteApiKey}
-                  onEmbeddingEnabledChange={setEmbeddingEnabled}
-                  onEmbeddingProviderChange={setEmbeddingProvider}
-                  onEmbeddingModelChange={setEmbeddingModel}
-                  onEmbeddingVectorWeightChange={setEmbeddingVectorWeight}
-                  onEmbeddingRemoteBaseUrlChange={setEmbeddingRemoteBaseUrl}
-                  onEmbeddingRemoteApiKeyChange={setEmbeddingRemoteApiKey}
+                <textarea
+                  value={coworkMemoryRawText}
+                  onChange={(event) => setCoworkMemoryRawText(event.target.value)}
+                  spellCheck={false}
+                  autoFocus
+                  className="min-h-0 w-full flex-1 resize-none bg-transparent px-5 pt-1 pb-4 text-xs font-mono leading-relaxed text-foreground focus:outline-none"
                 />
-              )}
-
-            </div>
-          </div>
-        );
-      }
-
-      case 'coworkDreaming':
-        return (
-          <div className="min-h-full">
-            <DreamingSettingsSection
-              dreamingEnabled={dreamingEnabled}
-              dreamingFrequency={dreamingFrequency}
-              onDreamingEnabledChange={setDreamingEnabled}
-              onDreamingFrequencyChange={setDreamingFrequency}
-            />
+                <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 px-5 py-3">
+                  <button
+                    type="button"
+                    onClick={() => setCoworkMemoryRawMode(false)}
+                    className="px-3.5 py-1.5 text-sm text-foreground hover:bg-surface-raised rounded-lg border border-border transition-colors"
+                  >
+                    {i18nService.t('cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void handleSaveCoworkMemoryRaw(); }}
+                    disabled={coworkMemoryRawSaving}
+                    className="px-3.5 py-1.5 text-sm text-white bg-primary hover:bg-primary-hover rounded-lg disabled:opacity-60 disabled:cursor-not-allowed transition-colors active:scale-[0.98]"
+                  >
+                    {i18nService.t('save')}
+                  </button>
+                </div>
+              </Modal>
+            )}
           </div>
         );
 
@@ -3527,11 +3204,8 @@ const Settings: React.FC<SettingsProps> = ({
       case 'model':
         return (
           <StarPathPlatformSettings provider={platformProvider}
-            defaultModel={defaultModelDraft.provider === platformId ? defaultModelDraft.id : ''}
-            onChange={updatePlatformProvider}
-            onDefaultModelChange={id => {
-              setDefaultModelDraft({ id, provider: platformId });
-            }} />
+            disabled={isSaving}
+            onChange={updatePlatformProvider} />
         );
 
       case 'shortcuts':
@@ -3805,30 +3479,27 @@ const Settings: React.FC<SettingsProps> = ({
       onClose={guardedClose}
       onEscape={handleEscape}
       overlayClassName="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-3 sm:p-4"
-      className="w-[calc(100vw-2rem)] min-w-0 max-w-[1000px]"
+      className="settings-modal-frame"
     >
       <div className="starpath-settings relative shadow-modal modal-content" onClick={handleSettingsClick}>
         <SettingsNavigation tabs={sidebarTabs} activeTab={activeTab} onSelect={handleTabChange} />
+        <button type="button" aria-label={i18nService.t('close')} onClick={guardedClose}
+          className="settings-icon-button settings-close-button">
+          <XMarkIcon className="h-5 w-5" />
+        </button>
 
-        {/* Right content */}
-        <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden bg-background rounded-r-2xl">
+        {/* Settings content beside the navigation, stacked on narrow windows. */}
+        <div className="settings-main">
           {/* Content header */}
           <div className="settings-content-header shrink-0">
-            <div className="min-w-0"><h3 className="text-xl font-semibold tracking-tight text-foreground">{activeTabLabel}</h3>
+            <span className="settings-page-emblem" aria-hidden="true">{sidebarTabs.find(tab => tab.key === activeTab)?.icon}</span>
+            <div className="min-w-0"><h3 id="starpath-settings-heading" className="settings-page-title">{activeTabLabel}</h3>
               <p className="mt-2 text-xs leading-5 text-secondary">{i18nService.t(`starpathSettingsDescription_${activeTab}`)}</p></div>
-            <button
-              type="button"
-              aria-label={i18nService.t('close')}
-              onClick={guardedClose}
-              className="text-secondary hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg transition-colors"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
           </div>
 
           {noticeMessage && (
-            <div className="px-6">
-              <ErrorMessage
+            <div className="settings-notice-container">
+              <SettingsNotice
                 message={noticeMessage}
                 onClose={() => setNoticeMessage(null)}
               />
@@ -3836,8 +3507,8 @@ const Settings: React.FC<SettingsProps> = ({
           )}
 
           {error && (
-            <div className="px-6">
-              <ErrorMessage
+            <div className="settings-notice-container">
+              <SettingsNotice error
                 message={error}
                 onClose={() => setError(null)}
               />
@@ -3851,7 +3522,7 @@ const Settings: React.FC<SettingsProps> = ({
               className="settings-content-body flex-1 overflow-y-auto"
               style={{ scrollbarGutter: 'stable' }}
             >
-              {renderTabContent()}
+              <div className="settings-tab-content" data-settings-page={activeTab}>{renderTabContent()}</div>
             </div>
 
             {/* Footer buttons */}
@@ -3863,6 +3534,7 @@ const Settings: React.FC<SettingsProps> = ({
                 }`}
               />
               <div className="settings-actions bg-background">
+                <p className="settings-actions-note">{i18nService.t('starpathSettingsApplyHint')}</p>
                 <button
                   type="button"
                   onClick={guardedClose}
@@ -3873,7 +3545,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <button
                   type="submit"
                   disabled={isSaving || isAppearanceChanging}
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-primary-foreground rounded-lg transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                  className="settings-primary-button"
                 >
                   {isSaving ? i18nService.t('saving') : i18nService.t('save')}
                 </button>

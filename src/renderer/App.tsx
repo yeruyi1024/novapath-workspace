@@ -20,7 +20,6 @@ import type { LibrarySessionRef } from '../shared/library/types';
 import { OpenClawEnginePhase } from '../shared/openclawEngine/constants';
 import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../shared/product';
 import { ProviderAuthType, ProviderName, ProviderRegistry } from '../shared/providers';
-import { SIDEBAR_TASK_FILTER_ENABLED } from './components/agentSidebar/SidebarTaskFilterButton';
 import { CoworkView } from './components/cowork';
 import {
   CoworkShortcutDirection,
@@ -47,6 +46,7 @@ import NewUserOnboardingOverlay, {
 import { ScheduledTasksView } from './components/scheduledTasks';
 import Settings, { type SettingsOpenOptions } from './components/Settings';
 import Sidebar from './components/Sidebar';
+import { SIDEBAR_TASK_FILTER_ENABLED } from './components/sidebar/SidebarTaskFilterButton';
 import { SkillsAndConnectorsView, SkillsConnectorsSection } from './components/skillsAndConnectors';
 import SkinBackdrop, { SkinBackdropVariant } from './components/skin/SkinBackdrop';
 import SkinPresentationScope from './components/skin/SkinPresentationScope';
@@ -65,7 +65,6 @@ import {
 } from './components/update/appUpdateInteractionState';
 import AppUpdateModal from './components/update/AppUpdateModal';
 import { shouldShowAppUpdateNotice } from './components/update/appUpdateNoticeState';
-import WelcomeDialog from './components/WelcomeDialog';
 import WindowsAppTitleBar from './components/window/WindowsAppTitleBar';
 import { defaultConfig, getProviderDisplayName, ShortcutAction } from './config';
 import { selectIsEnterpriseAccount } from './features/enterpriseAccount/selectors';
@@ -82,7 +81,9 @@ import {
   isLatestAsyncRequest,
 } from './services/latestAsyncRequest';
 import { LogReporterAction, reportYdAnalyzer } from './services/logReporter';
+import { useMaasAccount } from './services/maasAccount';
 import { getOnboardingErrorCode, reportOnboardingAction } from './services/onboardingAnalytics';
+import { createPromptDraftPersistence, PROMPT_DRAFT_STORAGE_KEY } from './services/promptDraftPersistence';
 import { scheduledTaskService } from './services/scheduledTask';
 import { isTextEditingSafeShortcut, matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
@@ -99,6 +100,7 @@ import { openArtifactPreviewTab } from './store/slices/artifactSlice';
 import {
   clearDraftAttachments,
   clearDraftSelectedTextSnippets,
+  markPromptDraftsRestored,
   setDraftCollaborationMode,
   setDraftKitIds,
   setDraftPrompt,
@@ -123,6 +125,14 @@ const AGENT_TASK_SLOT_SHORTCUT_ACTIONS = [
 ] as const;
 
 const NEW_USER_WELCOME_AFTER_LOGIN_STORAGE_KEY = 'lobsterai:newUserWelcomeAfterLogin';
+const promptDraftPersistence = createPromptDraftPersistence({
+  read: () => window.electron.store.get(PROMPT_DRAFT_STORAGE_KEY),
+  write: drafts => window.electron.store.set(PROMPT_DRAFT_STORAGE_KEY, drafts),
+  getDrafts: () => store.getState().cowork.draftPrompts,
+  restore: (sessionId, draft) => { store.dispatch(setDraftPrompt({ sessionId, draft })); },
+  subscribe: listener => store.subscribe(listener),
+  onError: () => { console.warn('[Drafts] Unable to save prompt drafts'); },
+});
 const NEW_USER_WELCOME_AFTER_LOGIN_RESTART_GRACE_MS = 1800;
 const NEW_USER_WELCOME_AFTER_LOGIN_ENGINE_SETTLE_MS = 700;
 const NEW_USER_WELCOME_UNAUTHENTICATED_RETURN_DELAY_MS = 600;
@@ -176,9 +186,7 @@ const SETTINGS_TAB_SHORTCUT_ACTIONS: Array<{
   { action: ShortcutAction.OpenSettingsModel, initialTab: 'model' },
   { action: ShortcutAction.OpenSettingsIm, initialTab: 'im' },
   { action: ShortcutAction.OpenSettingsBrowser, initialTab: 'browserWebAccess' },
-  { action: ShortcutAction.OpenSettingsEmail, initialTab: 'email' },
   { action: ShortcutAction.OpenSettingsMemory, initialTab: 'coworkMemory' },
-  { action: ShortcutAction.OpenSettingsDreaming, initialTab: 'coworkDreaming' },
   { action: ShortcutAction.OpenSettingsPlugins, initialTab: 'plugins' },
   { action: ShortcutAction.OpenSettingsAbout, initialTab: 'about' },
 ];
@@ -223,6 +231,8 @@ const logAppUpdateRendererLifecycle = (
 };
 
 const App: React.FC = () => {
+  const platformAccount = useMaasAccount();
+  const hasPromptedPlatformKeyRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions & { requestId: number }>({ requestId: 0 });
   const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'kits' | 'mcp' | 'library'>('cowork');
@@ -306,7 +316,7 @@ const App: React.FC = () => {
     appUpdateState.status,
   );
   const shouldShowNewUserOnboarding =
-    privacyAgreed === false
+    PRODUCT_FEATURES.account && !platformAccount.account && privacyAgreed === false
     && !authUser
     && !isNewUserOnboardingDismissed
     && hasResolvedEngineStartupOverlayState
@@ -579,6 +589,15 @@ const App: React.FC = () => {
       }
 
       if (!coreStartupServicesInitializedRef.current) {
+        const draftsReady = await runStep('promptDraftPersistence.initialize', () => promptDraftPersistence.initialize(), {
+          attempts: 1,
+          firstTimeoutMs: initTimeoutMs,
+        });
+        // Late storage replies also restore the input without overwriting edits.
+        void promptDraftPersistence.initialize().then(() => {
+          store.dispatch(markPromptDraftsRestored());
+        }).catch(() => { console.warn('[Drafts] Unable to restore prompt drafts'); });
+        mark(draftsReady ? 'prompt drafts restored' : 'prompt draft restore pending');
         themeService.initialize();
         mark('themeService done');
 
@@ -752,6 +771,12 @@ const App: React.FC = () => {
     }));
     setShowSettings(true);
   }, []);
+
+  useEffect(() => {
+    if (!isInitialized || initError || hasPromptedPlatformKeyRef.current) return;
+    hasPromptedPlatformKeyRef.current = true;
+    if (!configService.getConfig().api.key.trim()) handleShowSettings({ initialTab: 'model' });
+  }, [handleShowSettings, initError, isInitialized]);
 
   const handleShowSkills = useCallback(() => {
     setMainView('skills');
@@ -1164,12 +1189,12 @@ const App: React.FC = () => {
 
   // Release the first-launch gate once login completes in an external auth flow.
   useEffect(() => {
-    if (privacyAgreed === false && authUser) {
+    if (privacyAgreed === false && (authUser || platformAccount.account)) {
       void acceptPrivacyAgreement().catch((error) => {
         console.warn('[Onboarding] failed to persist privacy agreement after login callback:', error);
       });
     }
-  }, [privacyAgreed, authUser, acceptPrivacyAgreement]);
+  }, [privacyAgreed, authUser, platformAccount.account, acceptPrivacyAgreement]);
 
   const finishNewUserOnboarding = useCallback((source: NewUserOnboardingCompletionSource) => {
     console.log(`[Onboarding] completing new user onboarding source=${source}`);
@@ -1556,6 +1581,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.defaultPrevented || isShortcutInputActive()) return;
+      if (document.querySelector('[data-platform-dialog]')) return;
 
       const { shortcuts } = configService.getConfig();
       const activeShortcuts = {
@@ -2207,7 +2233,7 @@ const App: React.FC = () => {
             <AppUpdateBlockingPanel updateState={appUpdateState} />
           </AppUpdateInteractionOverlay>
         )}
-        {shouldShowNewUserOnboarding && (PRODUCT_FEATURES.account ? (
+        {shouldShowNewUserOnboarding && (
           <FirstRunLoginIntroduction onStartExperience={handleNewUserOnboardingStartExperience}>
             <NewUserOnboardingOverlay
               step={newUserOnboardingStep}
@@ -2216,15 +2242,7 @@ const App: React.FC = () => {
               onStartExperience={handleNewUserOnboardingStartExperience}
             />
           </FirstRunLoginIntroduction>
-        ) : (
-          <WelcomeDialog
-            onCustomModel={() => {
-              finishNewUserOnboarding('skip');
-              handleShowSettings({ initialTab: 'model' });
-            }}
-            onContinue={() => finishNewUserOnboarding('skip')}
-          />
-        ))}
+        )}
       </div>
 
       <EngineFailureOverlay

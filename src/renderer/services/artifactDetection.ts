@@ -15,6 +15,7 @@ import {
   toAbsoluteArtifactPath,
 } from './artifactParser';
 import { parseLocalServiceArtifactsFromMessages } from './localServiceContextParser';
+import { resolveReferencedFilePath } from './referencedFilePath';
 
 /**
  * Detect artifacts from a session transcript.
@@ -191,7 +192,12 @@ export async function loadDetectedFileArtifact(
   cwd?: string,
 ): Promise<Artifact | null> {
   if (!artifact.filePath) return null;
-  const absPath = toAbsoluteArtifactPath(artifact.filePath, cwd);
+  let absPath: string;
+  try {
+    absPath = await resolveReferencedFilePath(artifact.filePath, cwd);
+  } catch {
+    return null;
+  }
 
   if (artifact.type === ArtifactTypeValue.Video) {
     return { ...artifact, content: '', filePath: absPath };

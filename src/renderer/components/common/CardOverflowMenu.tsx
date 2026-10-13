@@ -11,6 +11,7 @@ const MENU_EDGE_GAP_PX = 8;
 const MENU_TRIGGER_GAP_PX = 4;
 const MENU_ITEM_HEIGHT_PX = 36;
 const SUBMENU_MAX_VISIBLE_ITEMS = 4;
+const MenuKey = { Dismiss: 'Escape', Next: 'ArrowDown', Previous: 'ArrowUp', First: 'Home', Last: 'End' } as const;
 
 export const CARD_OVERFLOW_MENU_SURFACE_CLASSNAME =
   'rounded-xl border border-border bg-surface py-1 shadow-popover';
@@ -43,6 +44,10 @@ interface CardOverflowMenuProps {
   menuWidthPx?: number;
   /** Called only when the menu changes from closed to open. */
   onOpen?: () => void;
+  /** Custom account-style entry; default overflow triggers remain unchanged. */
+  triggerContent?: React.ReactNode;
+  triggerClassName?: string;
+  triggerLabel?: string;
 }
 
 /** Reusable overflow menu with an optional inline, one-level submenu. */
@@ -51,12 +56,23 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
   className = '',
   menuWidthPx = MENU_WIDTH_PX,
   onOpen,
+  triggerContent,
+  triggerClassName,
+  triggerLabel,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedItemKey, setExpandedItemKey] = useState<string>();
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const hasCustomTrigger = triggerContent !== undefined;
+  const hasPosition = position !== null;
+
+  useEffect(() => {
+    if (isOpen && position && hasCustomTrigger) {
+      menuRef.current?.querySelector<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)')?.focus();
+    }
+  }, [isOpen, position, hasCustomTrigger]);
 
   const expandedParent = expandedItemKey
     ? items.find(item => item.key === expandedItemKey && item.children)
@@ -73,17 +89,19 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
     const rect = buttonRef.current.getBoundingClientRect();
     const maxLeft = window.innerWidth - menuWidthPx - MENU_EDGE_GAP_PX;
     const left = Math.max(MENU_EDGE_GAP_PX, Math.min(rect.right - menuWidthPx, maxLeft));
+    const visibleMenuHeight = hasCustomTrigger && menuRef.current
+      ? menuRef.current.getBoundingClientRect().height : menuHeight;
     const spaceBelow = window.innerHeight - rect.bottom;
-    const openAbove = spaceBelow < menuHeight + MENU_TRIGGER_GAP_PX && rect.top > spaceBelow;
+    const openAbove = spaceBelow < visibleMenuHeight + MENU_TRIGGER_GAP_PX && rect.top > spaceBelow;
     const preferredTop = openAbove
-      ? rect.top - menuHeight - MENU_TRIGGER_GAP_PX
+      ? rect.top - visibleMenuHeight - MENU_TRIGGER_GAP_PX
       : rect.bottom + MENU_TRIGGER_GAP_PX;
-    const maxTop = window.innerHeight - menuHeight - MENU_EDGE_GAP_PX;
+    const maxTop = window.innerHeight - visibleMenuHeight - MENU_EDGE_GAP_PX;
     setPosition({
       top: Math.max(MENU_EDGE_GAP_PX, Math.min(preferredTop, maxTop)),
       left,
     });
-  }, [menuHeight, menuWidthPx]);
+  }, [menuHeight, menuWidthPx, hasCustomTrigger]);
 
   useLayoutEffect(() => {
     if (isOpen) updatePosition();
@@ -93,6 +111,10 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
     }
   }, [isOpen, updatePosition]);
 
+  useLayoutEffect(() => {
+    if (isOpen && hasPosition && hasCustomTrigger) updatePosition();
+  }, [isOpen, hasPosition, hasCustomTrigger, updatePosition]);
+
   useEffect(() => {
     if (!isOpen) return undefined;
     const handlePointerDown = (event: MouseEvent) => {
@@ -101,9 +123,12 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
       setIsOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== MenuKey.Dismiss) return;
       if (expandedItemKey) setExpandedItemKey(undefined);
-      else setIsOpen(false);
+      else {
+        setIsOpen(false);
+        if (hasCustomTrigger) { event.preventDefault(); buttonRef.current?.focus(); }
+      }
     };
     const handleReflow = () => setIsOpen(false);
     document.addEventListener('mousedown', handlePointerDown);
@@ -116,7 +141,7 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
       window.removeEventListener('resize', handleReflow);
       window.removeEventListener('scroll', handleReflow, true);
     };
-  }, [expandedItemKey, isOpen]);
+  }, [expandedItemKey, isOpen, hasCustomTrigger]);
 
   if (items.length === 0) return null;
 
@@ -127,8 +152,8 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-label={i18nService.t('moreActions')}
-        title={i18nService.t('moreActions')}
+        aria-label={triggerLabel ?? i18nService.t('moreActions')}
+        title={triggerLabel ?? i18nService.t('moreActions')}
         onClick={(event) => {
           event.stopPropagation();
           setIsOpen(value => {
@@ -136,17 +161,38 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
             return !value;
           });
         }}
-        className={`inline-flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-foreground ${
+        className={`${triggerClassName ?? 'inline-flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-raised hover:text-foreground'} ${
           isOpen ? 'bg-surface-raised text-foreground' : ''
         } ${className}`}
       >
-        <EllipsisHorizontalIcon className="h-4 w-4" />
+        {triggerContent ?? <EllipsisHorizontalIcon className="h-4 w-4" />}
       </button>
       {isOpen && position && createPortal(
         <div
           ref={menuRef}
           role="menu"
+          aria-label={triggerLabel}
           onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (!hasCustomTrigger) return;
+            if (event.key === MenuKey.Dismiss) {
+              event.preventDefault(); event.stopPropagation();
+              setIsOpen(false); buttonRef.current?.focus();
+              return;
+            }
+            const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)') ?? []);
+            const index = buttons.indexOf(event.target as HTMLButtonElement);
+            if (index < 0) return;
+            let next: number;
+            switch (event.key) {
+              case MenuKey.Next: next = (index + 1) % buttons.length; break;
+              case MenuKey.Previous: next = (index - 1 + buttons.length) % buttons.length; break;
+              case MenuKey.First: next = 0; break;
+              case MenuKey.Last: next = buttons.length - 1; break;
+              default: return;
+            }
+            event.preventDefault(); buttons[next].focus();
+          }}
           style={{ top: position.top, left: position.left, width: menuWidthPx }}
           className={`fixed z-[9999] ${CARD_OVERFLOW_MENU_SURFACE_CLASSNAME}`}
         >
@@ -182,11 +228,12 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
                       return;
                     }
                     setIsOpen(false);
+                    if (hasCustomTrigger) buttonRef.current?.focus();
                     item.onSelect?.();
                   }}
                   className={`${CARD_OVERFLOW_MENU_ITEM_CLASSNAME} ${
                     item.destructive ? 'text-red-500 dark:text-red-400' : 'text-foreground'
-                  }`}
+                  } ${hasCustomTrigger ? 'focus-visible:bg-primary-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary' : ''}`}
                 >
                   {item.icon}
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>

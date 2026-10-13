@@ -6,7 +6,9 @@ import { PRODUCT } from '../shared/product';
 import { APP_NAME, APP_USER_MODEL_ID, DB_FILENAME } from './appConstants';
 import { getProductDataPaths } from './productDataPath';
 
-test('StarPath rebranding preserves the existing data and database identity', () => {
+test('NovaPath rebranding preserves the existing data and database identity', () => {
+  expect(PRODUCT.englishName).toBe('NovaPath');
+  expect(PRODUCT.appId).toBe('com.starpath.desktop');
   expect(APP_NAME).toBe(PRODUCT.name);
   expect(APP_USER_MODEL_ID).toBe(PRODUCT.appId);
   const appData = path.join('profile', 'app-data');

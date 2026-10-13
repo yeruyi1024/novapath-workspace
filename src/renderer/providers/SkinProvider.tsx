@@ -1,17 +1,13 @@
 import React, {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 
-import type { SkinAssetSlot } from '../../shared/skin/constants';
 import {
   type ActiveSkin,
-  buildSkinAssetUrl,
   skinService,
 } from '../services/skin';
 import { synchronizeSkinTheme } from '../services/skinThemeAppearance';
@@ -20,22 +16,7 @@ import {
   type ThemeSelection,
   themeService,
 } from '../services/theme';
-
-interface SkinContextValue {
-  activeSkin: ActiveSkin | null;
-  savedSkins: ActiveSkin[];
-  isLoading: boolean;
-  isAppearanceChanging: boolean;
-  refreshVersion: number;
-  refresh: () => Promise<void>;
-  apply: (skinId: string) => Promise<void>;
-  deactivate: () => Promise<void>;
-  deleteSkin: (skinId: string) => Promise<void>;
-  selectThemeMode: (mode: ThemeMode) => Promise<ThemeSelection>;
-  selectThemeById: (themeId: string) => Promise<ThemeSelection>;
-}
-
-const SkinContext = createContext<SkinContextValue | null>(null);
+import { SkinContext, type SkinContextValue } from './skinContext';
 
 export const SkinProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [activeSkin, setActiveSkin] = useState<ActiveSkin | null>(null);
@@ -261,18 +242,4 @@ export const SkinProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   ]);
 
   return <SkinContext.Provider value={value}>{children}</SkinContext.Provider>;
-};
-
-export const useSkin = (): SkinContextValue => {
-  const context = useContext(SkinContext);
-  if (!context) throw new Error('useSkin must be used within SkinProvider');
-  return context;
-};
-
-export const useSkinAsset = (slot: SkinAssetSlot): string | null => {
-  const { activeSkin, refreshVersion } = useSkin();
-  return useMemo(
-    () => buildSkinAssetUrl(activeSkin?.assets[slot], refreshVersion),
-    [activeSkin, refreshVersion, slot],
-  );
 };

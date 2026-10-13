@@ -220,6 +220,7 @@ export class SkillServiceManager {
     try {
       cpRecursiveSync(bundledPath, skillPath, {
         force: true,
+        preserveTimestamps: true,
       });
       console.log('[SkillServices] Repaired web-search runtime from bundled resources');
     } catch (error) {

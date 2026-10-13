@@ -36,14 +36,14 @@ const SettingRow: React.FC<{
   control?: React.ReactNode;
   children?: React.ReactNode;
 }> = ({ title, description, control, children }) => (
-  <div>
-    <div className="flex items-start justify-between gap-4">
+  <div className="settings-browser-row">
+    <div className="settings-browser-row-content">
       <div className="min-w-0 flex-1">
         <h4 className="text-sm font-medium text-foreground">{title}</h4>
         {description ? <div className="mt-1 text-sm text-secondary">{description}</div> : null}
         {children ? <div className="mt-3">{children}</div> : null}
       </div>
-      {control ? <div className="shrink-0">{control}</div> : null}
+      {control ? <div className="settings-browser-control">{control}</div> : null}
     </div>
   </div>
 );
@@ -174,7 +174,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
             ? i18nService.t('browserDisplayModeInAppDescription')
             : i18nService.t('browserDisplayModeExternalDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-display-mode"
                 value={value.displayMode}
@@ -202,7 +202,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
               ? i18nService.t('browserCredentialUseModeOncePerTaskDescription')
               : i18nService.t('browserCredentialUseModeAlwaysAskDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-credential-use-mode"
                 value={value.credentialUseMode}
@@ -234,7 +234,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
             ? i18nService.t('browserCredentialSaveModeNeverDescription')
             : i18nService.t('browserCredentialSaveModeAskDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-credential-save-mode"
                 value={value.credentialSaveMode}
@@ -260,7 +260,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
           title={i18nService.t('browserNetworkSectionTitle')}
           description={networkModeDescription}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-network-mode"
                 value={value.networkMode}

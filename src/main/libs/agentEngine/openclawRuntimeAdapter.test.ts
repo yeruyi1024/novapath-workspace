@@ -1075,8 +1075,8 @@ test('outbound prompt identifies the application without replacing custom assist
   internal.bridgedSessions.add('session-1');
   const custom = 'Your assistant name is My Project Helper.';
   const prompt = await internal.buildOutboundPrompt('session-1', 'What application is this?', custom);
-  expect(prompt).toContain('This conversation runs in 星途 StarPath');
-  expect(prompt).toContain('[StarPath system instructions]');
+  expect(prompt).toContain('This conversation runs in 星途 NovaPath');
+  expect(prompt).toContain('[NovaPath system instructions]');
   expect(prompt).toContain(custom);
   expect(prompt).not.toContain('LobsterAI');
 });
@@ -1159,10 +1159,10 @@ test('outbound prompt injects continuity capsule bridge before the current reque
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续');
 
-  expect(prompt).toContain('[StarPath continuity context after context compaction]');
+  expect(prompt).toContain('[NovaPath continuity context after context compaction]');
   expect(prompt).toContain('Improve compaction continuity.');
   expect(prompt).toContain('src/main/libs/agentEngine/openclawRuntimeAdapter.ts');
-  expect(prompt.indexOf('[StarPath continuity context after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[NovaPath continuity context after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1207,10 +1207,10 @@ test('outbound prompt injects full capsule first and mini capsule on later turns
   const firstPrompt = await internal.buildOutboundPrompt('session-1', '继续');
   const secondPrompt = await internal.buildOutboundPrompt('session-1', '再继续');
 
-  expect(firstPrompt).toContain('[StarPath continuity context after context compaction]');
+  expect(firstPrompt).toContain('[NovaPath continuity context after context compaction]');
   expect(firstPrompt).toContain('Touched files:');
   expect(firstPrompt).toContain('src/main/libs/agentEngine/openclawRuntimeAdapter.ts');
-  expect(secondPrompt).toContain('[StarPath brief continuity context after context compaction]');
+  expect(secondPrompt).toContain('[NovaPath brief continuity context after context compaction]');
   expect(secondPrompt).toContain('Improve compaction continuity.');
   expect(secondPrompt).toContain('Inject capsule bridge.');
   expect(secondPrompt).not.toContain('Touched files:');
@@ -1259,9 +1259,9 @@ test('outbound prompt injects workspace rehydration bridge before the current re
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续');
 
-  expect(prompt).toContain('[StarPath workspace state after context compaction]');
+  expect(prompt).toContain('[NovaPath workspace state after context compaction]');
   expect(prompt).toContain('src/main/libs/agentEngine/coworkWorkspaceRehydration.ts');
-  expect(prompt.indexOf('[StarPath workspace state after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[NovaPath workspace state after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1309,8 +1309,8 @@ test('outbound prompt injects workspace rehydration bridge once per compaction',
   const firstPrompt = await internal.buildOutboundPrompt('session-1', '继续');
   const secondPrompt = await internal.buildOutboundPrompt('session-1', '再继续');
 
-  expect(firstPrompt).toContain('[StarPath workspace state after context compaction]');
-  expect(secondPrompt).not.toContain('[StarPath workspace state after context compaction]');
+  expect(firstPrompt).toContain('[NovaPath workspace state after context compaction]');
+  expect(secondPrompt).not.toContain('[NovaPath workspace state after context compaction]');
 });
 
 test('outbound prompt injects top-k evidence bridge before the current request', async () => {
@@ -1369,9 +1369,9 @@ test('outbound prompt injects top-k evidence bridge before the current request',
 
   const prompt = await internal.buildOutboundPrompt('session-1', '继续处理 src/pages/Bakery.tsx 的 npm test failed');
 
-  expect(prompt).toContain('[StarPath retrieved evidence after context compaction]');
+  expect(prompt).toContain('[NovaPath retrieved evidence after context compaction]');
   expect(prompt).toContain('npm test failed in src/pages/Bakery.tsx');
-  expect(prompt.indexOf('[StarPath retrieved evidence after context compaction]')).toBeLessThan(
+  expect(prompt.indexOf('[NovaPath retrieved evidence after context compaction]')).toBeLessThan(
     prompt.indexOf('[Current user request]'),
   );
 });
@@ -1413,7 +1413,7 @@ test('outbound prompt skips continuity capsule bridge before compaction', async 
 
   const prompt = await internal.buildOutboundPrompt('session-1', 'hello');
 
-  expect(prompt).not.toContain('[StarPath continuity context after context compaction]');
+  expect(prompt).not.toContain('[NovaPath continuity context after context compaction]');
 });
 
 test('context usage ignores non-checkpoint compactionCount', () => {

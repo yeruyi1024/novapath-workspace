@@ -79,6 +79,7 @@ import type { OpenClawEngineManager } from './openclawEngineManager';
 import { repairHeartbeatFile, stripProactiveHeartbeatSection } from './openclawHeartbeatRepair';
 import { withManagedOpenClawModelPolicy, withoutOpenClawWriteMetadata } from './openclawManagedModelPolicy';
 import { ensureDefaultIdentity, getMainAgentWorkspacePath } from './openclawMemoryFile';
+import { disableRetiredDreaming, OPENCLAW_MEMORY_CORE_PLUGIN_ID } from './openclawMemoryPolicy';
 import { resolveOpenClawCatalogModelMaxTokens } from './openclawModelCatalog';
 
 const gwDiagTs = (): string => {
@@ -94,7 +95,6 @@ import { omitUnavailableOptionalChannels } from './openclawOptionalChannels';
 import { buildQQAccountConfig, OpenClawQQPlugin, QQ_APPROVALS_DISABLED } from './openclawQQConfig';
 import { withRequiredOpenClawSessionStoreOwner } from './openclawSessionStoreOwner';
 import { getOpenClawTokenProxyPort } from './openclawTokenProxy';
-import { STARPATH_RESPONSE_POLICY } from './starpathResponsePolicy';
 import { getActiveSystemProxyUrl, isSystemProxyEnabled } from './systemProxy';
 
 export type AskUserCallbackConfig = {
@@ -148,7 +148,6 @@ export const OPENCLAW_MODEL_SELECTION_SCOPE = 'session';
 export const OPENCLAW_HEARTBEAT_EVERY_ENABLED = '1h';
 export const OPENCLAW_HEARTBEAT_EVERY_DISABLED = '0m';
 const DINGTALK_OPENCLAW_CHANNEL = 'dingtalk-connector';
-const OPENCLAW_MEMORY_CORE_PLUGIN_ID = 'memory-core';
 const OPENCLAW_MODEL_COMPAT_PLUGIN_ID = 'lobsterai-model-compat';
 
 const asConfigRecord = (value: unknown): Record<string, unknown> | undefined => (
@@ -2767,37 +2766,8 @@ export class OpenClawConfigSync {
       };
     }
 
-    // Sync Dreaming config into memory-core plugin
-    if (managedConfig.plugins) {
-      const plugins = managedConfig.plugins as Record<string, unknown>;
-      const entries = plugins.entries as Record<string, Record<string, unknown>>;
-      const existingMemoryCore = entries[OPENCLAW_MEMORY_CORE_PLUGIN_ID] ?? {};
-      const existingMemoryCoreConfig = (existingMemoryCore as Record<string, unknown>).config as Record<string, unknown> | undefined;
-      if (coworkConfig.dreamingEnabled) {
-        entries[OPENCLAW_MEMORY_CORE_PLUGIN_ID] = {
-          ...existingMemoryCore,
-          enabled: true,
-          config: {
-            ...existingMemoryCoreConfig,
-            dreaming: {
-              enabled: true,
-              frequency: coworkConfig.dreamingFrequency || '0 3 * * *',
-            },
-          },
-        };
-      } else {
-        entries[OPENCLAW_MEMORY_CORE_PLUGIN_ID] = {
-          ...existingMemoryCore,
-          enabled: true,
-          config: {
-            ...existingMemoryCoreConfig,
-            dreaming: {
-              enabled: false,
-            },
-          },
-        };
-      }
-    }
+    // Bootstrap and config sync share the same retired-feature policy.
+    disableRetiredDreaming(managedConfig);
 
     // Sync Telegram OpenClaw channel config — multi-instance via accounts
     const telegramInstances = this.getTelegramInstances();
@@ -3850,7 +3820,6 @@ export class OpenClawConfigSync {
       // Skills are now loaded by OpenClaw natively via skills.load.extraDirs
       // in openclaw.json, so we no longer embed the skills routing prompt here.
 
-      sections.push(STARPATH_RESPONSE_POLICY);
       sections.push(MANAGED_WEB_SEARCH_POLICY_PROMPT);
       sections.push(MANAGED_BROWSER_POLICY_PROMPT);
       sections.push(MANAGED_EXEC_SAFETY_PROMPT);

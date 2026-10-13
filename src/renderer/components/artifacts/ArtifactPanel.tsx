@@ -177,6 +177,7 @@ import NodeDeploymentPersistenceOperationStatus, {
   NodeDeploymentPersistenceOperationPhase,
   type NodeDeploymentPersistenceOperationState,
 } from './NodeDeploymentPersistenceOperationStatus';
+import PreviewFileBreadcrumb from './PreviewFileBreadcrumb';
 import {
   createPublishingAnalyticsAttempt,
   createPublishingAnalyticsDialog,
@@ -5198,16 +5199,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         {selectedArtifact ? (
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: current file + actions. A workspace review owns its toolbar and file tree. */}
-            {!isWorkspaceDiffArtifact(selectedArtifact) && <div className="h-10 flex items-center gap-2 px-3 border-b border-border shrink-0">
-              <span className="text-sm font-medium truncate">
-                {selectedArtifact.fileName || selectedArtifact.title}
-              </span>
-              <span className="flex-1" />
+            {!isWorkspaceDiffArtifact(selectedArtifact) && <div className="h-10 flex items-center gap-1 px-3 border-b border-border/70 shrink-0">
+              <PreviewFileBreadcrumb
+                filePath={selectedArtifact.filePath}
+                label={selectedArtifact.fileName || selectedArtifact.title}
+              />
               {artifactToolbarPublishTarget && (
                 <button
                   type="button"
                   onClick={handleShareSelectedArtifact}
-                  className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-secondary transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:bg-surface hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
                   aria-label={t('htmlShare')}
                   title={t('htmlShare')}
                 >
@@ -5226,7 +5227,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                       });
                       return nextOpen;
                     })}
-                    className={`p-1 rounded transition-colors ${
+                    className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 ${
                       isArtifactActionsMenuOpen
                         ? 'bg-surface text-foreground'
                         : 'text-secondary hover:text-foreground hover:bg-surface'
@@ -5326,7 +5327,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               {isCompactHtmlToolbar && showOpenBrowserAction && (
                 <button
                   onClick={handleOpenInBrowser}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:text-foreground hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
+                  aria-label={t('artifactOpenInBrowser')}
                   title={t('artifactOpenInBrowser')}
                 >
                   <OpenExternalIcon />
@@ -5335,7 +5337,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               {showPrimaryOpenWithAppAction && (
                 <button
                   onClick={handleOpenWithApp}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:text-foreground hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
+                  aria-label={t('artifactOpenWithApp')}
                   title={t('artifactOpenWithApp')}
                 >
                   <OpenExternalIcon />
@@ -5344,21 +5347,25 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               {showPrimaryRevealInFolderAction && (
                 <button
                   onClick={handleRevealInFolder}
-                  className="p-1 rounded text-secondary hover:text-foreground hover:bg-surface transition-colors"
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-secondary transition-colors hover:text-foreground hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45"
+                  aria-label={t('artifactOpenFolder')}
                   title={t('artifactOpenFolder')}
                 >
                   <FolderIcon />
                 </button>
               )}
               <button
+                type="button"
                 ref={fileListButtonRef}
                 onClick={toggleFileListDrawer}
-                className={`p-1 rounded transition-colors ${
+                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 ${
                   isFileListDrawerVisible
                     ? 'text-primary bg-primary/10'
                     : 'text-secondary hover:text-foreground hover:bg-surface'
                 }`}
+                aria-label={t('artifactFileList')}
                 title={t('artifactFileList')}
+                aria-expanded={isFileListDrawerVisible}
               >
                 <FileListIcon />
               </button>

@@ -1,3 +1,4 @@
+import { PLATFORM_MODEL_BASE_URL } from '../../shared/auth/platformConfig';
 import { PRODUCT } from '../../shared/product';
 import { ApiFormat, ProviderAuthType } from '../../shared/providers';
 import type { AppConfig } from '../config';
@@ -75,7 +76,7 @@ export function buildPlatformConfigUpdate(
   }
   const provider = providers[configuredId];
   const apiKey = provider.apiKey.trim();
-  const baseUrl = provider.enabled ? normalizePlatformBaseUrl(provider.baseUrl) : provider.baseUrl.trim();
+  const baseUrl = PLATFORM_MODEL_BASE_URL;
   const models = provider.models ?? [];
   if (provider.enabled && !apiKey) throw new PlatformError(PlatformErrorCode.MissingKey);
   if (provider.enabled && !models.length) throw new PlatformError(PlatformErrorCode.EmptyCatalog);
@@ -90,7 +91,7 @@ export function buildPlatformConfigUpdate(
       apiFormat: ApiFormat.OpenAI,
       authType: ProviderAuthType.ApiKey,
     } : { ...config, enabled: false }])),
-    api: { key: provider.enabled ? apiKey : '', baseUrl: provider.enabled ? baseUrl : '' },
+    api: { key: provider.enabled ? apiKey : '', baseUrl },
     model: {
       ...previousModel,
       availableModels: provider.enabled ? models : [],
@@ -157,6 +158,27 @@ async function requestPlatform(fetchApi: PlatformFetch, baseUrl: string, apiKey:
 
 export async function syncPlatformModels(fetchApi: PlatformFetch, baseUrl: string, apiKey: string, previous: Model[]): Promise<Model[]> {
   return parsePlatformModels(await requestPlatform(fetchApi, baseUrl, apiKey, 'models'), previous);
+}
+
+/** Saving a key is the only setup step: discover models before committing routing. */
+export async function preparePlatformConfigUpdate(
+  providers: PlatformProvidersConfig,
+  id: string,
+  defaultModel: string,
+  previous: AppConfig,
+  fetchApi: PlatformFetch,
+  refreshModels = false,
+): Promise<Partial<AppConfig>> {
+  const provider = providers[id];
+  if (!provider) throw new PlatformError(PlatformErrorCode.MissingKey);
+  const apiKey = provider.apiKey.trim();
+  let models = provider.models ?? [];
+  const saved = previous.providers?.[id];
+  if (apiKey && (refreshModels || saved?.apiKey.trim() !== apiKey || saved.baseUrl !== PLATFORM_MODEL_BASE_URL || !models.length)) {
+    models = await syncPlatformModels(fetchApi, PLATFORM_MODEL_BASE_URL, apiKey, models);
+  }
+  return buildPlatformConfigUpdate({ ...providers, [id]: { ...provider, apiKey, models,
+    baseUrl: PLATFORM_MODEL_BASE_URL, enabled: Boolean(apiKey) } }, id, defaultModel, previous.model);
 }
 
 export async function testPlatformConnection(fetchApi: PlatformFetch, baseUrl: string, apiKey: string, model: string): Promise<void> {

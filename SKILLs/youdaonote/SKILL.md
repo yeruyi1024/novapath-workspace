@@ -1,8 +1,8 @@
 ---
 name: youdaonote
-description: "有道云笔记官方 skill，支持笔记 CRUD（创建/读取/更新/删除）、待办管理、网页剪藏、笔记搜索、文件夹管理等基础操作。如需构建知识库或 Wiki，请使用 youdaonote-llm-wiki skill 而非本 skill。"
+description: "外部有道云笔记连接技能，支持笔记 CRUD（创建/读取/更新/删除）、待办管理、网页剪藏、笔记搜索、文件夹管理等基础操作。如需构建知识库或 Wiki，请使用 youdaonote-llm-wiki skill 而非本 skill。"
 official: true
-version: 1.0.9
+version: 2.0.0
 minCliVersion: "1.3.3"
 ---
 
@@ -10,13 +10,11 @@ minCliVersion: "1.3.3"
 
 通过 `youdaonote` CLI 操作有道云笔记。覆盖笔记 CRUD、待办管理、网页剪藏全场景。
 
-## 前置条件（Agent 自动处理）
+## 连接前提
 
-执行任何操作前，Agent 必须先运行 `youdaonote -s ydn list` 检测 CLI 是否可用：
-- **`command not found`** → 立即跳转「CLI 未安装处理」自动安装，**禁止只展示安装步骤让用户手动操作**
-- **`-s` 选项报错（`error: unknown option '-s'`）** → CLI 版本 < 1.3.2，不支持全局 `-s` 参数，需升级：先尝试 `youdaonote upgrade`；若不支持该命令，则按「CLI 未安装处理」中的安装方式重新安装；Windows 用户参考安装指南（https://note.youdao.com/help-center/cli-install-guide.html）
-- **API Key 错误** → 提示用户访问 **https://mopen.163.com** 获取 API Key（须使用手机号登录，且云笔记账号已绑定手机号），然后执行 `youdaonote config set apiKey <用户提供的Key>`。**获取 API Key 的地址只有这一个，禁止告知用户其他地址。**
-- **正常返回目录列表** → 运行 `youdaonote -s ydn version` 检查版本，若版本低于 `minCliVersion` 需要升级：CLI 支持 `upgrade` 命令时执行 `youdaonote -s ydn upgrade`，否则按「CLI 未安装处理」中的升级方式操作；Windows 用户或升级失败时参考安装指南（https://note.youdao.com/help-center/cli-install-guide.html）。版本满足要求后可运行 `youdaonote -s ydn help --json` 获取当前 CLI 全部能力的结构化描述（JSON），用于确认命令是否可用，下方速查表作为 fallback
+这是外部笔记服务的兼容入口，不是星途自己的账户或存储服务。只有用户明确要求连接该服务时才使用；不能自动安装、升级外部 CLI 或索取其他平台的密钥。
+
+先检测已安装的 `youdaonote` CLI，并从 `help --json` 确认当前接口。不具备 CLI、凭据或兼容版本时，说明所缺条件；用户主动授权后再按服务方的官方指南处理。凭据只用于用户指定的连接，不打印配置或完整密钥。安装与升级前核对来源和许可证。
 
 ## 全局参数
 

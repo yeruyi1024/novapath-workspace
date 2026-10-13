@@ -1,5 +1,6 @@
 import { type ProviderConfig, ProviderRegistry } from '@shared/providers';
 
+import { PLATFORM_MODEL_BASE_URL } from '../shared/auth/platformConfig';
 import {
   type BrowserWebAccessConfig,
   defaultBrowserWebAccessConfig,
@@ -43,15 +44,19 @@ export const ShortcutAction = {
   OpenSettingsModel: 'openSettingsModel',
   OpenSettingsIm: 'openSettingsIm',
   OpenSettingsBrowser: 'openSettingsBrowser',
-  OpenSettingsEmail: 'openSettingsEmail',
   OpenSettingsMemory: 'openSettingsMemory',
-  OpenSettingsDreaming: 'openSettingsDreaming',
   OpenSettingsPlugins: 'openSettingsPlugins',
   OpenSettingsShortcuts: 'openSettingsShortcuts',
   OpenSettingsAbout: 'openSettingsAbout',
 } as const;
 
 export type ShortcutAction = typeof ShortcutAction[keyof typeof ShortcutAction];
+
+// Compatibility identifiers only; retired settings must not bind these keys.
+export const RetiredSettingsShortcut = {
+  Email: 'openSettingsEmail',
+  Dreaming: 'openSettingsDreaming',
+} as const;
 
 export type ShortcutConfig = Record<ShortcutAction, string> & {
   [key: string]: string | undefined;
@@ -169,6 +174,7 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
     };
   }
 
+  providers.custom_0 = { enabled: false, apiKey: '', baseUrl: PLATFORM_MODEL_BASE_URL, apiFormat: 'openai', models: [] };
   return providers;
 };
 
@@ -176,16 +182,14 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
 export const defaultConfig: AppConfig = {
   api: {
     key: '',
-    baseUrl: 'https://api.deepseek.com',
+    baseUrl: PLATFORM_MODEL_BASE_URL,
   },
   model: {
-    availableModels: [
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false },
-    ],
-    defaultModel: 'deepseek-reasoner',
-    defaultModelProvider: 'deepseek',
+    availableModels: [],
+    defaultModel: '',
   },
   providers: buildDefaultProviders(),
+  platformProviderId: 'custom_0',
   theme: 'system',
   uiFontSize: FontPreferences.UiFontSizeDefault,
   uiFontSizeMigrationVersion: UI_FONT_SIZE_MIGRATION_VERSION,
@@ -238,9 +242,7 @@ export const defaultConfig: AppConfig = {
     [ShortcutAction.OpenSettingsModel]: '',
     [ShortcutAction.OpenSettingsIm]: '',
     [ShortcutAction.OpenSettingsBrowser]: '',
-    [ShortcutAction.OpenSettingsEmail]: '',
     [ShortcutAction.OpenSettingsMemory]: '',
-    [ShortcutAction.OpenSettingsDreaming]: '',
     [ShortcutAction.OpenSettingsPlugins]: '',
     [ShortcutAction.OpenSettingsShortcuts]: '',
     [ShortcutAction.OpenSettingsAbout]: '',

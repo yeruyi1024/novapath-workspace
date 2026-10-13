@@ -30,7 +30,11 @@ export default class AppErrorBoundary extends Component<{ children: ReactNode },
           <div className="max-w-md text-center">
             <h1 className="text-lg font-semibold">{i18nService.t('appRenderFailed')}</h1>
             <p className="mt-3 text-sm text-secondary">{i18nService.t('appRenderFailedHint')}</p>
-            <button type="button" onClick={() => window.location.reload()}
+            <button type="button" onClick={() => {
+                if (window.electron?.appInfo?.reloadWindow) {
+                  void window.electron.appInfo.reloadWindow().catch(() => window.location.reload());
+                } else window.location.reload();
+              }}
               className="mt-6 rounded-lg border border-border bg-surface px-5 py-2 text-sm hover:bg-surface-raised">
               {i18nService.t('retry')}
             </button>

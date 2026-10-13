@@ -244,7 +244,7 @@ describe('OpenClawEngineManager startup runtime recovery', () => {
     return { manager, internals, order };
   };
 
-  test('ordinary startup preserves retired config and unreadable session indexes for Quick Repair', async () => {
+  test('ordinary startup preserves legacy data while disabling retired dreaming', async () => {
     const { manager, order } = prepareSpawnlessStartup();
     const legacyStore = path.join(manager.getStateDir(), 'agents', 'main', 'sessions', 'sessions.json');
     fs.mkdirSync(path.dirname(legacyStore), { recursive: true });
@@ -255,7 +255,11 @@ describe('OpenClawEngineManager startup runtime recovery', () => {
     await manager.startGateway('legacy-data-test');
 
     expect(order).toEqual(['startup-compatibility']);
-    expect(fs.readFileSync(manager.getConfigPath(), 'utf8')).toBe(config);
+    expect(JSON.parse(fs.readFileSync(manager.getConfigPath(), 'utf8'))).toEqual({
+      gateway: { mode: 'local' },
+      session: { maintenance: { rotateBytes: 1000 } },
+      plugins: { entries: { 'memory-core': { enabled: true, config: { dreaming: { enabled: false } } } } },
+    });
     expect(fs.readFileSync(legacyStore, 'utf8')).toBe('\uFEFFnot json');
     expect(fs.readdirSync(path.dirname(legacyStore))).toEqual(['sessions.json']);
     expect(spawnOpenClawGatewayProcess).not.toHaveBeenCalled();
@@ -281,7 +285,13 @@ describe('OpenClawEngineManager startup runtime recovery', () => {
 
     expect(configSeenByHelper).toEqual({
       gateway: { mode: 'local', port: 18789 },
-      plugins: { load: { paths: [missingRuntimeDir, userDataDir] }, entries: { browser: { enabled: true } } },
+      plugins: {
+        load: { paths: [missingRuntimeDir, userDataDir] },
+        entries: {
+          browser: { enabled: true },
+          'memory-core': { enabled: true, config: { dreaming: { enabled: false } } },
+        },
+      },
     });
     expect(spawnOpenClawGatewayProcess).not.toHaveBeenCalled();
   });

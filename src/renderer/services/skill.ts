@@ -281,22 +281,6 @@ class SkillService {
     }
   }
 
-  async testEmailConnectivity(
-    skillId: string,
-    config: Record<string, string>
-  ): Promise<EmailConnectivityTestResult | null> {
-    try {
-      const result = await window.electron.skills.testEmailConnectivity(skillId, config);
-      if (result.success && result.result) {
-        return result.result;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to test email connectivity:', error);
-      return null;
-    }
-  }
-
   async getEmailAccountsConfig(skillId: string): Promise<EmailSkillAccountsConfig> {
     try {
       console.debug('[EmailSkill] loading email accounts config', { skillId });
@@ -311,10 +295,10 @@ class SkillService {
         return result.config;
       }
       console.warn('[EmailSkill] failed to load email accounts config', { skillId, error: result.error });
-      return { version: 1, defaultAccountId: '', accounts: [] };
+      throw new Error(i18nService.t('emailConfigLoadError'));
     } catch (error) {
       console.error('Failed to get email accounts config:', error);
-      return { version: 1, defaultAccountId: '', accounts: [] };
+      throw new Error(i18nService.t('emailConfigLoadError'));
     }
   }
 

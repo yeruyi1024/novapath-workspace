@@ -2,10 +2,10 @@ import React, { useCallback, useEffect } from 'react';
 
 import { i18nService } from '@/services/i18n';
 
-import SidebarTaskFilterButton from '../agentSidebar/SidebarTaskFilterButton';
-import SidebarTaskSearchButton from '../agentSidebar/SidebarTaskSearchButton';
 import ComposeIcon from '../icons/ComposeIcon';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
+import SidebarTaskFilterButton from '../sidebar/SidebarTaskFilterButton';
+import SidebarTaskSearchButton from '../sidebar/SidebarTaskSearchButton';
 import WindowTitleBar from './WindowTitleBar';
 
 interface WindowsAppTitleBarProps {

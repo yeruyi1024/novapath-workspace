@@ -72,6 +72,7 @@ interface CoworkState {
   /** Target session selected during cross-agent navigation, used only to stabilize presentation. */
   sessionNavigationTargetId: string | null;
   draftPrompts: Record<string, string>;
+  promptDraftsRestored: boolean;
   /** Keyed by draftKey (sessionId or '__home__'), stores pending attachments */
   draftAttachments: Record<string, DraftAttachment[]>;
   /** Keyed by draftKey, stores selected assistant text excerpts for the next user turn. */
@@ -128,6 +129,7 @@ const initialState: CoworkState = {
   currentSession: null,
   sessionNavigationTargetId: null,
   draftPrompts: {},
+  promptDraftsRestored: false,
   draftAttachments: {},
   draftSelectedTextSnippets: {},
   draftBrowserAnnotationBatches: {},
@@ -591,6 +593,9 @@ const coworkSlice = createSlice({
       }
     },
 
+    markPromptDraftsRestored(state) {
+      state.promptDraftsRestored = true;
+    },
     setDraftPrompt(state, action: PayloadAction<{ sessionId: string; draft: string }>) {
       const { sessionId, draft } = action.payload;
       if (draft) {
@@ -959,6 +964,7 @@ const coworkSlice = createSlice({
 
     deleteSession(state, action: PayloadAction<string>) {
       removeSessionFromState(state, action.payload);
+      delete state.draftPrompts[action.payload];
       delete state.btwThreadsBySessionId[action.payload];
       delete state.planConfirmations[action.payload];
       delete state.steerDrafts[action.payload];
@@ -972,6 +978,7 @@ const coworkSlice = createSlice({
     deleteSessions(state, action: PayloadAction<string[]>) {
       removeSessionsFromState(state, action.payload);
       for (const sessionId of action.payload) {
+        delete state.draftPrompts[sessionId];
         delete state.btwThreadsBySessionId[sessionId];
         delete state.planConfirmations[sessionId];
         delete state.steerDrafts[sessionId];
@@ -1539,6 +1546,7 @@ export const {
   setCurrentSession,
   finishSessionNavigation,
   setDraftPrompt,
+  markPromptDraftsRestored,
   setSteerDraft,
   addPendingSteer,
   updateSteerStatus,

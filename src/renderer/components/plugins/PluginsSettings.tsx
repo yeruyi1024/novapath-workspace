@@ -503,7 +503,7 @@ export default function PluginsSettings({ handleRef }: PluginsSettingsProps) {
   }
 
   return (
-    <div className="space-y-6 px-1">
+    <div className="settings-plugins-page space-y-6">
       {/* Syncing overlay */}
       {syncing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -552,8 +552,8 @@ export default function PluginsSettings({ handleRef }: PluginsSettingsProps) {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Toolbar */}
+      <div className="settings-page-toolbar">
         <div>
           <h3 className="text-base font-semibold text-foreground">
             {i18nService.t('pluginsTitle')}

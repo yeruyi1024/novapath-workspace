@@ -1,7 +1,8 @@
 import { describe, expect, test, vi } from 'vitest';
 
+import { PLATFORM_MODEL_BASE_URL } from '../../shared/auth/platformConfig';
 import { defaultConfig } from '../config';
-import { buildPlatformConfigUpdate, CONNECTIVITY_TEST_TOKEN_BUDGET, normalizePlatformBaseUrl, parsePlatformModels, PlatformErrorCode, type PlatformProvidersConfig as ProvidersConfig, resolvePlatformProviderId, syncPlatformModels, testPlatformConnection } from './starpathPlatform';
+import { buildPlatformConfigUpdate, CONNECTIVITY_TEST_TOKEN_BUDGET, normalizePlatformBaseUrl, parsePlatformModels, PlatformErrorCode, type PlatformProvidersConfig as ProvidersConfig, preparePlatformConfigUpdate, resolvePlatformProviderId, syncPlatformModels, testPlatformConnection } from './starpathPlatform';
 
 describe('StarPath gateway configuration', () => {
   test.each([
@@ -37,8 +38,8 @@ describe('StarPath gateway configuration', () => {
     const providers = { openai: legacy, custom_3: gateway };
     const update = buildPlatformConfigUpdate(providers, 'custom_3', 'legacy-model', defaultConfig.model);
     expect(update.providers?.openai).toEqual({ ...legacy, enabled: false });
-    expect(update.providers?.custom_3).toMatchObject({ enabled: true, apiKey: 'platform-key', baseUrl: 'https://gateway.example/v1', apiFormat: 'openai', authType: 'apikey' });
-    expect(update.api).toEqual({ key: 'platform-key', baseUrl: 'https://gateway.example/v1' });
+    expect(update.providers?.custom_3).toMatchObject({ enabled: true, apiKey: 'platform-key', baseUrl: PLATFORM_MODEL_BASE_URL, apiFormat: 'openai', authType: 'apikey' });
+    expect(update.api).toEqual({ key: 'platform-key', baseUrl: PLATFORM_MODEL_BASE_URL });
     expect(update.model).toMatchObject({ defaultModel: 'platform-model', defaultModelProvider: 'custom_3', availableModels: gateway.models });
     expect(providers).toEqual({ openai: legacy, custom_3: gateway });
     expect(legacy.enabled).toBe(true);
@@ -50,7 +51,7 @@ describe('StarPath gateway configuration', () => {
       custom_1: { enabled: false, apiKey: '', baseUrl: '', models: [] },
     }, 'custom_1', 'old-model', defaultConfig.model);
     expect(update.providers?.openai.enabled).toBe(false);
-    expect(update.api).toEqual({ key: '', baseUrl: '' });
+    expect(update.api).toEqual({ key: '', baseUrl: PLATFORM_MODEL_BASE_URL });
     expect(update.model).toMatchObject({ defaultModel: '', defaultModelProvider: undefined, availableModels: [] });
   });
 
@@ -62,11 +63,48 @@ describe('StarPath gateway configuration', () => {
   });
 
   test.each([
-    [{ enabled: true, apiKey: 'key', baseUrl: 'invalid', models: [{ id: 'model', name: 'Model' }] }, PlatformErrorCode.InvalidUrl],
     [{ enabled: true, apiKey: '', baseUrl: 'https://gateway.example', models: [{ id: 'model', name: 'Model' }] }, PlatformErrorCode.MissingKey],
     [{ enabled: true, apiKey: 'key', baseUrl: 'https://gateway.example', models: [] }, PlatformErrorCode.EmptyCatalog],
   ])('rejects incomplete enabled connections before changing stored routing', (provider, error) => {
     expect(() => buildPlatformConfigUpdate({ custom_0: provider }, 'custom_0', 'model', defaultConfig.model)).toThrow(error);
+  });
+
+  test('ignores attempted gateway edits when saving managed routing', () => {
+    const update = buildPlatformConfigUpdate({ custom_0: { enabled: true, apiKey: 'key', baseUrl: 'https://other.example', models: [{ id: 'model', name: 'Model' }] } }, 'custom_0', 'model', defaultConfig.model);
+    expect(update.api?.baseUrl).toBe(PLATFORM_MODEL_BASE_URL);
+    expect(update.providers?.custom_0.baseUrl).toBe(PLATFORM_MODEL_BASE_URL);
+  });
+
+  test('saving only a key discovers models from the fixed platform and chooses an available model', async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, data: { data: [{ id: 'new-model' }] } });
+    const providers = { custom_0: { enabled: false, apiKey: ' platform-key ', baseUrl: 'https://other.example', models: [] } };
+    const update = await preparePlatformConfigUpdate(providers, 'custom_0', 'old-model', defaultConfig, fetch);
+    expect(fetch.mock.calls[0][0].url).toBe(PLATFORM_MODEL_BASE_URL + '/models');
+    expect(update.api).toEqual({ key: 'platform-key', baseUrl: PLATFORM_MODEL_BASE_URL });
+    expect(update.model?.defaultModel).toBe('new-model');
+    expect(update.providers?.custom_0.enabled).toBe(true);
+    expect(providers.custom_0.models).toEqual([]);
+  });
+
+  test('a rejected key cannot replace saved credentials; clearing requires no remote request', async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, data: { message: 'bad key' } });
+    const providers = { custom_0: { enabled: true, apiKey: 'bad-key', baseUrl: PLATFORM_MODEL_BASE_URL, models: [] } };
+    await expect(preparePlatformConfigUpdate(providers, 'custom_0', '', defaultConfig, fetch)).rejects.toMatchObject({ code: PlatformErrorCode.RequestFailed, status: 401 });
+    fetch.mockClear();
+    const cleared = await preparePlatformConfigUpdate({ custom_0: { ...providers.custom_0, apiKey: '' } }, 'custom_0', '', defaultConfig, fetch);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(cleared.api?.key).toBe('');
+    expect(cleared.providers?.custom_0.enabled).toBe(false);
+  });
+
+  test('saving on the key page revalidates an unchanged key; unrelated settings need no model request', async () => {
+    const provider = { enabled: true, apiKey: 'platform-key', baseUrl: PLATFORM_MODEL_BASE_URL, models: [{ id: 'cached', name: 'Cached' }] };
+    const previous = { ...defaultConfig, providers: { custom_0: provider } };
+    const fetch = vi.fn().mockResolvedValue({ ok: false, status: 401, data: {} });
+    await preparePlatformConfigUpdate(previous.providers, 'custom_0', 'cached', previous, fetch);
+    expect(fetch).not.toHaveBeenCalled();
+    await expect(preparePlatformConfigUpdate(previous.providers, 'custom_0', 'cached', previous, fetch, true)).rejects.toMatchObject({ status: 401 });
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   test('deduplicates discovery while preserving existing model capabilities and custom parameters', () => {

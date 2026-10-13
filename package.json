@@ -1,8 +1,8 @@
 {
-  "name": "starpath",
+  "name": "novapath",
   "private": true,
   "author": {
-    "name": "StarPath"
+    "name": "NovaPath"
   },
   "license": "MIT",
   "version": "2026.9.23",
@@ -179,6 +179,7 @@
     "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "node scripts/setup-python-runtime.js",
     "setup:document-runtime": "node scripts/setup-document-runtime.cjs",
+    "setup:local-asr": "node scripts/setup-local-asr-runtime.cjs",
     "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
     "openclaw:patch": "node scripts/apply-openclaw-patches.cjs",
     "verify:installer-patches": "node scripts/verify-installer-patches.cjs",

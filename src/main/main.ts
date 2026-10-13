@@ -42,6 +42,7 @@ import {
   LogReporterStoreKey,
 } from '../shared/analytics/constants';
 import { AppIpcChannel } from '../shared/app/constants';
+import { StartupAppearanceArgument, startupBackground } from '../shared/app/startupAppearance';
 import { AppSettingsAutoLaunchErrorCode, AppSettingsIpc } from '../shared/appSettings/constants';
 import { type AppUpdateActiveWorkloads, AppUpdateIpc } from '../shared/appUpdate/constants';
 import { ArtifactBrowserPartition, ArtifactPreviewIpc, ArtifactPreviewProtocol } from '../shared/artifactPreview/constants';
@@ -59,6 +60,7 @@ import {
   AuthSessionChangeReason,
   AuthSessionStatus,
 } from '../shared/auth/constants';
+import { lockPlatformConfig } from '../shared/auth/platformConfig';
 import {
   type AgentBrowserCredentialSavePromptRequest,
   AgentBrowserHostMenuAction,
@@ -268,6 +270,8 @@ import type {
 import { registerActivityIpcHandlers } from './ipcHandlers/activity';
 import { registerAgentHandlers } from './ipcHandlers/agents';
 import { registerAsrIpcHandlers } from './ipcHandlers/asr';
+import { registerGatewayAsrHandlers } from './ipcHandlers/asr/gatewayHandlers';
+import { registerLocalAsrHandlers } from './ipcHandlers/asr/localHandlers';
 import { registerBrowserCredentialHandlers } from './ipcHandlers/browserCredentials/handlers';
 import { registerCoworkSubagentHandlers } from './ipcHandlers/coworkSubagent';
 import { isDecisionModelFeatureActive, registerDecisionModelHandlers } from './ipcHandlers/decisionModel/handlers';
@@ -434,11 +438,11 @@ import {
   resolveLobsterBrowserMcpStdioLaunch,
 } from './libs/lobsterBrowserMcpServer';
 import { exportLogsZip } from './libs/logExport';
+import { registerMaasAuth } from './libs/maasAuth';
 import { MainLogReporter } from './libs/mainLogReporter';
 import {
-  createDevelopmentMainWindowLoadRecovery,
-  type DevelopmentMainWindowLoadRecovery,
-  MainWindowLoadErrorCode,
+  createMainWindowLoadRecovery,
+  type MainWindowLoadRecovery,
 } from './libs/mainWindowLoadRecovery';
 import { inferImageMimeTypeFromDataUrl, type PersistedGeneratedImageAsset, persistGeneratedImageAssets, type PersistGeneratedImageAssetsResult, persistGeneratedVideoAssets, type RemoteGeneratedMediaAsset } from './libs/mediaAssetPersistence';
 import {
@@ -523,6 +527,7 @@ import {
 import { runLegacyWeixinAllowFromMigration } from './libs/openclawWeixinPairingMigration';
 import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
 import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
+import { createRendererSnapshot } from './libs/rendererSnapshot';
 import { isAnalyticsEndpointUrl, sanitizeUrlForLog, serializeForLog } from './libs/sanitizeForLog';
 import { packageNodeServiceDeployment } from './libs/shareDeployment/nodeServiceDeploymentPackager';
 import {
@@ -598,7 +603,8 @@ import {
 import { registerVoiceInputPermissionHandler } from './permissions/voiceInputPermission';
 import { patchEnabledNspClawguard } from './plugins/nspClawguardCompatibility';
 import { isHiddenUserPluginId } from './plugins/pluginManager';
-import { getProductDataPaths } from './productDataPath';
+import { configureProductAppIdentity } from './productAppIdentity';
+import { resolveProductDataPaths } from './productDataPath';
 import type { SkillChangeBatch } from './skills/skillChangeDiagnostics';
 import { SkillManager } from './skills/skillManager';
 import { getSkillServiceManager } from './skills/skillServices';
@@ -644,8 +650,7 @@ const gwDiagTs = (): string => {
 };
 
 // Configure the app identity before any OS-level surfaces are created.
-app.name = APP_NAME;
-app.setName(APP_NAME);
+configureProductAppIdentity(app, process.platform);
 if (process.platform === 'win32') {
   app.setAppUserModelId(APP_USER_MODEL_ID);
 }
@@ -1964,23 +1969,25 @@ const savePngWithDialog = async (
   return { success: true, canceled: false, path: outputPath };
 };
 
-const configureUserDataPath = (): void => {
+const configureUserDataPath = () => {
   const appDataPath = app.getPath('appData');
-  const preferredUserDataPath = getProductDataPaths(appDataPath).userDataPath;
+  const dataPaths = resolveProductDataPaths(appDataPath, fs.existsSync);
+  const preferredUserDataPath = dataPaths.userDataPath;
   const currentUserDataPath = app.getPath('userData');
 
   if (currentUserDataPath !== preferredUserDataPath) {
     app.setPath('userData', preferredUserDataPath);
     console.log(`[Main] userData path updated: ${currentUserDataPath} -> ${preferredUserDataPath}`);
   }
+  return dataPaths;
 };
 
-configureUserDataPath();
+const configuredProductDataPaths = configureUserDataPath();
 let startupDataMigrationRestoreResult: DataMigrationLastRestoreResult | null = null;
 try {
   startupDataMigrationRestoreResult = performPendingDataMigrationRestoreSync({
     userDataPath: app.getPath('userData'),
-    rollbackRootPath: getProductDataPaths(app.getPath('appData')).rollbackRootPath,
+    rollbackRootPath: configuredProductDataPaths.rollbackRootPath,
   });
 } catch (error) {
   console.error('[DataMigration] pending restore failed before logger initialization:', error);
@@ -2097,7 +2104,7 @@ app.on('render-process-gone', (_event, webContents, details) => {
     details.reason === 'oom' ||
     details.reason === 'launch-failed' ||
     details.reason === 'integrity-failure';
-  if (shouldReload) {
+  if (shouldReload && webContents !== mainWindow?.webContents) {
     scheduleReload(`render-process-gone (${details.reason})`, webContents);
   }
 });
@@ -4563,7 +4570,9 @@ type MediaStatusPollUpdate = {
   toolCallId: string;
   details: Record<string, unknown>;
 };
-let lastReloadAt = 0;
+let mainWindowLoadRecovery: MainWindowLoadRecovery | null = null;
+let rendererSnapshot: ReturnType<typeof createRendererSnapshot> | null = null;
+const lastReloadByTarget = new WeakMap<WebContents, number>();
 const MIN_RELOAD_INTERVAL_MS = 5000;
 type AppConfigSettings = {
   api?: unknown;
@@ -4732,7 +4741,7 @@ const updateTitleBarOverlay = () => {
   // Also update the window background color to match the theme
   const config = getStore().get<AppConfigSettings>('app_config');
   const theme = resolveThemeFromConfig(config);
-  mainWindow.setBackgroundColor(theme === 'dark' ? '#0F1117' : '#F8F9FB');
+  mainWindow.setBackgroundColor(startupBackground(theme));
 };
 
 const applyProxyPreference = async (useSystemProxy: boolean): Promise<void> => {
@@ -4842,15 +4851,26 @@ const scheduleReload = (reason: string, webContents?: WebContents) => {
   if (!target || target.isDestroyed()) {
     return;
   }
+  if (target === mainWindow?.webContents) {
+    mainWindowLoadRecovery?.handleRendererGone('crashed');
+    return;
+  }
   const now = Date.now();
+  const lastReloadAt = lastReloadByTarget.get(target) ?? 0;
   if (now - lastReloadAt < MIN_RELOAD_INTERVAL_MS) {
     console.warn(`Skipping reload (${reason}); last reload was ${now - lastReloadAt}ms ago.`);
     return;
   }
-  lastReloadAt = now;
+  lastReloadByTarget.set(target, now);
   console.warn(`Reloading window due to ${reason}`);
   target.reloadIgnoringCache();
 };
+
+app.on('will-quit', () => {
+  mainWindowLoadRecovery?.dispose();
+  try { rendererSnapshot?.dispose(); } catch { console.warn('[Main] renderer snapshot cleanup failed'); }
+  rendererSnapshot = null;
+});
 
 // 确保应用程序只有一个实例
 const gotTheLock = app.requestSingleInstanceLock();
@@ -4944,6 +4964,8 @@ if (!gotTheLock) {
     fn(`[Renderer][${safeTag}] ${safeMessage}`);
   });
 
+  registerMaasAuth(() => mainWindow);
+
   // Allow renderer to retrieve a buffered auth code on init
   ipcMain.handle(AuthIpcChannel.GetPendingCallback, () =>
     authCallbackRouter.markListenerReadyAndConsumePending());
@@ -4986,6 +5008,7 @@ if (!gotTheLock) {
     const previousAppConfig = key === 'app_config'
       ? getStore().get<AppConfigSettings>('app_config')
       : undefined;
+    if (key === 'app_config') value = lockPlatformConfig(value);
     getStore().set(key, value);
     if (key === 'app_config') {
       const nextAppConfig = value as AppConfigSettings | undefined;
@@ -5212,6 +5235,13 @@ if (!gotTheLock) {
         error: error instanceof Error ? error.message : 'Failed to set prevent-sleep',
       };
     }
+  });
+
+  ipcMain.handle(AppIpcChannel.ReloadWindow, event => {
+    if (!mainWindow || event.sender !== mainWindow.webContents
+      || event.senderFrame !== event.sender.mainFrame || !mainWindowLoadRecovery) return false;
+    mainWindowLoadRecovery.retry();
+    return true;
   });
 
   ipcMain.handle('app:relaunch', () => {
@@ -8886,7 +8916,7 @@ if (!gotTheLock) {
 
       const restoreResult = performDataMigrationRestoreSync({
         userDataPath: app.getPath('userData'),
-        rollbackRootPath: getProductDataPaths(app.getPath('appData')).rollbackRootPath,
+        rollbackRootPath: configuredProductDataPaths.rollbackRootPath,
         archivePath,
       });
       const success = restoreResult?.status === DataMigrationRestoreStatus.Success;
@@ -11134,50 +11164,6 @@ if (!gotTheLock) {
       };
     }
   });
-  // ── Dreaming content display ──────────────────────────────────────────
-  ipcMain.handle('cowork:dreaming:status', async () => {
-    try {
-      const gwClient = openClawRuntimeAdapter?.getGatewayClient();
-      if (!gwClient) {
-        return { success: false, error: 'Gateway client not available' };
-      }
-      const result = await gwClient.request<Record<string, unknown>>(
-        'doctor.memory.status',
-        {},
-        { timeoutMs: 10_000 },
-      );
-      const dreaming = (result as any)?.dreaming;
-      if (!dreaming) {
-        return { success: true, data: null };
-      }
-      return { success: true, data: dreaming };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch dreaming status',
-      };
-    }
-  });
-  ipcMain.handle('cowork:dreaming:diary', async () => {
-    try {
-      const gwClient = openClawRuntimeAdapter?.getGatewayClient();
-      if (!gwClient) {
-        return { success: false, error: 'Gateway client not available' };
-      }
-      const result = await gwClient.request<Record<string, unknown>>(
-        'doctor.memory.dreamDiary',
-        {},
-        { timeoutMs: 10_000 },
-      );
-      return { success: true, data: result };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch dream diary',
-      };
-    }
-  });
-
   ipcMain.handle(CoworkIpcChannel.BootstrapRead, async (
     _event,
     filename: string,
@@ -13331,6 +13317,15 @@ if (!gotTheLock) {
     }
   });
 
+  registerLocalAsrHandlers(() => mainWindow);
+  registerGatewayAsrHandlers(() => mainWindow, () => {
+    const providerId = getStore().get<{ platformProviderId?: string }>('app_config')?.platformProviderId;
+    const provider = resolveAllEnabledProviderConfigs().find(item => item.providerName === providerId);
+    return provider && provider.apiType === 'openai' && provider.authType !== 'oauth' && provider.apiKey
+      ? { baseURL: provider.baseURL, apiKey: provider.apiKey, modelIds: provider.models.map(model => model.id) }
+      : null;
+  });
+
   registerAsrIpcHandlers({
     getAuthTokens,
     fetchWithAuth,
@@ -13879,6 +13874,7 @@ if (!gotTheLock) {
     );
     const { isMaximized: shouldRestoreMaximized, ...initialWindowBounds } = initialWindowState;
 
+    const initialAppearance = getInitialTheme();
     mainWindow = new BrowserWindow({
       ...initialWindowBounds,
       minWidth: MIN_APP_WINDOW_WIDTH,
@@ -13905,6 +13901,7 @@ if (!gotTheLock) {
         sandbox: true,
         webSecurity: true,
         preload: PRELOAD_PATH,
+        additionalArguments: [`${StartupAppearanceArgument}${initialAppearance}`],
         backgroundThrottling: false,
         devTools: isDev,
         spellcheck: false,
@@ -13914,7 +13911,7 @@ if (!gotTheLock) {
         disableDialogs: true,
         navigateOnDragDrop: false,
       },
-      backgroundColor: getInitialTheme() === 'dark' ? '#0F1117' : '#F8F9FB',
+      backgroundColor: startupBackground(initialAppearance),
       show: false,
       autoHideMenuBar: true,
       enableLargerThanScreen: false,
@@ -14000,48 +13997,6 @@ if (!gotTheLock) {
       }
     };
 
-    // Packaged builds keep the bounded watchdog for first launches delayed by
-    // antivirus scanning. Development uses an explicit-failure retry controller
-    // below so an actively loading Vite page is never cancelled by the watchdog.
-    const LOAD_WATCHDOG_DELAYS_MS = [30_000, 45_000, 60_000, 90_000];
-    let loadRecoveryAttempts = 0;
-    let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const clearLoadWatchdog = () => {
-      if (loadWatchdogTimer) {
-        clearTimeout(loadWatchdogTimer);
-        loadWatchdogTimer = null;
-      }
-    };
-
-    const scheduleLoadWatchdog = () => {
-      clearLoadWatchdog();
-      const delay = LOAD_WATCHDOG_DELAYS_MS[
-        Math.min(loadRecoveryAttempts, LOAD_WATCHDOG_DELAYS_MS.length - 1)
-      ];
-      loadWatchdogTimer = setTimeout(() => {
-        loadWatchdogTimer = null;
-        if (!mainWindow || mainWindow.isDestroyed()) return;
-        if (hasRenderedFirstFrame) return;
-        if (!mainWindow.webContents.isLoadingMainFrame()) return;
-        if (loadRecoveryAttempts >= LOAD_WATCHDOG_DELAYS_MS.length) {
-          console.error(
-            `[Main] window still not loaded after ${loadRecoveryAttempts} reload attempts, giving up`,
-          );
-          return;
-        }
-        loadRecoveryAttempts++;
-        console.warn(
-          `[Main] window load watchdog: still loading after ${delay}ms, reload attempt ${loadRecoveryAttempts}/${LOAD_WATCHDOG_DELAYS_MS.length}`,
-        );
-        scheduleReload('load-watchdog');
-        scheduleLoadWatchdog();
-      }, delay);
-    };
-    if (!isDev) {
-      scheduleLoadWatchdog();
-    }
-
     // 兜底显示:首帧迟迟不来时,宁可让用户看到纯背景色的窗口,也不能看起来
     // "应用没打开"。开机自启保持仅托盘,不弹窗。
     const SHOW_FALLBACK_DELAY_MS = 10_000;
@@ -14057,20 +14012,23 @@ if (!gotTheLock) {
     }, SHOW_FALLBACK_DELAY_MS);
 
     let hasOpenedDevelopmentTools = false;
-    const developmentLoadRecovery: DevelopmentMainWindowLoadRecovery | null = isDev
-      ? createDevelopmentMainWindowLoadRecovery({
-          isTargetAvailable: () => !isQuitting && !createdMainWindow.isDestroyed(),
-          loadDevelopmentUrl: () => createdMainWindow.loadURL(DEV_SERVER_URL),
-          loadErrorPage: () => createdMainWindow.loadFile(
-            path.join(__dirname, '../resources/error.html'),
-          ),
-        })
-      : null;
+    const rendererEntry = path.join(__dirname, '../dist/index.html');
+    const loadRenderer = (): Promise<void> => {
+      if (isDev) return createdMainWindow.loadURL(DEV_SERVER_URL);
+      if (!app.isPackaged && !rendererSnapshot) {
+        rendererSnapshot = createRendererSnapshot(path.dirname(rendererEntry), app.getPath('temp'));
+      }
+      return createdMainWindow.loadFile(rendererSnapshot?.entry ?? rendererEntry);
+    };
+    const windowLoadRecovery = createMainWindowLoadRecovery({
+      isTargetAvailable: () => !isQuitting && !createdMainWindow.isDestroyed(),
+      loadPage: loadRenderer,
+      loadErrorPage: () => createdMainWindow.loadFile(path.join(__dirname, '../resources/error.html')),
+    });
+    mainWindowLoadRecovery = windowLoadRecovery;
 
     mainWindow.webContents.on('did-finish-load', () => {
-      developmentLoadRecovery?.handleDidFinishLoad();
-      clearLoadWatchdog();
-      loadRecoveryAttempts = 0;
+      windowLoadRecovery.handleDidFinishLoad();
       markFirstFrameRendered('did-finish-load');
       if (
         shouldOpenDevTools
@@ -14115,68 +14073,29 @@ if (!gotTheLock) {
     mainWindow.webContents.on('render-process-gone', (_event, details) => {
       authCallbackRouter.markRendererUnavailable();
       console.error('Window render process gone:', details);
-      scheduleReload('webContents-crashed');
+      windowLoadRecovery.handleRendererGone(details.reason);
     });
 
-    // Register failure handling before the first navigation. In development,
-    // the controller deduplicates the event and loadURL promise rejection.
-    mainWindow.webContents.on(
-      'did-fail-load',
+    // One controller owns event/promise deduplication, retries, and crash limits.
+    mainWindow.webContents.on('did-fail-load',
       (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-        if (!isMainFrame) return;
-        if (errorCode === MainWindowLoadErrorCode.Aborted) {
-          developmentLoadRecovery?.handleDidFailLoad({
-            errorCode,
-            errorDescription,
-            isMainFrame,
-            validatedUrl: validatedURL,
-          });
-          return;
-        }
-        if (isDev) {
-          developmentLoadRecovery?.handleDidFailLoad({
-            errorCode,
-            errorDescription,
-            isMainFrame,
-            validatedUrl: validatedURL,
-          });
-        } else {
-          console.error('Page failed to load:', errorCode, errorDescription);
-          if (loadRecoveryAttempts >= LOAD_WATCHDOG_DELAYS_MS.length) return;
-          loadRecoveryAttempts++;
-          console.warn(
-            `[Main] retrying window load after failure (attempt ${loadRecoveryAttempts}/${LOAD_WATCHDOG_DELAYS_MS.length})`,
-          );
-          setTimeout(() => {
-            scheduleReload('did-fail-load');
-            scheduleLoadWatchdog();
-          }, 3_000);
-        }
-      },
-    );
-    mainWindow.once('ready-to-show', () => {
-      developmentLoadRecovery?.handleFirstPaint();
-      clearLoadWatchdog();
-    });
+        windowLoadRecovery.handleDidFailLoad({ errorCode, errorDescription, isMainFrame, validatedUrl: validatedURL });
+      });
+    mainWindow.once('ready-to-show', () => windowLoadRecovery.handleFirstPaint());
     mainWindow.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
       if (isMainFrame && !isInPlace) {
+        windowLoadRecovery.handleNavigationStarted();
         isOpenSessionFromNotificationReady = false;
       }
       authCallbackRouter.handleNavigationStarted({ isMainFrame, isInPlace });
     });
 
-    if (isDev) {
-      developmentLoadRecovery?.start();
-    } else {
-      void createdMainWindow.loadFile(path.join(__dirname, '../dist/index.html')).catch(error => {
-        console.error('[Main] failed to start loading the packaged renderer:', error);
-      });
-    }
+    windowLoadRecovery.start();
 
     // 当窗口关闭时，清除引用
     mainWindow.on('closed', () => {
-      developmentLoadRecovery?.dispose();
-      clearLoadWatchdog();
+      windowLoadRecovery.dispose();
+      if (mainWindowLoadRecovery === windowLoadRecovery) mainWindowLoadRecovery = null;
       clearTimeout(showFallbackTimer);
       windowStatePersist.cleanup();
       authCallbackRouter.markRendererUnavailable();
@@ -14640,6 +14559,11 @@ if (!gotTheLock) {
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
     store = await initStore();
+    const storedPlatformConfig = store.get('app_config');
+    if (storedPlatformConfig && typeof storedPlatformConfig === 'object') {
+      const lockedConfig = lockPlatformConfig(storedPlatformConfig);
+      if (JSON.stringify(lockedConfig) !== JSON.stringify(storedPlatformConfig)) store.set('app_config', lockedConfig);
+    }
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
     const libraryLocalStore = new LibraryLocalStore(store.getDatabase());

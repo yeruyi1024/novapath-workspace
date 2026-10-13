@@ -85,7 +85,7 @@ const outcomeMessage = (outcome: BrowserCredentialLoginOutcome): string => {
     case BrowserCredentialLoginOutcome.Denied:
       return 'The user did not allow the Agent to use a saved credential.';
     case BrowserCredentialLoginOutcome.Failed:
-      return 'StarPath could not complete the saved-credential sign-in.';
+      return 'NovaPath could not complete the saved-credential sign-in.';
   }
 };
 
