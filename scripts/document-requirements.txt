@@ -10,3 +10,5 @@ xlsxwriter==3.2.9
 typing-extensions==4.16.0
 et-xmlfile==2.0.0
 charset-normalizer==3.5.2
+pdf2image==1.17.0
+six==1.17.0

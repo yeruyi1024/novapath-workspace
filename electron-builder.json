@@ -42,6 +42,7 @@
     "!**/tsconfig.*.json",
     "!**/*.test.*",
     "!**/*.spec.*",
+    "!archive/legacy-document-skills/**",
     "!**/tests/**",
     "!**/test/**",
     "!**/__tests__/**"

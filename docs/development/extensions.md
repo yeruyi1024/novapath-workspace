@@ -16,6 +16,10 @@
 
 这些能力处理文档文件，不代表直接操控已经打开的 WPS 窗口。标准文档操作无需安装 WPS；旧格式转换、OCR、复杂排版渲染及部分公式计算可能需要额外组件，不能声称所有高级功能已经随包提供。右侧支持 DOCX、XLSX/XLS、CSV/TSV、PPTX、PDF 等已有渲染器；不支持的格式提供系统应用打开入口。
 
+2026-10-15 按用户要求恢复四项原官方工具至正常技能目录，当前本地同步版本为 2.1.1；完整 OOXML 校验、Word 原编辑器、HTML 转 PPT 和 PDF 标注入口重新可执行。用户最新决定为先用原官方技能，自编助手暂停，不作为默认或缺依赖时的兜底；源码暂留待老板决定。功能变化须老板评审，发行许可检查保持阻止状态，当前不得直接打包发布。详见[恢复及验收记录](../../specs/bugfixes/2026-10-15-document-capability-restore.md)。
+
+本地重新准备时，先按各自锁文件执行 `npm ci --prefix SKILLs/docx`、`npm ci --prefix SKILLs/pptx`，再执行 `npm run setup:document-runtime`；不要在活动客户端使用的目录里重建。HTML 转 PPT 需要可用的 Chrome/Chromium，PDF 栅格化需要 Poppler，公式重算需要 LibreOffice；这些外部工具未自动纳入本次安装包。原工作流需要 pandoc/markitdown 等依赖而环境未配置时，应明确说明依赖缺口，不自动改用自编助手或宣称原流程已完整执行。
+
 ## 发布与升级责任
 
 - 随包技能由我们维护版本、测试并随客户端发布；`src/main/skills/skillManager.ts` 负责同步和升级备份恢复。

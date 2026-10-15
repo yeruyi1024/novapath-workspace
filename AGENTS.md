@@ -62,6 +62,13 @@ Extension maintenance and document capability boundaries are recorded in
   A hidden feature is not proof that its storage or runtime code is disposable.
 - Never remove open-source license notices or attribution required by licenses
   when removing old product branding.
+- By user instruction on 2026-10-15, preserve the original document capability
+  range. Functional reductions or replacements require the boss's explicit
+  review before merging. Local restoration is authorized; retain release
+  license checks and do not treat business approval as third-party permission.
+  Use the original official document skills and their tools for now. Custom
+  replacement helpers are paused and must not become defaults or automatic
+  fallbacks; their future and distribution require the boss's decision.
 - Retirement expansion is paused by user instruction on 2026-10-13. Keep
   implementation, disable unwanted behavior, and adapt company services first.
   Do not remove code/resources/tests merely because UI is hidden or imports are

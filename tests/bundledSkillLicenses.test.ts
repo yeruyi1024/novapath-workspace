@@ -16,13 +16,27 @@ afterEach(() => roots.splice(0).forEach(root => fs.rmSync(root, { recursive: tru
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starpath-license-'));
   roots.push(root);
-  for (const skill of ['docx', 'pptx', 'xlsx', 'pdf', 'local-tools']) {
-    fs.cpSync(path.join(repo, 'SKILLs', skill), path.join(root, 'SKILLs', skill), { recursive: true });
+  // A permissive distribution candidate is separate from the restored local
+  // source tree. Keep exercising the unchanged release guard without relabeling
+  // the original third-party materials in the repository.
+  for (const skill of ['docx', 'pptx', 'xlsx', 'pdf']) {
+    const directory = path.join(root, 'SKILLs', skill);
+    fs.mkdirSync(directory, { recursive: true });
+    const version = skill === 'pptx' || skill === 'pdf' ? '2.0.1' : '2.0.0';
+    fs.writeFileSync(path.join(directory, 'SKILL.md'), [
+      '---', `name: ${skill}`, 'description: Distribution test fixture', 'license: MIT',
+      'metadata:', '  author: StarPath', `  version: ${version}`, '---', '',
+    ].join('\n'));
+    fs.copyFileSync(path.join(repo, 'SKILLs', skill, 'LICENSE.starpath.txt'), path.join(directory, 'LICENSE.txt'));
   }
+  fs.cpSync(path.join(repo, 'SKILLs/local-tools'), path.join(root, 'SKILLs/local-tools'), { recursive: true });
   return root;
 }
-test('default document skills pass the ownership guard', () => {
-  expect(verifyBundledSkillLicenses(repo)).toEqual({ documentSkills: 4 });
+test('restored local document skills remain blocked from distribution', () => {
+  expect(() => verifyBundledSkillLicenses(repo)).toThrow('Restricted bundled skill');
+});
+test('a separately prepared permissive candidate passes the unchanged ownership guard', () => {
+  expect(verifyBundledSkillLicenses(fixture())).toEqual({ documentSkills: 4 });
 });
 test('restricted material reintroduced into a bundle blocks packaging', () => {
   const root = fixture();

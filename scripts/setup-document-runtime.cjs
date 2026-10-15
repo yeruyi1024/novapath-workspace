@@ -34,7 +34,7 @@ function verifyPreparedRuntime(runtimeRoot, target) {
     if (metadata.target !== target || metadata.pythonVersion !== manifest.pythonVersion
       || metadata.release !== manifest.release || metadata.archiveSha256 !== manifest.targets[target]?.sha256
       || metadata.requirementsSha256 !== requirementsDigest()) return false;
-    return ['pptx', 'docx', 'openpyxl', 'pypdf', 'reportlab', 'PIL', 'lxml', 'defusedxml']
+    return ['pptx', 'docx', 'openpyxl', 'pypdf', 'reportlab', 'PIL', 'lxml', 'defusedxml', 'pdf2image', 'six.py']
       .every(name => fs.existsSync(path.join(runtimeRoot, siteRelativePath(target), name)));
   } catch { return false; }
 }
@@ -68,7 +68,7 @@ async function ensureDocumentRuntime(target = hostTarget) {
   const output = path.join(base, target);
   if (verifyPreparedRuntime(output, target)) {
     if (target === hostTarget) {
-      runPython(path.join(output, pythonRelativePath(target)), ['-I', '-c', 'import pptx, docx, openpyxl, pypdf, reportlab, PIL, lxml, defusedxml']);
+      runPython(path.join(output, pythonRelativePath(target)), ['-I', '-c', 'import pptx, docx, openpyxl, pypdf, reportlab, PIL, lxml, defusedxml, pdf2image, six']);
       runPython(path.join(output, pythonRelativePath(target)), ['-I', path.join(__dirname, 'verify-document-runtime.py')]);
     }
     console.log(`[document-runtime] Ready: ${target}`);
@@ -90,7 +90,7 @@ async function ensureDocumentRuntime(target = hostTarget) {
       ...targetOptions, '-r', requirementsPath]);
     if (target === hostTarget) {
       runPython(installer, ['-I', '-m', 'pip', 'check']);
-      runPython(installer, ['-I', '-c', 'import pptx, docx, openpyxl, pypdf, reportlab, PIL, lxml, defusedxml']);
+      runPython(installer, ['-I', '-c', 'import pptx, docx, openpyxl, pypdf, reportlab, PIL, lxml, defusedxml, pdf2image, six']);
       runPython(installer, ['-I', path.join(__dirname, 'verify-document-runtime.py')]);
     }
     fs.writeFileSync(path.join(staging, 'starpath-runtime.json'), JSON.stringify({ target,
