@@ -1,8 +1,8 @@
+import { PRODUCT_SERVICES } from '../../shared/product';
 /**
  * 集中管理所有业务 API 端点。
  * 后续新增的业务接口也应在此文件中配置。
  */
-
 import { configService } from './config';
 
 export const isTestModeEnabled = () => {
@@ -10,39 +10,24 @@ export const isTestModeEnabled = () => {
 };
 
 // 自动更新
-export const getUpdateCheckUrl = () => isTestModeEnabled()
-  ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/update'
-  : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/update';
+export const getUpdateCheckUrl = () => PRODUCT_SERVICES.updateUrl;
 
 // 手动检查更新
-export const getManualUpdateCheckUrl = () => isTestModeEnabled()
-  ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/update-manual'
-  : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/update-manual';
+export const getManualUpdateCheckUrl = () => PRODUCT_SERVICES.manualUpdateUrl;
 
-export const getFallbackDownloadUrl = () => isTestModeEnabled()
-  ? 'https://lobsterai.inner.youdao.com/#/download-list'
-  : 'https://lobsterai.youdao.com/#/download-list';
+export const getFallbackDownloadUrl = () => PRODUCT_SERVICES.downloadUrl;
 
 // Skill 商店
-export const getSkillStoreUrl = () => isTestModeEnabled()
-  ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/skill-store'
-  : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/skill-store';
+export const getSkillStoreUrl = () => PRODUCT_SERVICES.skillStoreUrl;
 
 // Kit 商店
-export const getKitStoreUrl = () => isTestModeEnabled()
-  ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/kit-store'
-  : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/kit-store';
+export const getKitStoreUrl = () => PRODUCT_SERVICES.kitStoreUrl;
 
 // 登录地址
-export const getLoginOvermindUrl = () => isTestModeEnabled()
-  ? 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/test/login-url'
-  : 'https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/login-url';
+export const getLoginOvermindUrl = () => PRODUCT_SERVICES.loginConfigUrl;
 
 // Portal 页面
-const PORTAL_BASE_TEST = 'https://lobsterai.inner.youdao.com/portal#';
-const PORTAL_BASE_PROD = 'https://lobsterai.youdao.com/portal#';
-
-const getPortalBase = () => isTestModeEnabled() ? PORTAL_BASE_TEST : PORTAL_BASE_PROD;
+const getPortalBase = () => PRODUCT_SERVICES.portalBaseUrl;
 
 export const PortalPricingKeyfrom = {
   HtmlShare: 'html_share',
@@ -87,7 +72,7 @@ export const getClientBannerTargetUrl = (linkUrl: string, description: string): 
   if (!linkUrl) return describesTrial ? getPortalSubscriptionTrialUrl() : getPortalInvitationUrl();
   try {
     const url = new URL(linkUrl);
-    if (![new URL(PORTAL_BASE_TEST).origin, new URL(PORTAL_BASE_PROD).origin].includes(url.origin)) return linkUrl;
+    if (![new URL(getPortalBase()).origin].includes(url.origin)) return linkUrl;
     const hashRoute = url.hash.startsWith('#/');
     const route = new URL(hashRoute ? url.hash.slice(1) : url.pathname + url.search, url.origin);
     const isPricing = hashRoute

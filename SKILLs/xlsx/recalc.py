@@ -9,16 +9,15 @@ import sys
 import subprocess
 import os
 import platform
+import tempfile
+import shutil
 from pathlib import Path
 from openpyxl import load_workbook
 
 
-def setup_libreoffice_macro():
+def setup_libreoffice_macro(profile_root):
     """Setup LibreOffice macro for recalculation if not already configured"""
-    if platform.system() == 'Darwin':
-        macro_dir = os.path.expanduser('~/Library/Application Support/LibreOffice/4/user/basic/Standard')
-    else:
-        macro_dir = os.path.expanduser('~/.config/libreoffice/4/user/basic/Standard')
+    macro_dir = str(Path(profile_root) / 'user' / 'basic' / 'Standard')
     
     macro_file = os.path.join(macro_dir, 'Module1.xba')
     
@@ -28,7 +27,7 @@ def setup_libreoffice_macro():
                 return True
     
     if not os.path.exists(macro_dir):
-        subprocess.run(['soffice', '--headless', '--terminate_after_init'], 
+        subprocess.run(['soffice', f'-env:UserInstallation={Path(profile_root).as_uri()}', '--headless', '--terminate_after_init'],
                       capture_output=True, timeout=10)
         os.makedirs(macro_dir, exist_ok=True)
     
@@ -51,6 +50,13 @@ def setup_libreoffice_macro():
 
 
 def recalc(filename, timeout=30):
+    # Preserve the original entrypoint while keeping macro setup away from the
+    # user's LibreOffice profile and any concurrently running office process.
+    with tempfile.TemporaryDirectory(prefix='novapath-legacy-recalc-') as profile_root:
+        return _recalc_with_profile(filename, timeout, profile_root)
+
+
+def _recalc_with_profile(filename, timeout, profile_root):
     """
     Recalculate formulas in Excel file and report any errors
     
@@ -64,15 +70,18 @@ def recalc(filename, timeout=30):
     if not Path(filename).exists():
         return {'error': f'File {filename} does not exist'}
     
-    abs_path = str(Path(filename).absolute())
-    
-    if not setup_libreoffice_macro():
-        return {'error': 'Failed to setup LibreOffice macro'}
+    abs_path = str(Path(filename).resolve())
+    source = Path(abs_path)
+    inputs = Path(profile_root) / 'input'
+    outputs = Path(profile_root) / 'output'
+    inputs.mkdir()
+    outputs.mkdir()
+    shutil.copy2(source, inputs / source.name)
     
     cmd = [
-        'soffice', '--headless', '--norestore',
-        'vnd.sun.star.script:Standard.Module1.RecalculateAndSave?language=Basic&location=application',
-        abs_path
+        'soffice', f'-env:UserInstallation={(Path(profile_root) / "profile").as_uri()}',
+        '--headless', '--norestore', '--convert-to', source.suffix.lstrip('.'),
+        '--outdir', str(outputs), str(inputs / source.name)
     ]
     
     # Handle timeout command differences between Linux and macOS
@@ -89,14 +98,28 @@ def recalc(filename, timeout=30):
         if timeout_cmd:
             cmd = [timeout_cmd, str(timeout)] + cmd
     
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return {'error': 'LibreOffice recalculation timed out'}
     
     if result.returncode != 0 and result.returncode != 124:  # 124 is timeout exit code
-        error_msg = result.stderr or 'Unknown error during recalculation'
-        if 'Module1' in error_msg or 'RecalculateAndSave' not in error_msg:
-            return {'error': 'LibreOffice macro not configured properly'}
-        else:
-            return {'error': error_msg}
+        return {'error': result.stderr or 'LibreOffice recalculation failed'}
+
+    generated = outputs / source.name
+    if not generated.is_file():
+        return {'error': 'LibreOffice did not produce a recalculated workbook'}
+    load_workbook(generated, read_only=True, data_only=True).close()
+    staged_path = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=source.parent, suffix=source.suffix, delete=False) as staged:
+            staged_path = Path(staged.name)
+            with generated.open('rb') as stream:
+                shutil.copyfileobj(stream, staged)
+        os.replace(staged_path, source)
+    finally:
+        if staged_path:
+            staged_path.unlink(missing_ok=True)
     
     # Check for Excel errors in the recalculated file - scan ALL cells
     try:

@@ -5,6 +5,24 @@ import { describe, expect, test } from 'vitest';
 import Toast from './Toast';
 
 describe('Toast', () => {
+  test('renders a successful sign-in as non-blocking status feedback', () => {
+    const html = renderToStaticMarkup(React.createElement(Toast, {
+      message: '登录成功', closeLabel: '关闭', tone: 'success',
+    }));
+    expect(html).toContain('登录成功');
+    expect(html).toContain('role="status"');
+    expect(html).not.toContain('role="alert"');
+    expect(html).not.toContain('fixed inset-0');
+  });
+  test('announces errors with a distinct icon and does not add a blocking overlay', () => {
+    const html = renderToStaticMarkup(React.createElement(Toast, {
+      message: '文件不存在', closeLabel: '关闭', tone: 'error', onClose: () => {},
+    }));
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('aria-live="assertive"');
+    expect(html).toContain('bg-destructive/10');
+    expect(html).not.toContain('fixed inset-0');
+  });
   test('renders non-blocking feedback without a modal backdrop', () => {
     const html = renderToStaticMarkup(React.createElement(Toast, {
       message: '消息已复制',

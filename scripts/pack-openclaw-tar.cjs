@@ -35,10 +35,6 @@ const EXCLUDED_FILE_PATTERNS = [
   /^readme(\.(md|txt|rst))?$/i,
   /^changelog(\.(md|txt|rst))?$/i,
   /^history(\.(md|txt|rst))?$/i,
-  /^license(\.(md|txt))?$/i,
-  /^licence(\.(md|txt))?$/i,
-  /^authors(\.(md|txt))?$/i,
-  /^contributors(\.(md|txt))?$/i,
   /^\.eslintrc/i,
   /^\.prettierrc/i,
   /^\.editorconfig$/i,
@@ -55,6 +51,7 @@ const EXCLUDED_FILE_PATTERNS = [
 ];
 
 const EXCLUDED_DIRS = new Set([
+  '__pycache__',
   'test',
   'tests',
   '__tests__',

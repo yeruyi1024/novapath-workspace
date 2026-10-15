@@ -44,15 +44,25 @@ export const startRealtimeVoiceRecording = async ({
     },
   });
 
-  const audioContext = new AudioContextImpl();
-  if (audioContext.state === 'suspended') {
-    await audioContext.resume();
+  let audioContext: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode;
+  let processor: ScriptProcessorNode;
+  let mutedOutput: GainNode;
+  try {
+    audioContext = new AudioContextImpl();
+    if (audioContext.state === 'suspended') await audioContext.resume();
+    source = audioContext.createMediaStreamSource(stream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+    mutedOutput = audioContext.createGain();
+    mutedOutput.gain.value = 0;
+  } catch (error) {
+    stream.getTracks().forEach(track => track.stop());
+    if (audioContext) await audioContext.close().catch(() => undefined);
+    throw error;
   }
-
-  const source = audioContext.createMediaStreamSource(stream);
-  const processor = audioContext.createScriptProcessor(4096, 1, 1);
-  const mutedOutput = audioContext.createGain();
-  mutedOutput.gain.value = 0;
+  const context = audioContext;
+  let closePromise: Promise<void> | null = null;
+  const closeContext = () => closePromise ??= context.close();
 
   const pendingChunks: Float32Array[] = [];
   let pendingSourceSamples = 0;
@@ -60,7 +70,7 @@ export const startRealtimeVoiceRecording = async ({
   let stopped = false;
   const minSourceSamplesPerChunk = Math.max(
     1,
-    Math.round(audioContext.sampleRate * (chunkIntervalMillis / 1000)),
+    Math.round(context.sampleRate * (chunkIntervalMillis / 1000)),
   );
 
   const flush = () => {
@@ -68,7 +78,7 @@ export const startRealtimeVoiceRecording = async ({
     const merged = mergeAudioChunks(pendingChunks);
     pendingChunks.length = 0;
     pendingSourceSamples = 0;
-    const resampled = resampleLinear(merged, audioContext.sampleRate, VOICE_INPUT_TARGET_SAMPLE_RATE);
+    const resampled = resampleLinear(merged, context.sampleRate, VOICE_INPUT_TARGET_SAMPLE_RATE);
     if (resampled.length === 0) return;
     outputSampleCount += resampled.length;
     const pcmBytes = encodePcm16Bytes(resampled);
@@ -87,31 +97,37 @@ export const startRealtimeVoiceRecording = async ({
     }
   };
 
-  source.connect(processor);
-  processor.connect(mutedOutput);
-  mutedOutput.connect(audioContext.destination);
-
   const cleanup = () => {
     if (stopped) return;
     stopped = true;
-    processor.disconnect();
-    source.disconnect();
-    mutedOutput.disconnect();
+    processor.onaudioprocess = null;
+    for (const node of [processor, source, mutedOutput]) {
+      try { node.disconnect(); } catch { /* Release remaining nodes and microphone even after a graph error. */ }
+    }
     stream.getTracks().forEach((track) => track.stop());
   };
+
+  try {
+    source.connect(processor);
+    processor.connect(mutedOutput);
+    mutedOutput.connect(context.destination);
+  } catch (error) {
+    cleanup();
+    await closeContext().catch(() => undefined);
+    throw error;
+  }
 
   return {
     stop: async () => {
       cleanup();
-      flush();
-      await audioContext.close();
+      try { flush(); } finally { await closeContext(); }
       if (outputSampleCount < VOICE_INPUT_TARGET_SAMPLE_RATE * (VOICE_INPUT_MIN_RECORDING_MS / 1000)) {
         throw new AsrClientError(i18nService.t('voiceInputNoAudioCaptured'));
       }
     },
     cancel: () => {
       cleanup();
-      void audioContext.close();
+      void closeContext().catch(() => undefined);
     },
     getOutputSampleCount: () => outputSampleCount,
   };

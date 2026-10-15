@@ -3,6 +3,7 @@ import {
   DecisionModelProvider,
   type DecisionModelTestResult,
 } from '../../shared/decisionModel/constants';
+import { PRODUCT } from '../../shared/product';
 import { type DecisionModelConfig, isValidDecisionEndpoint } from './decisionModelConfig';
 
 export const TYPESAFE_SYSTEM_ONE_URL = 'https://api.typesafe.ai/v1/systemone';
@@ -13,8 +14,8 @@ export const JEV_LATEST_MODEL = 'jev-latest';
 export const OPENROUTER_JEV_MODEL = 'typesafe/jev-1.13';
 
 // OpenRouter attributes requests to the calling app through these headers.
-const OPENROUTER_APP_REFERER = 'https://lobsterai.youdao.com';
-const OPENROUTER_APP_TITLE = 'LobsterAI';
+const OPENROUTER_APP_REFERER = 'https://openrouter.ai';
+const OPENROUTER_APP_TITLE = PRODUCT.name;
 
 export const DEFAULT_DECISION_TIMEOUT_MS = 30_000;
 const CONNECTION_TEST_TIMEOUT_MS = 20_000;

@@ -1,23 +1,28 @@
+import { app } from 'electron';
 import { expect, test, vi } from 'vitest';
 
 vi.mock('electron', () => ({
-  app: { getAppPath: () => process.cwd(), getPath: () => '/tmp' },
+  app: { getAppPath: () => process.cwd(), getPath: () => '/tmp', getLocale: vi.fn(() => 'en-US') },
 }));
 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { PRODUCT } from '../../shared/product';
 import {
   addMemoryEntry,
   deleteMemoryEntry,
+  ensureDefaultIdentity,
   migrateSqliteToMemoryMd,
   parseMemoryMd,
+  readBootstrapFile,
   readMemoryFileRaw,
   resolveMemoryFilePath,
   searchMemoryEntries,
   serializeMemoryMd,
   updateMemoryEntry,
+  writeBootstrapFile,
   writeMemoryFileRaw,
 } from './openclawMemoryFile';
 
@@ -34,6 +39,77 @@ function cleanupDir(dir: string) {
 function memFilePath(dir: string) {
   return path.join(dir, 'MEMORY.md');
 }
+
+test.each(['zh-CN', 'en-US'])('new identity uses the product brand for %s', locale => {
+  const dir = makeTmpDir();
+  vi.mocked(app.getLocale).mockReturnValue(locale);
+  try {
+    ensureDefaultIdentity(dir);
+    const identity = fs.readFileSync(path.join(dir, 'IDENTITY.md'), 'utf8');
+    expect(identity).toContain(locale.startsWith('zh') ? PRODUCT.name : PRODUCT.englishName);
+    expect(identity).not.toMatch(/LobsterAI|网易|NetEase|Youdao|24\/7|7×24/);
+  } finally {
+    vi.mocked(app.getLocale).mockReturnValue('en-US');
+    cleanupDir(dir);
+  }
+});
+
+test.each([
+  '你的名字是 LobsterAI，一个由网易有道开发的全场景个人助理 Agent。你 7×24 小时在线，能够自主处理日常生产力任务，包括数据分析、PPT 制作、视频生成、文档撰写、信息搜索、邮件工作流、定时任务等。你和用户共享同一个工作空间，协同完成用户的目标。',
+  'Your name is LobsterAI, a full-scenario personal assistant agent developed by NetEase Youdao. You are available 24/7 and can autonomously handle everyday productivity tasks, including data analysis, PPT creation, video generation, document writing, information search, email workflows, scheduled jobs, and more. You and the user share the same workspace, collaborating to achieve the user\'s goals.',
+])('migrates an untouched historical identity while preserving adjacent workspace files', legacy => {
+  const dir = makeTmpDir();
+  try {
+    writeBootstrapFile(dir, 'IDENTITY.md', `\n${legacy}\n`);
+    writeBootstrapFile(dir, 'USER.md', 'User-specific preferences');
+    writeBootstrapFile(dir, 'SOUL.md', 'Custom behavioral instructions');
+    writeMemoryFileRaw(memFilePath(dir), '- Remember my project');
+    const memoryBefore = readMemoryFileRaw(memFilePath(dir));
+    ensureDefaultIdentity(dir);
+    const identity = fs.readFileSync(path.join(dir, 'IDENTITY.md'), 'utf8');
+    expect(identity).toContain(PRODUCT.englishName);
+    expect(identity).not.toMatch(/LobsterAI|NetEase|网易/);
+    ensureDefaultIdentity(dir);
+    expect(fs.readFileSync(path.join(dir, 'IDENTITY.md'), 'utf8')).toBe(identity);
+    expect(fs.readFileSync(path.join(dir, 'USER.md'), 'utf8')).toBe('User-specific preferences');
+    expect(fs.readFileSync(path.join(dir, 'SOUL.md'), 'utf8')).toBe('Custom behavioral instructions');
+    expect(readMemoryFileRaw(memFilePath(dir))).toBe(memoryBefore);
+  } finally { cleanupDir(dir); }
+});
+
+test('preserves a customized identity even if it mentions the historical vendor', () => {
+  const dir = makeTmpDir();
+  const custom = '# My assistant\nI previously used LobsterAI from NetEase.\nUse my custom project instructions.\n';
+  try {
+    writeBootstrapFile(dir, 'IDENTITY.md', custom);
+    ensureDefaultIdentity(dir);
+    expect(fs.readFileSync(path.join(dir, 'IDENTITY.md'), 'utf8')).toBe(custom);
+  } finally { cleanupDir(dir); }
+});
+
+test.each(['untouched', 'filled', 'extended', 'missing-runtime'])('handles the runtime identity template conservatively: %s', variant => {
+  const dir = makeTmpDir();
+  const runtime = path.join(dir, 'runtime');
+  const templateDir = path.join(runtime, 'docs', 'reference', 'templates');
+  const body = '# IDENTITY.md - Who Am I?\n\n- **Name:**\n  _(pick something you like)_\n';
+  const custom = variant === 'filled' ? body.replace('**Name:**', '**Name:** My assistant')
+    : variant === 'extended' ? `${body}\nKeep my custom instructions.\n` : body;
+  try {
+    if (variant !== 'missing-runtime') {
+      fs.mkdirSync(templateDir, { recursive: true });
+      fs.writeFileSync(path.join(templateDir, 'IDENTITY.md'), `---\nsummary: Default template\n---\n\n${body}`);
+    }
+    writeBootstrapFile(dir, 'IDENTITY.md', custom);
+    writeBootstrapFile(dir, 'USER.md', 'User preferences');
+    writeBootstrapFile(dir, 'SOUL.md', 'Custom behavior');
+    ensureDefaultIdentity(dir, runtime);
+    const identity = readBootstrapFile(dir, 'IDENTITY.md');
+    if (variant === 'untouched') expect(identity).toContain(PRODUCT.englishName);
+    else expect(identity).toBe(custom);
+    expect(readBootstrapFile(dir, 'USER.md')).toBe('User preferences');
+    expect(readBootstrapFile(dir, 'SOUL.md')).toBe('Custom behavior');
+  } finally { cleanupDir(dir); }
+});
 
 // ==================== parseMemoryMd ====================
 

@@ -3,6 +3,14 @@
 const path = require('path');
 
 const config = require('../electron-builder.json');
+const product = require('../src/shared/product/product.json');
+config.productName = product.name;
+config.executableName = product.englishName;
+config.appId = product.appId;
+config.linux = {
+  ...config.linux,
+  desktop: { ...config.linux.desktop, Name: product.name },
+};
 const { BuildEnv } = require('./build-env.cjs');
 const { readBuildKeyfrom } = require('./build-keyfrom.cjs');
 const { configureMacWebAuthnEntitlements } = require('./mac-webauthn-entitlements.cjs');
@@ -101,15 +109,22 @@ const silentOnDoubleClick = isChannelBuild && isTruthyBuildEnv(BuildEnv.SilentOn
 
 for (const platformName of ['mac', 'win', 'linux']) {
   mergeExtraResources(platformName);
+  config[platformName].extraResources.push({
+    from: `resources/document-runtime/${platformName}-\${arch}`,
+    to: 'document-runtime',
+    filter: ['**/*', '!**/__pycache__/**'],
+  });
+  config[platformName].extraResources.push({
+    from: `resources/asr-runtime/${platformName}-\${arch}`,
+    to: 'asr-runtime',
+    filter: ['**/*', '!model.bin'],
+  });
 }
 
 configureMacWebAuthnEntitlements(config, process.env.APPLE_TEAM_ID);
 
-// Sign every Windows binary electron-builder produces (LobsterAI.exe, the
-// uninstaller, the installer) through the internal Youdao signing service,
-// not just the final Setup.exe: the unsigned inner exe is what security
-// software freezes on first execution. The hook skips with a warning when
-// YD_SIGN_* credentials are absent, so local packaging still works.
+// Optional company signing for every Windows binary, using explicit
+// STARPATH_SIGN_* credentials. Local packaging skips signing when unset.
 config.win = {
   ...config.win,
   sign: path.join(__dirname, 'win-sign.cjs'),
@@ -119,12 +134,12 @@ delete config.extraResources;
 
 config.dmg = {
   ...(config.dmg || {}),
-  artifactName: `LobsterAI-darwin-\${arch}-\${version}-${keyfrom}.\${ext}`,
+  artifactName: `${product.slug}-darwin-\${arch}-\${version}-${keyfrom}.\${ext}`,
 };
 
 config.nsis = {
   ...(config.nsis || {}),
-  artifactName: `LobsterAI-Setup-\${arch}-\${version}-${keyfrom}${silentOnDoubleClick ? '-silent' : ''}.\${ext}`,
+  artifactName: `${product.slug}-Setup-\${arch}-\${version}-${keyfrom}${silentOnDoubleClick ? '-silent' : ''}.\${ext}`,
 };
 
 if (isWebInstallerEnabled()) {
@@ -137,7 +152,7 @@ if (isWebInstallerEnabled()) {
   };
   config.nsisWeb = {
     appPackageUrl: resolveWebPackageUrl(keyfrom),
-    artifactName: `LobsterAI-WebSetup-\${arch}-\${version}-${keyfrom}${silentOnDoubleClick ? '-silent' : ''}.\${ext}`,
+    artifactName: `${product.slug}-WebSetup-\${arch}-\${version}-${keyfrom}${silentOnDoubleClick ? '-silent' : ''}.\${ext}`,
   };
   console.log(`[WebInstaller] nsis-web target enabled, app package url: ${config.nsisWeb.appPackageUrl}`);
 }

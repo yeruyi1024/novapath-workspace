@@ -1,16 +1,9 @@
 import React from 'react';
 
-const PromptAddIcon: React.FC<{ className?: string }> = ({ className }) => {
-  return (
-    <svg className={className} viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path
-        d="M17 7V27M7 17H27"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-};
+const PromptAddIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 4v16M4 12h16" />
+  </svg>
+);
 
 export default PromptAddIcon;

@@ -3,7 +3,21 @@ name: xlsx
 description: "Comprehensive spreadsheet creation, editing, and analysis with support for formulas, formatting, data analysis, and visualization. When Claude needs to work with spreadsheets (.xlsx, .xlsm, .csv, .tsv, etc) for: (1) Creating new spreadsheets with formulas and formatting, (2) Reading or analyzing data, (3) Modify existing spreadsheets while preserving formulas, (4) Data analysis and visualization in spreadsheets, or (5) Recalculating formulas"
 license: Proprietary. LICENSE.txt has complete terms
 official: true
+metadata:
+  version: 2.1.1
 ---
+
+## 星途本地恢复运行说明
+
+本版本按用户要求恢复原有办公能力，保留原始许可与正文；发行方案待负责人确认。以下本地运行约定优先于后文的环境安装示例：
+
+- Python 使用 `"$STARPATH_PYTHON"`（由应用准备的文档 Python），脚本路径从 `$SKILLS_ROOT/xlsx` 解析。
+- Node 脚本通过 `NODE_PATH="$SKILLS_ROOT/xlsx/node_modules" node <脚本>` 加载本技能依赖，或从该目录用绝对路径 require；无需全局 npm 安装。
+- `pandoc`、LibreOffice、Poppler 等外部转换工具使用已配置的本地可执行文件；缺少时明确报错，不把未执行写成成功。
+- 按用户最新决定，默认遵循下文原官方技能正文及其附带工具；暂停自编替代方案，不自动切换到简化助手。缺少原流程依赖时明确说明需要补齐，不以减少功能的流程代替。
+- 原 API、模板、验证能力与许可证保留。自编助手源码暂存待老板决定，其独立许可 `LICENSE.starpath.txt` 不覆盖原官方材料，也不代表启用该替代方案。
+
+
 
 # Requirements for Outputs
 
@@ -136,7 +150,7 @@ This applies to ALL calculations - totals, percentages, ratios, differences, etc
    ```bash
    python recalc.py output.xlsx
    ```
-6. **Verify and fix any errors**: 
+6. **Verify and fix any errors**:
    - The script returns JSON with error details
    - If `status` is `errors_found`, check `error_summary` for specific error types and locations
    - Fix the identified errors and recalculate again
@@ -233,7 +247,7 @@ Quick checks to ensure formulas work correctly:
 
 ### Common Pitfalls
 - [ ] **NaN handling**: Check for null values with `pd.notna()`
-- [ ] **Far-right columns**: FY data often in columns 50+ 
+- [ ] **Far-right columns**: FY data often in columns 50+
 - [ ] **Multiple matches**: Search all occurrences, not just first
 - [ ] **Division by zero**: Check denominators before using `/` in formulas (#DIV/0!)
 - [ ] **Wrong references**: Verify all cell references point to intended cells (#REF!)

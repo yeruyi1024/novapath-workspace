@@ -50,10 +50,9 @@ const makeItem = (itemKind: LibraryItemKind): LibraryItem => ({
 }) as LibraryItem;
 
 describe('library item action policy', () => {
-  test('uses the overflow menu for local file management instead of preview', () => {
+  test('keeps local file actions without offering new file sharing', () => {
     const actions = getLibraryCardActionIds(makeItem(LibraryItemKind.LocalArtifact));
     expect(actions).toEqual([
-      LibraryItemAction.ShareLocal,
       LibraryItemAction.ToggleFavorite,
       LibraryItemAction.OpenWithApp,
       LibraryItemAction.RevealLocal,
@@ -96,10 +95,7 @@ describe('library item action policy', () => {
     const item = makeItem(LibraryItemKind.LocalArtifact);
     const cardActions = getLibraryCardActionIds(item);
     const previewActions = getLibraryPreviewActionIds(item);
-    expect(cardActions.filter(action => (
-      action !== LibraryItemAction.ShareLocal
-      && action !== LibraryItemAction.ToggleFavorite
-    ))).toEqual(previewActions);
+    expect(cardActions.filter(action => action !== LibraryItemAction.ToggleFavorite)).toEqual(previewActions);
   });
 
   test('omits related sessions when an item has no relation', () => {

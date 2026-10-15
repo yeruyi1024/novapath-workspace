@@ -1,9 +1,8 @@
 {
-  "name": "lobsterai",
+  "name": "novapath",
   "private": true,
   "author": {
-    "name": "LobsterAI",
-    "email": "lobsterai.project@rd.netease.com"
+    "name": "NovaPath"
   },
   "license": "MIT",
   "version": "2026.9.23",
@@ -87,18 +86,22 @@
         "npm": "moltbot-popo",
         "version": "2.1.13",
         "registry": "https://npm.nie.netease.com",
+        "installByDefault": false,
         "optional": true
       },
       {
         "id": "openclaw-nim-channel",
         "npm": "git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1",
         "version": "1.1.1",
+        "installByDefault": false,
         "optional": true
       },
       {
         "id": "openclaw-netease-bee",
         "npm": "openclaw-netease-bee",
-        "version": "0.1.3"
+        "version": "0.1.3",
+        "optional": true,
+        "installByDefault": false
       },
       {
         "id": "clawemail-email",
@@ -153,7 +156,7 @@
     "build:skill:email": "npm ci --prefix SKILLs/imap-smtp-email --omit=dev --no-audit --no-fund",
     "build:skills": "npm run build:skill:web-search && npm run build:skill:tech-news && npm run build:skill:email",
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron .",
-    "wait:electron:dev": "wait-on -v -t 120000 http://localhost:5175 dist-electron/main.js dist-electron/preload.js dist-electron/browserAnnotationPreload.js dist-electron/agentBrowserCredentialPreload.js dist-electron/manualCredentialCapturePreload.js",
+    "wait:electron:dev": "wait-on -v -t 120000 http://localhost:5175 dist-electron/.vite-electron-ready dist-electron/main.js dist-electron/preload.js dist-electron/browserAnnotationPreload.js dist-electron/agentBrowserCredentialPreload.js dist-electron/manualCredentialCapturePreload.js",
     "electron:dev": "rimraf dist-electron && npm run compile:electron && concurrently --kill-others \"vite --port 5175 --strictPort\" \"npm run wait:electron:dev && npm run start:electron\"",
     "electron:dev:inspect": "cross-env ELECTRON_OPEN_DEVTOOLS=1 npm run electron:dev",
     "electron:dev:openclaw": "npm run openclaw:runtime:host && npm run electron:dev",
@@ -175,6 +178,8 @@
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
     "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "node scripts/setup-python-runtime.js",
+    "setup:document-runtime": "node scripts/setup-document-runtime.cjs",
+    "setup:local-asr": "node scripts/setup-local-asr-runtime.cjs",
     "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
     "openclaw:patch": "node scripts/apply-openclaw-patches.cjs",
     "verify:installer-patches": "node scripts/verify-installer-patches.cjs",

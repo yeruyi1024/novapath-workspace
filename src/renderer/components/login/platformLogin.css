@@ -1,0 +1,194 @@
+.platform-welcome {
+  background:
+    radial-gradient(ellipse 65% 55% at 12% 18%, var(--lobster-primary-muted) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 88% 82%, var(--lobster-primary-muted) 0%, transparent 60%),
+    var(--lobster-background);
+}
+
+.platform-login-card {
+  min-width: 0;
+  padding: 38px 36px;
+  border: 1px solid var(--lobster-border);
+  border-radius: 22px;
+  background: var(--lobster-surface);
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.1), 0 4px 16px rgba(0, 0, 0, 0.03);
+}
+
+.platform-login-dialog {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+
+.platform-login-password {
+  position: relative;
+}
+
+.platform-login-password input {
+  padding-right: 46px;
+}
+
+.platform-login-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+  color: var(--lobster-text-secondary);
+  transform: translateY(-50%);
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.platform-login-password-toggle:hover:not(:disabled) {
+  background: var(--lobster-surface-raised);
+  color: var(--lobster-foreground);
+}
+
+.platform-login-form button:focus-visible {
+  outline: 2px solid var(--lobster-primary);
+  outline-offset: 3px;
+}
+
+.platform-login-form input:focus-visible {
+  outline: none;
+}
+
+.platform-login-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--lobster-primary-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.platform-login-eyebrow-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.platform-login-security {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--lobster-border-subtle);
+  color: var(--lobster-text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.platform-login-loading {
+  display: flex;
+  min-height: 280px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.platform-login-input {
+  display: block;
+  width: 100%;
+  height: 40px;
+  margin-top: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--lobster-input-border);
+  border-radius: 10px;
+  outline: none;
+  background: var(--lobster-background);
+  color: var(--lobster-foreground);
+  font-size: 13px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, background-color 150ms ease;
+}
+
+.platform-login-input::placeholder {
+  color: var(--lobster-text-muted);
+  opacity: 0.75;
+}
+
+.platform-login-input:hover:not(:disabled) {
+  border-color: var(--lobster-border);
+}
+
+.platform-login-input:focus {
+  border-color: var(--lobster-primary);
+  box-shadow: 0 0 0 3px var(--lobster-primary-muted);
+}
+
+.platform-login-input:disabled {
+  opacity: 0.55;
+}
+
+.platform-login-submit {
+  box-shadow: 0 4px 12px var(--lobster-primary-muted);
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
+}
+
+.platform-login-submit:hover:not(:disabled) {
+  box-shadow: 0 6px 18px var(--lobster-primary-muted);
+}
+
+.platform-login-submit:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.platform-login-sms-btn {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 100ms ease;
+}
+
+.platform-login-sms-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+@media (max-width: 959px) {
+  .platform-login-card {
+    padding: 28px 24px;
+  }
+}
+
+@media (max-width: 767px) {
+  .platform-login-card {
+    width: 100%;
+    max-width: 440px;
+    justify-self: center;
+    padding: 28px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-login-input,
+  .platform-login-submit,
+  .platform-login-sms-btn {
+    transition: none;
+  }
+}
+
+.platform-login-sms-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--lobster-primary-muted);
+  background: var(--lobster-primary-muted);
+  color: var(--lobster-primary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.platform-login-sms-btn:disabled {
+  font-weight: 400;
+  color: var(--lobster-text-secondary);
+}

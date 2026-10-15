@@ -1,0 +1,12 @@
+{
+  "engineVersion": "v1.9.5",
+  "sourceUrl": "https://codeload.github.com/ggml-org/whisper.cpp/tar.gz/refs/tags/v1.9.5",
+  "sourceSha256": "ff1a9053feb509ff9d7729703355541ae9690073a6b1c40eb692c962e0dc1720",
+  "model": {
+    "id": "whisper-small-q5_1",
+    "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin",
+    "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+    "bytes": 190085487
+  },
+  "targets": ["mac-arm64", "mac-x64", "win-x64", "win-arm64", "linux-x64", "linux-arm64"]
+}

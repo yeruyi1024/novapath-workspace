@@ -2,7 +2,10 @@
 name: "playwright"
 description: "Use when the task requires automating a real browser from the terminal (navigation, form filling, snapshots, screenshots, data extraction, UI-flow debugging) via `playwright-cli` or the bundled wrapper script."
 official: true
+version: 2.0.0
 ---
+
+星途维护说明：本文件已调整助手名称或运行路径说明；上游许可证与版权归属保留在原许可文件中。
 
 
 # Playwright CLI Skill
@@ -35,11 +38,11 @@ Once `npx` is present, proceed with the wrapper script. A global install of `pla
 ## Skill path (set once)
 
 ```bash
-export SKILLS_ROOT="${LOBSTERAI_SKILLS_ROOT:-${SKILLS_ROOT:-$HOME/Library/Application Support/LobsterAI/SKILLs}}"
+export SKILLS_ROOT="${SKILLS_ROOT:?Use the skills directory provided by the application}"
 export PWCLI="$SKILLS_ROOT/playwright/scripts/playwright_cli.sh"
 ```
 
-Installed skills resolve from `$LOBSTERAI_SKILLS_ROOT` / `$SKILLS_ROOT` (production default: app `userData/SKILLs`, macOS usually `~/Library/Application Support/LobsterAI/SKILLs`).
+Installed skills resolve from `$SKILLS_ROOT`, supplied by the application for the current operating system. Do not guess a platform-specific installation path.
 
 ## Quick start
 

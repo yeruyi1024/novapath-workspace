@@ -10,6 +10,7 @@ import {
   resolveModelRuntimeProfile,
 } from '@shared/providers';
 
+import { lockPlatformConfig } from '../../shared/auth/platformConfig';
 import { normalizeBrowserWebAccessConfig } from '../../shared/browserWebAccess/constants';
 import { normalizeNotificationSettings } from '../../shared/notifications/constants';
 import {
@@ -21,6 +22,7 @@ import {
   isCustomProvider,
   normalizeFontPreference,
   resolveArtifactAutoPreviewEnabled,
+  RetiredSettingsShortcut,
   ShortcutAction,
   type ShortcutConfig,
   UI_FONT_SIZE_MIGRATION_VERSION,
@@ -223,6 +225,10 @@ const normalizeShortcutsConfig = (storedShortcuts?: AppConfig['shortcuts']): Sho
     ...defaultConfig.shortcuts!,
     ...(storedShortcuts ?? {}),
   } as ShortcutConfig;
+
+  Object.values(RetiredSettingsShortcut).forEach(action => {
+    delete shortcuts[action];
+  });
 
   if (!storedShortcuts) {
     return shortcuts;
@@ -657,7 +663,12 @@ const hydrateStoredConfig = (storedConfig: AppConfig): AppConfig => {
   // Migrate model.defaultModel if it was removed
   const allRemovedIds = Object.values(REMOVED_PROVIDER_MODELS).flat();
   const migratedModel = { ...defaultConfig.model, ...storedConfig.model };
-  if (allRemovedIds.includes(migratedModel.defaultModel)) {
+  // A gateway may legitimately keep a model removed from a built-in catalog.
+  // Apply retirement only to the selected provider, retaining legacy id-only migration.
+  const removedDefaultIds = migratedModel.defaultModelProvider
+    ? REMOVED_PROVIDER_MODELS[migratedModel.defaultModelProvider] ?? []
+    : allRemovedIds;
+  if (removedDefaultIds.includes(migratedModel.defaultModel)) {
     migratedModel.defaultModel = defaultConfig.model.defaultModel;
   }
   if (migratedModel.availableModels) {
@@ -680,6 +691,7 @@ const hydrateStoredConfig = (storedConfig: AppConfig): AppConfig => {
     },
     shortcuts: normalizeShortcutsConfig(storedConfig.shortcuts),
     providers: mergedProviders as AppConfig['providers'],
+    platformProviderId: storedConfig.platformProviderId,
     providerModelMigrationVersions,
     // One-time forced resets to the current defaults (see
     // *_FONT_SIZE_MIGRATION_VERSION); afterwards the stored choice wins.
@@ -729,7 +741,7 @@ class ConfigService {
       }
       if (storedConfig) {
         const previousMigrationVersions = storedConfig.providerModelMigrationVersions;
-        const hydratedConfig = hydrateStoredConfig(storedConfig);
+        const hydratedConfig = lockPlatformConfig(hydrateStoredConfig(storedConfig));
         if (initGeneration !== this.initGeneration) return;
         this.config = hydratedConfig;
         if (JSON.stringify(hydratedConfig) !== JSON.stringify(storedConfig)) {
@@ -772,7 +784,7 @@ class ConfigService {
     const stored = await localStore.getItemStrict<AppConfig>(CONFIG_KEYS.APP_CONFIG);
     const base = stored ? hydrateStoredConfig(stored) : this.config;
 
-    this.config = omitLegacyVoiceInputConfig({
+    const nextConfig = lockPlatformConfig(omitLegacyVoiceInputConfig({
       ...base,
       ...newConfig,
       ...(normalizedProviders ? { providers: normalizedProviders } : {}),
@@ -797,8 +809,9 @@ class ConfigService {
       notificationSettings: normalizeNotificationSettings(
         newConfig.notificationSettings ?? base.notificationSettings,
       ),
-    } as AppConfig);
-    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
+    } as AppConfig));
+    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, nextConfig);
+    this.config = nextConfig;
     window.dispatchEvent(new CustomEvent(ConfigServiceEvent.Updated));
   }
 

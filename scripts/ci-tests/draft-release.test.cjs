@@ -61,6 +61,18 @@ test('prepare reuses an exact existing tag and discovers a matching draft withou
   assert.equal(writes(calls).length, 0);
 });
 
+test('renaming preserves exact-source draft stamps from current and legacy brands', () => {
+  for (const brand of ['NovaPath', 'StarPath', 'LobsterAI']) {
+    const body = `Unsigned ${brand} ${context.version} build from commit ${sha}.`;
+    const valid = stub({ releases: [{ ...draft, body }] });
+    assert.equal(prepareTag(context, valid.gh).sourceCommit, sha);
+    assert.equal(writes(valid.calls).length, 0);
+    const invalid = stub({ releases: [{ ...draft, body: body.replace(sha, otherSha) }] });
+    assert.throws(() => prepareTag(context, invalid.gh), /another commit/);
+    assert.equal(writes(invalid.calls).length, 0);
+  }
+});
+
 test('prepare peels nested annotated tag objects to the exact source commit', () => {
   const first = 'c'.repeat(40), second = 'd'.repeat(40);
   const { gh, calls } = stub({ ref: { ...ref, object: { type: 'tag', sha: first } }, tagObjects: {

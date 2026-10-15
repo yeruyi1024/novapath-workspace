@@ -22,6 +22,7 @@ import type {
   LibraryLocalDetailData,
   LibrarySessionRef,
 } from '../../../shared/library/types';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import { loadDetectedFileArtifact } from '../../services/artifactDetection';
 import { i18nService } from '../../services/i18n';
 import type { Artifact } from '../../types/artifact';
@@ -235,7 +236,7 @@ const LibraryPreviewModalContent: React.FC<LibraryPreviewModalProps> = ({
     ? Math.max(localItem.relatedSessionCount, sessions.length)
     : sessions.length;
   const hasPreviewMenuItems = previewActions.length > 0;
-  const canShare = Boolean(
+  const canShare = PRODUCT_FEATURES.fileSharing && Boolean(
     localItem
     && artifact
     && artifactFileShare
@@ -303,7 +304,7 @@ const LibraryPreviewModalContent: React.FC<LibraryPreviewModalProps> = ({
           </div>
 
           <div className="flex shrink-0 items-center gap-1" data-library-preview-popover>
-            {localItem && (
+            {localItem && canShare && (
               <PreviewHeaderAction
                 label={i18nService.t('htmlShare')}
                 onClick={handleShare}

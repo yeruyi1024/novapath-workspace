@@ -1,4 +1,13 @@
-import { describe, expect, test } from 'vitest';
+vi.mock('../../shared/product', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../shared/product')>();
+  return {
+    ...actual,
+    PRODUCT_FEATURES: { ...actual.PRODUCT_FEATURES, analytics: true },
+    PRODUCT_SERVICES: { ...actual.PRODUCT_SERVICES, analyticsUrl: 'https://metrics.example.com/events' },
+  };
+});
+
+import { describe, expect, test, vi } from 'vitest';
 
 import { LogReporterEndpoint } from '../../shared/analytics/constants';
 import { isAnalyticsEndpointUrl, sanitizeUrlForLog, SENSITIVE_LOG_KEY_PATTERN, serializeForLog } from './sanitizeForLog';

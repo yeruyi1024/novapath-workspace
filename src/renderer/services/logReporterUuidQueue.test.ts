@@ -1,3 +1,12 @@
+vi.mock('../../shared/product', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../shared/product')>();
+  return {
+    ...actual,
+    PRODUCT_FEATURES: { ...actual.PRODUCT_FEATURES, analytics: true },
+    PRODUCT_SERVICES: { ...actual.PRODUCT_SERVICES, analyticsUrl: 'https://metrics.example.com/events' },
+  };
+});
+
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 const testState = vi.hoisted(() => ({

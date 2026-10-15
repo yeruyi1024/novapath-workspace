@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
+import { resolveTruncatedFileLink } from '../utils/resolveTruncatedFileLink';
 import MarkdownContent, {
   convertLatexMathDelimiters,
   getLargeMarkdownPreview,
@@ -10,6 +11,20 @@ import MarkdownContent, {
   safeUrlTransform,
   shouldUseLargeMarkdownPreview,
 } from './MarkdownContent';
+
+test('renders an encoded Chinese file link with a shortened directory using its known full path', () => {
+  const path = '/Users/test/lobsterai/project/密测14 中文 文件 20261014.txt';
+  const content = `[密测14 中文 文件 20261014.txt](file:///Use…ect/${encodeURIComponent('密测14 中文 文件 20261014.txt')})`;
+  const html = renderToStaticMarkup(React.createElement(MarkdownContent, {
+    content,
+    resolveLocalFilePath: href => resolveTruncatedFileLink(
+      decodeURIComponent(normalizeMarkdownLocalFilePath(href)),
+      [path],
+    ),
+  }));
+  expect(html).toContain(`title="${path}"`);
+  expect(html).not.toContain('/Use…ect/');
+});
 
 test('normalizes macOS, Windows drive, and UNC file links for local actions', () => {
   expect(normalizeMarkdownLocalFilePath('file:///Users/test/My%20File.md'))

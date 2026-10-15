@@ -85,6 +85,25 @@ describe('artifactToolbarPublishPolicy', () => {
     })).toBeNull();
   });
 
+  test('disabled file sharing hides HTML sharing while keeping local deployment', () => {
+    const artifact = makeArtifact(ArtifactTypeValue.Html, {
+      filePath: '/tmp/index.html',
+    });
+
+    expect(resolveBrowserToolbarPublishTarget({
+      htmlArtifact: artifact,
+      localService,
+      shareAvailable: false,
+    })).toBeNull();
+    expect(resolveBrowserToolbarPublishTarget({
+      localService,
+      shareAvailable: false,
+    })).toEqual({
+      kind: ArtifactToolbarPublishActionKind.Deploy,
+      localService,
+    });
+  });
+
   test('deploys a local service when no managed HTML preview is active', () => {
     expect(resolveBrowserToolbarPublishTarget({
       localService,

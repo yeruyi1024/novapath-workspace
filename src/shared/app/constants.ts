@@ -1,4 +1,5 @@
 export const AppIpcChannel = {
+  ReloadWindow: 'app:reloadWindow',
   GetKeyfromAttribution: 'app:getKeyfromAttribution',
   OpenSystemNotificationSettings: 'app:openSystemNotificationSettings',
 } as const;

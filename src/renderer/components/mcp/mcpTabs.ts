@@ -11,8 +11,8 @@ export const McpTab = {
 } as const;
 export type McpTab = typeof McpTab[keyof typeof McpTab];
 
-/** Marketplace leads, as on the Skills and Kits pages: browsing comes first. */
-export const MCP_TAB_ORDER: readonly McpTab[] = [McpTab.Marketplace, McpTab.Installed];
+/** Start with configured tools; optional marketplace integrations stay one tab away. */
+export const MCP_TAB_ORDER: readonly McpTab[] = [McpTab.Installed, McpTab.Marketplace];
 
 export const MCP_TAB_LABEL_KEYS: Record<McpTab, string> = {
   [McpTab.Installed]: 'mcpInstalled',

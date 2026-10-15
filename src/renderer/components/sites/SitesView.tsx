@@ -23,6 +23,7 @@ import { useSelector } from 'react-redux';
 
 import { PublishingRecoveryAnalyticsSurface } from '../../../shared/analytics/constants';
 import { HtmlShareAccessMode, HtmlShareStatus } from '../../../shared/htmlShare/constants';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import {
   PublishingResourceKind,
   PublishingSubscriptionRecoveryMode,
@@ -461,7 +462,7 @@ const SitesView: React.FC<SitesViewProps> = ({
     selectedSiteRecoveryMode,
     selectedSiteShareId,
   ]);
-  const showSubscriptionRecovery = Boolean(
+  const showSubscriptionRecovery = PRODUCT_FEATURES.legacyPublishing && Boolean(
     recoveryAnalyticsContext
     && selectedSite
     && shouldShowPublishingSubscriptionRecovery({
@@ -2094,7 +2095,7 @@ const SitesView: React.FC<SitesViewProps> = ({
             {i18nService.t('sitesDeleteConfirmDescription')}
           </p>
           <SiteDeleteWarnings
-            showFreeQuotaNotice={showFreeSiteDeleteQuotaNotice}
+            showFreeQuotaNotice={PRODUCT_FEATURES.legacyPublishing && showFreeSiteDeleteQuotaNotice}
             showPersistenceWarning={Boolean(isNode && selectedSite.persistence?.enabled)}
           />
           <label
@@ -2220,7 +2221,7 @@ const SitesView: React.FC<SitesViewProps> = ({
       <header className="mx-auto w-full min-w-[720px] max-w-[840px] shrink-0 px-6 py-4">
         <div className="flex items-center justify-between gap-4">
           <p className="text-sm text-secondary">{i18nService.t('sitesSubtitle')}</p>
-          {isUnfilteredEmpty && !embedded && createSiteButton(true)}
+          {isUnfilteredEmpty && !embedded && PRODUCT_FEATURES.legacyPublishing && createSiteButton(true)}
         </div>
         {!isUnfilteredEmpty && (
           <div className="mt-3 flex flex-nowrap items-center gap-2.5">
@@ -2263,7 +2264,7 @@ const SitesView: React.FC<SitesViewProps> = ({
             >
               <ArrowPathIcon className={`h-4 w-4 ${listLoading ? 'animate-spin' : ''}`} />
             </button>
-            {!embedded && createSiteButton(true)}
+            {!embedded && PRODUCT_FEATURES.legacyPublishing && createSiteButton(true)}
           </div>
         )}
       </header>
@@ -2286,7 +2287,7 @@ const SitesView: React.FC<SitesViewProps> = ({
             <EmptyState
               onCreateSiteByChat={onCreateSiteByChat}
               readOnly={readOnly}
-              allowCreate={!embedded}
+              allowCreate={!embedded && PRODUCT_FEATURES.legacyPublishing}
             />
           ) : listData.list.length === 0 ? (
             <div className="flex h-56 flex-col items-center justify-center text-sm text-secondary">

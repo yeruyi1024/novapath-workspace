@@ -1,7 +1,7 @@
 {
-  "appId": "com.lobsterai.app",
-  "productName": "LobsterAI",
-  "executableName": "LobsterAI",
+  "appId": "com.starpath.desktop",
+  "productName": "星途 NovaPath",
+  "executableName": "NovaPath",
   "directories": {
     "output": "release"
   },
@@ -10,15 +10,21 @@
   "files": [
     "package.json",
     "resources/SYSTEM_PROMPT.md",
+    "resources/error.html",
+    "resources/recovery.js",
     {
       "from": "dist",
       "to": "dist",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     {
       "from": "dist-electron",
       "to": "dist-electron",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     "!**/*.map",
     "!**/*.d.ts",
@@ -30,15 +36,13 @@
     "!**/CHANGELOG.md",
     "!**/CHANGELOG",
     "!**/HISTORY.md",
-    "!**/LICENSE",
-    "!**/LICENSE.md",
-    "!**/LICENSE.txt",
     "!**/.eslintrc*",
     "!**/.prettierrc*",
     "!**/tsconfig.json",
     "!**/tsconfig.*.json",
     "!**/*.test.*",
     "!**/*.spec.*",
+    "!archive/legacy-document-skills/**",
     "!**/tests/**",
     "!**/test/**",
     "!**/__tests__/**"
@@ -61,12 +65,22 @@
     {
       "from": "build/icons/png/512x512.png",
       "to": "app-icon/512x512.png"
+    },
+    {
+      "from": "LICENSE",
+      "to": "licenses/upstream-project-LICENSE.txt"
+    },
+    {
+      "from": "resources/THIRD_PARTY_NOTICES.md",
+      "to": "licenses/THIRD_PARTY_NOTICES.md"
     }
   ],
   "protocols": [
     {
-      "name": "LobsterAI",
-      "schemes": ["lobsterai"]
+      "name": "星途 NovaPath",
+      "schemes": [
+        "lobsterai"
+      ]
     }
   ],
   "mac": {
@@ -81,10 +95,10 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "extendInfo": {
       "CFBundleIconName": "icon",
-      "NSMicrophoneUsageDescription": "LobsterAI 需要访问您的麦克风来录制语音输入并进行语音识别。",
-      "NSCalendarsUsageDescription": "LobsterAI 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
-      "NSRemindersUsageDescription": "LobsterAI 需要访问您的提醒事项来帮助您管理待办事项。",
-      "NSAppleEventsUsageDescription": "LobsterAI 需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
+      "NSMicrophoneUsageDescription": "星途 NovaPath 需要访问您的麦克风来录制语音输入并进行语音识别。",
+      "NSCalendarsUsageDescription": "星途 NovaPath 需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
+      "NSRemindersUsageDescription": "星途 NovaPath 需要访问您的提醒事项来帮助您管理待办事项。",
+      "NSAppleEventsUsageDescription": "星途 NovaPath 需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
     },
     "extraResources": [
       {
@@ -96,6 +110,8 @@
           "!**/.env.*",
           "!**/.venv",
           "!**/.venv/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",
@@ -106,9 +122,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -135,9 +148,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -189,6 +199,8 @@
           "!**/.env.*",
           "!**/.venv",
           "!**/.venv/**",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",
@@ -199,9 +211,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -228,9 +237,6 @@
           "!**/CHANGELOG.md",
           "!**/CHANGELOG",
           "!**/HISTORY.md",
-          "!**/LICENSE",
-          "!**/LICENSE.md",
-          "!**/LICENSE.txt",
           "!**/.eslintrc*",
           "!**/.prettierrc*",
           "!**/tsconfig.json",
@@ -244,8 +250,8 @@
       }
     ],
     "desktop": {
-      "Name": "LobsterAI",
-      "Comment": "AI-assisted coding and productivity tool",
+      "Name": "星途 NovaPath",
+      "Comment": "AI workspace for projects and conversations",
       "Terminal": "false"
     }
   },

@@ -6,7 +6,7 @@ import * as tar from 'tar';
 import { afterEach, expect, test } from 'vitest';
 
 import { DataMigrationRestoreStatus } from '../../../shared/dataMigration/constants';
-import { DB_FILENAME } from '../../appConstants';
+import { APP_NAME, DB_FILENAME } from '../../appConstants';
 import {
   assertDataMigrationSqliteSnapshotMatchesLiveSync,
   createMigrationArchiveSync,
@@ -384,6 +384,24 @@ test('createMigrationArchive rejects a source without a sqlite database', () => 
   expect(fs.existsSync(archivePath)).toBe(false);
 });
 
+test.each(['LobsterAI', APP_NAME])('accepts valid backup archives with the %s root after rebranding', archiveRoot => {
+  const root = makeTempDir();
+  const sourceUserData = path.join(root, 'source');
+  const archivePath = path.join(root, 'backup.tar.gz');
+  writeSqliteFixture(path.join(sourceUserData, DB_FILENAME), 'source');
+  createMigrationArchiveSync({ userDataPath: sourceUserData, outputPath: archivePath });
+  const extracted = extractArchive(archivePath);
+  const legacyRoot = path.join(extracted, 'LobsterAI');
+  const brandedRoot = path.join(extracted, archiveRoot);
+  if (legacyRoot !== brandedRoot) fs.renameSync(legacyRoot, brandedRoot);
+  const manifestPath = path.join(brandedRoot, '.lobsterai-migration.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.archiveRoot = archiveRoot;
+  fs.writeFileSync(manifestPath, JSON.stringify(manifest));
+  tar.create({ sync: true, gzip: true, file: archivePath, cwd: extracted }, [archiveRoot]);
+  expect(inspectMigrationArchiveSync(archivePath).root).toBe(archiveRoot);
+});
+
 test('inspectMigrationArchive rejects legacy Windows PowerShell archive root', () => {
   const root = makeTempDir();
   const legacyRoot = path.join(root, 'AppData', 'Roaming', 'LobsterAI');
@@ -397,7 +415,7 @@ test('inspectMigrationArchive rejects legacy Windows PowerShell archive root', (
     cwd: root,
   }, ['AppData']);
 
-  expect(() => inspectMigrationArchiveSync(archivePath)).toThrow(/does not contain LobsterAI user data/);
+  expect(() => inspectMigrationArchiveSync(archivePath)).toThrow(`does not contain ${APP_NAME} user data`);
 });
 
 test('inspectMigrationArchive rejects archives without a migration manifest', () => {

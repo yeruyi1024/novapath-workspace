@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { SkinParticleDensity } from '../../../shared/skin/constants';
-import { useSkin } from '../../providers/SkinProvider';
+import { useSkin } from '../../providers/skinContext';
 
 interface SkinAmbientEffectsProps {
   visible: boolean;

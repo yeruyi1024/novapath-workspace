@@ -1,7 +1,7 @@
 import { ProviderName } from '@shared/providers';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
-import { type AppConfig, CODE_FONT_SIZE_MIGRATION_VERSION, CONFIG_KEYS, defaultConfig, FontPreferences, resolveArtifactAutoPreviewEnabled, ShortcutAction, UI_FONT_SIZE_MIGRATION_VERSION } from '../config';
+import { type AppConfig, CODE_FONT_SIZE_MIGRATION_VERSION, CONFIG_KEYS, defaultConfig, FontPreferences, resolveArtifactAutoPreviewEnabled, RetiredSettingsShortcut, ShortcutAction, UI_FONT_SIZE_MIGRATION_VERSION } from '../config';
 
 const makeLegacyConfigWithoutMiniMaxAddedModels = (): AppConfig => ({
   ...defaultConfig,
@@ -166,6 +166,59 @@ afterEach(() => {
   delete (globalThis as { window?: unknown }).window;
 });
 
+test('persists the StarPath connection and provider-specific default across unrelated saves and reloads', async () => {
+  const gatewayModel = { id: 'gpt-5.2', name: 'Gateway model', supportsImage: true };
+  const { configService, storeData } = await loadConfigServiceWithStoredConfig({ ...defaultConfig });
+  await configService.init();
+  await configService.updateConfig({
+    platformProviderId: 'custom_3',
+    providers: {
+      ...configService.getConfig().providers,
+      custom_3: { enabled: true, displayName: 'StarPath', baseUrl: 'https://gateway.example/v1', apiKey: 'test-key', apiFormat: 'openai', models: [gatewayModel] },
+    },
+    model: { ...defaultConfig.model, defaultModel: gatewayModel.id, defaultModelProvider: 'custom_3' },
+  });
+  await configService.updateConfig({ language: 'en' });
+  const saved = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
+  const reloaded = await loadConfigServiceWithStoredConfig(saved);
+  await reloaded.configService.init();
+  expect(reloaded.configService.getConfig()).toMatchObject({
+    platformProviderId: 'custom_3',
+    language: 'en',
+    model: { defaultModel: gatewayModel.id, defaultModelProvider: 'custom_3' },
+    providers: { custom_3: { models: [gatewayModel], apiKey: 'test-key' } },
+  });
+});
+
+test('platform-only settings survive reload without reactivating retained legacy providers', async () => {
+  const legacy = { enabled: true, apiKey: 'legacy-key', baseUrl: 'https://legacy.example/v1', apiFormat: 'openai' as const, models: [{ id: 'legacy-model', name: 'Legacy' }] };
+  const { configService, storeData } = await loadConfigServiceWithStoredConfig({
+    ...defaultConfig,
+    providers: { ...defaultConfig.providers, openai: legacy },
+  });
+  await configService.init();
+  const migratedLegacyModels = configService.getConfig().providers?.openai.models;
+  const { buildPlatformConfigUpdate } = await import('./starpathPlatform');
+  await configService.updateConfig(buildPlatformConfigUpdate({
+    ...configService.getConfig().providers,
+    custom_30: { enabled: true, apiKey: 'platform-key', baseUrl: 'https://gateway.example', models: [{ id: 'platform-model', name: 'Platform' }] },
+  }, 'custom_30', 'legacy-model', defaultConfig.model));
+  await configService.updateConfig({ language: 'en' });
+  const reloaded = await loadConfigServiceWithStoredConfig(storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig);
+  await reloaded.configService.init();
+  expect(reloaded.configService.getConfig()).toMatchObject({
+    platformProviderId: 'custom_30',
+    api: { key: 'platform-key', baseUrl: 'https://gateway.ai.shilijia.xyz/v1' },
+    model: { defaultModel: 'platform-model', defaultModelProvider: 'custom_30' },
+    providers: {
+      openai: { enabled: false, apiKey: legacy.apiKey },
+      custom_30: { enabled: true, apiFormat: 'openai', authType: 'apikey' },
+    },
+  });
+  expect(reloaded.configService.getConfig().providers?.openai.models).toEqual(migratedLegacyModels);
+  expect(Object.entries(reloaded.configService.getConfig().providers ?? {}).filter(([, config]) => config.enabled).map(([id]) => id)).toEqual(['custom_30']);
+});
+
 describe('configService initialization failures', () => {
   test('rejects when the strict store read fails so startup can schedule repair', async () => {
     vi.resetModules();
@@ -261,6 +314,21 @@ describe('configService initialization failures', () => {
     expect(configService.getConfig()).toEqual(defaultConfig);
     expect(setItem).not.toHaveBeenCalled();
   });
+
+  test('does not publish unsaved config when credential encryption rejects the write', async () => {
+    vi.resetModules();
+    const saveError = new Error('System credential storage is unavailable');
+    vi.doMock('./store', () => ({ localStore: {
+      getItem: vi.fn(), getItemStrict: vi.fn(async () => defaultConfig),
+      setItem: vi.fn(async () => { throw saveError; }), removeItem: vi.fn(),
+    } }));
+    const dispatchEvent = vi.fn();
+    (globalThis as unknown as { window?: unknown }).window = { dispatchEvent };
+    const { configService } = await import('./config');
+    await expect(configService.updateConfig({ language: 'en' })).rejects.toBe(saveError);
+    expect(configService.getConfig()).toEqual(defaultConfig);
+    expect(dispatchEvent).not.toHaveBeenCalled();
+  });
 });
 
 describe('configService theme persistence', () => {
@@ -323,6 +391,25 @@ describe('configService artifact auto-preview persistence', () => {
 });
 
 describe('configService shortcut migrations', () => {
+  test('retires email and dreaming bindings without changing active custom shortcuts', async () => {
+    const storedConfig: AppConfig = {
+      ...defaultConfig,
+      shortcuts: {
+        ...defaultConfig.shortcuts!,
+        [RetiredSettingsShortcut.Email]: 'CommandOrControl+Alt+E',
+        [RetiredSettingsShortcut.Dreaming]: 'CommandOrControl+Alt+D',
+        [ShortcutAction.OpenSettingsMemory]: 'CommandOrControl+Alt+M',
+      },
+    };
+    const { configService, storeData } = await loadConfigServiceWithStoredConfig(storedConfig);
+    await configService.init();
+    for (const config of [configService.getConfig(), storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig]) {
+      expect(config.shortcuts).not.toHaveProperty(RetiredSettingsShortcut.Email);
+      expect(config.shortcuts).not.toHaveProperty(RetiredSettingsShortcut.Dreaming);
+      expect(config.shortcuts?.[ShortcutAction.OpenSettingsMemory]).toBe('CommandOrControl+Alt+M');
+    }
+  });
+
   test('normalizes prior agent default shortcuts to unset', async () => {
     const storedConfig: AppConfig = {
       ...defaultConfig,
@@ -401,8 +488,9 @@ describe('configService provider migrations', () => {
 
     const savedConfig = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
     expect(savedConfig.providers?.[ProviderName.Minimax].models?.map(model => model.id)).toContain('MiniMax-M3');
-    expect(savedConfig.model.defaultModel).toBe('MiniMax-M3');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Minimax);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Minimax].enabled).toBe(false);
   });
 
   test('fills DeepSeek V4 context windows when saving partial config updates', async () => {
@@ -444,8 +532,9 @@ describe('configService provider migrations', () => {
       { id: 'mimo-v2-pro', name: 'MiMo V2 Pro', supportsImage: false, contextWindow: 128_000 },
       { id: 'mimo-v2-flash', name: 'MiMo V2 Flash', supportsImage: false, contextWindow: 64_000 },
     ]);
-    expect(savedConfig.model.defaultModel).toBe('mimo-v2-pro');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Xiaomi);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Xiaomi].enabled).toBe(false);
   });
 
   test('preserves user-configured context windows for known models', async () => {
@@ -851,8 +940,9 @@ describe('configService provider migrations', () => {
 
     const savedConfig = storeData[CONFIG_KEYS.APP_CONFIG] as AppConfig;
     expect(savedConfig.providers?.[ProviderName.Xiaomi].models?.map(model => model.id)).not.toContain(deletedModelId);
-    expect(savedConfig.model.defaultModel).toBe('mimo-v2.5');
-    expect(savedConfig.model.defaultModelProvider).toBe(ProviderName.Xiaomi);
+    expect(savedConfig.model.defaultModel).toBe('');
+    expect(savedConfig.model.defaultModelProvider).toBeUndefined();
+    expect(savedConfig.providers?.[ProviderName.Xiaomi].enabled).toBe(false);
   });
 
   test('marks provider model migrations when saving provider edits from default config', async () => {

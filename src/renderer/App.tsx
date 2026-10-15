@@ -18,8 +18,8 @@ import {
 } from '../shared/library/constants';
 import type { LibrarySessionRef } from '../shared/library/types';
 import { OpenClawEnginePhase } from '../shared/openclawEngine/constants';
+import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../shared/product';
 import { ProviderAuthType, ProviderName, ProviderRegistry } from '../shared/providers';
-import { SIDEBAR_TASK_FILTER_ENABLED } from './components/agentSidebar/SidebarTaskFilterButton';
 import { CoworkView } from './components/cowork';
 import {
   CoworkShortcutDirection,
@@ -46,6 +46,7 @@ import NewUserOnboardingOverlay, {
 import { ScheduledTasksView } from './components/scheduledTasks';
 import Settings, { type SettingsOpenOptions } from './components/Settings';
 import Sidebar from './components/Sidebar';
+import { SIDEBAR_TASK_FILTER_ENABLED } from './components/sidebar/SidebarTaskFilterButton';
 import { SkillsAndConnectorsView, SkillsConnectorsSection } from './components/skillsAndConnectors';
 import SkinBackdrop, { SkinBackdropVariant } from './components/skin/SkinBackdrop';
 import SkinPresentationScope from './components/skin/SkinPresentationScope';
@@ -80,11 +81,14 @@ import {
   isLatestAsyncRequest,
 } from './services/latestAsyncRequest';
 import { LogReporterAction, reportYdAnalyzer } from './services/logReporter';
+import { useMaasAccount } from './services/maasAccount';
 import { getOnboardingErrorCode, reportOnboardingAction } from './services/onboardingAnalytics';
+import { createPromptDraftPersistence, PROMPT_DRAFT_STORAGE_KEY } from './services/promptDraftPersistence';
 import { scheduledTaskService } from './services/scheduledTask';
 import { isTextEditingSafeShortcut, matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { applyTypographyPreferences } from './services/typography';
+import { workspaceProjects } from './services/workspaceProjects';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
@@ -96,6 +100,7 @@ import { openArtifactPreviewTab } from './store/slices/artifactSlice';
 import {
   clearDraftAttachments,
   clearDraftSelectedTextSnippets,
+  markPromptDraftsRestored,
   setDraftCollaborationMode,
   setDraftKitIds,
   setDraftPrompt,
@@ -120,6 +125,14 @@ const AGENT_TASK_SLOT_SHORTCUT_ACTIONS = [
 ] as const;
 
 const NEW_USER_WELCOME_AFTER_LOGIN_STORAGE_KEY = 'lobsterai:newUserWelcomeAfterLogin';
+const promptDraftPersistence = createPromptDraftPersistence({
+  read: () => window.electron.store.get(PROMPT_DRAFT_STORAGE_KEY),
+  write: drafts => window.electron.store.set(PROMPT_DRAFT_STORAGE_KEY, drafts),
+  getDrafts: () => store.getState().cowork.draftPrompts,
+  restore: (sessionId, draft) => { store.dispatch(setDraftPrompt({ sessionId, draft })); },
+  subscribe: listener => store.subscribe(listener),
+  onError: () => { console.warn('[Drafts] Unable to save prompt drafts'); },
+});
 const NEW_USER_WELCOME_AFTER_LOGIN_RESTART_GRACE_MS = 1800;
 const NEW_USER_WELCOME_AFTER_LOGIN_ENGINE_SETTLE_MS = 700;
 const NEW_USER_WELCOME_UNAUTHENTICATED_RETURN_DELAY_MS = 600;
@@ -173,9 +186,7 @@ const SETTINGS_TAB_SHORTCUT_ACTIONS: Array<{
   { action: ShortcutAction.OpenSettingsModel, initialTab: 'model' },
   { action: ShortcutAction.OpenSettingsIm, initialTab: 'im' },
   { action: ShortcutAction.OpenSettingsBrowser, initialTab: 'browserWebAccess' },
-  { action: ShortcutAction.OpenSettingsEmail, initialTab: 'email' },
   { action: ShortcutAction.OpenSettingsMemory, initialTab: 'coworkMemory' },
-  { action: ShortcutAction.OpenSettingsDreaming, initialTab: 'coworkDreaming' },
   { action: ShortcutAction.OpenSettingsPlugins, initialTab: 'plugins' },
   { action: ShortcutAction.OpenSettingsAbout, initialTab: 'about' },
 ];
@@ -220,6 +231,8 @@ const logAppUpdateRendererLifecycle = (
 };
 
 const App: React.FC = () => {
+  const platformAccount = useMaasAccount();
+  const hasPromptedPlatformKeyRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions & { requestId: number }>({ requestId: 0 });
   const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'kits' | 'mcp' | 'library'>('cowork');
@@ -236,7 +249,7 @@ const App: React.FC = () => {
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isTaskFilterActive, setIsTaskFilterActive] = useState(false);
-  const [hasUnreadCompletedTasks, setHasUnreadCompletedTasks] = useState(false);
+  const [hasUnreadCompletedTasks] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(244);
   const initialOpenClawEngineStatusRef = useRef(coworkService.getOpenClawEngineStatusSnapshot());
   const [isEngineStartupOverlayVisible, setIsEngineStartupOverlayVisible] = useState(
@@ -256,7 +269,6 @@ const App: React.FC = () => {
   });
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showUpdateInstallConfirm, setShowUpdateInstallConfirm] = useState(false);
-  const [isUpdateCardExpanded, setIsUpdateCardExpanded] = useState(false);
   const [isUserInitiatedUpdateFlowActive, setIsUserInitiatedUpdateFlowActive] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState<boolean | null>(null);
   const [trialTaskCreatedSignal, setTrialTaskCreatedSignal] = useState(0);
@@ -304,7 +316,7 @@ const App: React.FC = () => {
     appUpdateState.status,
   );
   const shouldShowNewUserOnboarding =
-    privacyAgreed === false
+    PRODUCT_FEATURES.account && !platformAccount.account && privacyAgreed === false
     && !authUser
     && !isNewUserOnboardingDismissed
     && hasResolvedEngineStartupOverlayState
@@ -577,6 +589,15 @@ const App: React.FC = () => {
       }
 
       if (!coreStartupServicesInitializedRef.current) {
+        const draftsReady = await runStep('promptDraftPersistence.initialize', () => promptDraftPersistence.initialize(), {
+          attempts: 1,
+          firstTimeoutMs: initTimeoutMs,
+        });
+        // Late storage replies also restore the input without overwriting edits.
+        void promptDraftPersistence.initialize().then(() => {
+          store.dispatch(markPromptDraftsRestored());
+        }).catch(() => { console.warn('[Drafts] Unable to restore prompt drafts'); });
+        mark(draftsReady ? 'prompt drafts restored' : 'prompt draft restore pending');
         themeService.initialize();
         mark('themeService done');
 
@@ -751,6 +772,12 @@ const App: React.FC = () => {
     setShowSettings(true);
   }, []);
 
+  useEffect(() => {
+    if (!isInitialized || initError || hasPromptedPlatformKeyRef.current) return;
+    hasPromptedPlatformKeyRef.current = true;
+    if (!configService.getConfig().api.key.trim()) handleShowSettings({ initialTab: 'model' });
+  }, [handleShowSettings, initError, isInitialized]);
+
   const handleShowSkills = useCallback(() => {
     setMainView('skills');
   }, []);
@@ -910,6 +937,7 @@ const App: React.FC = () => {
   }, [isSidebarCollapsed, mainView]);
 
   const handleNewChat = useCallback(() => {
+    workspaceProjects.select(null);
     setTrialTaskCreatedSignal(value => value + 1);
     // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
     const shouldClearInput = mainView === 'cowork' && !currentSessionId;
@@ -949,7 +977,7 @@ const App: React.FC = () => {
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
-    }, detail.actionLabel && detail.onAction ? 6000 : 2200);
+    }, detail.tone === 'error' || (detail.actionLabel && detail.onAction) ? 6000 : 2200);
   }, []);
 
   const startUserInitiatedUpdateFlow = useCallback((reason: string) => {
@@ -1011,9 +1039,11 @@ const App: React.FC = () => {
     };
   }, [showToast, stopUserInitiatedUpdateFlow]);
 
-  const handleShowLogin = useCallback(() => {
-    showToast(i18nService.t('featureInDevelopment'));
-  }, [showToast]);
+  useEffect(() => {
+    const openModelSettings = () => handleShowSettings({ initialTab: 'model' });
+    window.addEventListener(CoworkUiEvent.OpenModelSettings, openModelSettings);
+    return () => window.removeEventListener(CoworkUiEvent.OpenModelSettings, openModelSettings);
+  }, [handleShowSettings]);
 
   const runUpdateCheck = useCallback(async (): Promise<boolean> => {
     try {
@@ -1159,12 +1189,12 @@ const App: React.FC = () => {
 
   // Release the first-launch gate once login completes in an external auth flow.
   useEffect(() => {
-    if (privacyAgreed === false && authUser) {
+    if (privacyAgreed === false && (authUser || platformAccount.account)) {
       void acceptPrivacyAgreement().catch((error) => {
         console.warn('[Onboarding] failed to persist privacy agreement after login callback:', error);
       });
     }
-  }, [privacyAgreed, authUser, acceptPrivacyAgreement]);
+  }, [privacyAgreed, authUser, platformAccount.account, acceptPrivacyAgreement]);
 
   const finishNewUserOnboarding = useCallback((source: NewUserOnboardingCompletionSource) => {
     console.log(`[Onboarding] completing new user onboarding source=${source}`);
@@ -1524,11 +1554,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartAiSkinFromSettings = (text: string, kitId: string) => {
-    handleCloseSettings();
-    openHomeWithKit(kitId, text);
-  };
-
   const isShortcutInputActive = () => {
     const activeElement = document.activeElement;
     if (!(activeElement instanceof HTMLElement)) return false;
@@ -1556,6 +1581,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.repeat || event.defaultPrevented || isShortcutInputActive()) return;
+      if (document.querySelector('[data-platform-dialog]')) return;
 
       const { shortcuts } = configService.getConfig();
       const activeShortcuts = {
@@ -1877,7 +1903,7 @@ const App: React.FC = () => {
     if (!isInitialized) return;
 
     // Enterprise mode: completely skip update detection
-    if (enterpriseConfig?.disableUpdate) return;
+    if (!PRODUCT_SERVICES.updateUrl || enterpriseConfig?.disableUpdate) return;
 
     let cancelled = false;
     let lastCheckTime = 0;
@@ -2001,7 +2027,6 @@ const App: React.FC = () => {
       updateState={appUpdateState}
       onUpdate={handleConfirmUpdate}
       onShowDetails={handleOpenUpdateModal}
-      onExpandedChange={setIsUpdateCardExpanded}
     />
   ) : null;
   const canUseWindowsTopBarActions = isInitialized && !initError && !isUpdateInteractionBlocked;
@@ -2096,32 +2121,33 @@ const App: React.FC = () => {
     <SkinProvider>
       <SkinPresentationScope
         enabled
-        className="h-screen overflow-hidden flex flex-col bg-surface-raised"
+        className="workspace-shell h-screen overflow-hidden flex flex-col bg-background"
       >
       {toastMessage && (
         <Toast
           message={toastMessage.message}
+          tone={toastMessage.tone}
           actionLabel={toastMessage.actionLabel}
           onAction={toastMessage.onAction}
           closeLabel={i18nService.t('close')}
           onClose={() => setToastMessage(null)}
         />
       )}
-      <SubscriptionTrialCampaign
+      {PRODUCT_FEATURES.promotions && <SubscriptionTrialCampaign
         privacyAgreed={privacyAgreed}
         taskCreatedSignal={trialTaskCreatedSignal}
-        enabled={privacyAgreed === true && !isOverlayActive && hasResolvedEngineStartupOverlayState && !isEngineStartupOverlayVisible}
-      />
-      <StartupCreditCampaign
-        enabled={privacyAgreed === true && !isEnterpriseAccount}
-      />
+        enabled={PRODUCT_FEATURES.promotions && privacyAgreed === true && !isOverlayActive && hasResolvedEngineStartupOverlayState && !isEngineStartupOverlayVisible}
+      />}
+      {PRODUCT_FEATURES.promotions && <StartupCreditCampaign
+        enabled={PRODUCT_FEATURES.promotions && privacyAgreed === true && !isEnterpriseAccount}
+      />}
       {windowsStandaloneTitleBar}
+      {window.electron.platform === 'linux' && <div className="workspace-linux-titlebar draggable flex shrink-0 items-center px-4 text-xs text-muted">{i18nService.t('productName')}</div>}
       <div
         className="relative flex flex-1 min-h-0 overflow-hidden"
         aria-busy={isUpdateInteractionBlocked}
       >
         <Sidebar
-          onShowLogin={handleShowLogin}
           onShowSettings={handleShowSettings}
           activeView={mainView}
           onShowSkills={handleShowSkills}
@@ -2132,21 +2158,14 @@ const App: React.FC = () => {
           onNewChat={handleNewChat}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={handleToggleSidebar}
-          isTaskFilterActive={isTaskFilterActive}
-          hasUnreadCompletedTasks={hasUnreadCompletedTasks}
-          onToggleTaskFilter={handleToggleTaskFilter}
-          onTaskFilterSummaryChange={setHasUnreadCompletedTasks}
           onWidthChange={setSidebarWidth}
           updateNotice={!isSidebarCollapsed && !isUpdateInteractionBlocked ? updateCard : null}
-          hideAdBanner={isUpdateCardExpanded}
-          hideLogin={enterpriseConfig?.ui?.login === 'hide'}
-          isEngineStartupOverlayVisible={isEngineStartupOverlayVisible}
         />
-        <div className={`flex-1 min-w-0 transition-[padding] duration-200 ease-out ${isSidebarCollapsed ? 'pl-1.5' : ''}`}>
+        <div className="workspace-main flex-1 min-w-0">
           <div
             data-skin-cowork-frame={mainView === 'cowork' ? 'true' : undefined}
             data-skin-management-frame={mainView !== 'cowork' ? 'true' : undefined}
-            className="relative h-full min-h-0 rounded-xl border border-border bg-background overflow-hidden"
+            className="relative h-full min-h-0 bg-background overflow-hidden"
           >
             {mainView !== 'cowork' && (
               <SkinBackdrop variant={SkinBackdropVariant.Management} />
@@ -2194,6 +2213,8 @@ const App: React.FC = () => {
               />
             ) : (
               <CoworkView
+                onShowLibrary={handleShowLibrary}
+                onShowScheduledTasks={handleShowScheduledTasks}
                 onRequestAppSettings={handleShowSettings}
                 onShowSkills={handleShowSkills}
                 onShowKits={handleShowKits}
@@ -2234,7 +2255,6 @@ const App: React.FC = () => {
       {showSettings && (
         <Settings
           onClose={handleCloseSettings}
-          onStartAiSkin={handleStartAiSkinFromSettings}
           initialTab={settingsOptions.initialTab}
           initialTabRequestId={settingsOptions.requestId}
           notice={settingsOptions.notice}

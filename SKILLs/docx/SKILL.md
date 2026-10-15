@@ -3,7 +3,21 @@ name: docx
 description: "Comprehensive document creation, editing, and analysis with support for tracked changes, comments, formatting preservation, and text extraction. When Claude needs to work with professional documents (.docx files) for: (1) Creating new documents, (2) Modifying or editing content, (3) Working with tracked changes, (4) Adding comments, or any other document tasks"
 license: Proprietary. LICENSE.txt has complete terms
 official: true
+metadata:
+  version: 2.1.1
 ---
+
+## 星途本地恢复运行说明
+
+本版本按用户要求恢复原有办公能力，保留原始许可与正文；发行方案待负责人确认。以下本地运行约定优先于后文的环境安装示例：
+
+- Python 使用 `"$STARPATH_PYTHON"`（由应用准备的文档 Python），脚本路径从 `$SKILLS_ROOT/docx` 解析。
+- Node 脚本通过 `NODE_PATH="$SKILLS_ROOT/docx/node_modules" node <脚本>` 加载本技能依赖，或从该目录用绝对路径 require；无需全局 npm 安装。
+- `pandoc`、LibreOffice、Poppler 等外部转换工具使用已配置的本地可执行文件；缺少时明确报错，不把未执行写成成功。
+- 按用户最新决定，默认遵循下文原官方技能正文及其附带工具；暂停自编替代方案，不自动切换到简化助手。缺少原流程依赖时明确说明需要补齐，不以减少功能的流程代替。
+- 原 API、模板、验证能力与许可证保留。自编助手源码暂存待老板决定，其独立许可 `LICENSE.starpath.txt` 不覆盖原官方材料，也不代表启用该替代方案。
+
+
 
 # DOCX creation, editing, and analysis
 

@@ -1,0 +1,7 @@
+/* Keep the file name readable when actions leave little room for a directory.
+   The full resolved path remains available in the enclosing title. */
+@container (max-width: 240px) {
+  .preview-file-breadcrumb .preview-file-breadcrumb__parent {
+    display: none;
+  }
+}

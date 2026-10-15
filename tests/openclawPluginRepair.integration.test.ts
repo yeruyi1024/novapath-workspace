@@ -15,7 +15,8 @@ const runtimeRoot = process.env.OPENCLAW_PLUGIN_REPAIR_RUNTIME;
 const execFileAsync = promisify(execFile);
 
 test.skipIf(!runtimeRoot)('bundled repair reconciles a migrated Weixin ledger and boots twice with the shipped plugin', async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lobster-plugin-repair-integration-'));
+  // macOS /var is a symlink; the repair guard correctly rejects aliased paths.
+  const tempDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'lobster-plugin-repair-integration-')));
   const stateDir = path.join(tempDir, 'admin', 'LobsterAI', 'openclaw', 'state');
   const configPath = path.join(stateDir, 'openclaw.json');
   const backupDir = path.join(tempDir, 'backup');

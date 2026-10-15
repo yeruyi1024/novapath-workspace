@@ -12,6 +12,7 @@ import {
 } from '../../shared/browserCredentials/constants';
 import { WeixinPlugin } from '../../shared/im/weixin';
 import { OpenClawSkillReviewMode } from '../../shared/openclawEngine/constants';
+import { PRODUCT } from '../../shared/product';
 import { OpenClawProviderId, ProviderName } from '../../shared/providers';
 import { DEFAULT_DISCORD_OPENCLAW_CONFIG, DEFAULT_QQ_CONFIG, DiscordDmPolicy } from '../im/types';
 import { OpenClawAgentOwnership } from './openclawAgentModels';
@@ -217,6 +218,18 @@ describe('OpenClawConfigSync runtime config output', () => {
     } as never);
   };
 
+  test.each([true, false])('startup initializes the main identity with model available=%s and preserves customization', async modelAvailable => {
+    if (!modelAvailable) mockRuntimeState.rawApiConfig.config = null;
+    const sync = await createSync();
+    expect(sync.sync('startup').ok).toBe(true);
+    const identityPath = path.join(stateDir, 'workspace-main', 'IDENTITY.md');
+    expect(fs.readFileSync(identityPath, 'utf8')).toContain(PRODUCT.englishName);
+    const customized = '# My assistant\nUse my custom identity.\n';
+    fs.writeFileSync(identityPath, customized);
+    expect(sync.sync('startup-resync').ok).toBe(true);
+    expect(fs.readFileSync(identityPath, 'utf8')).toBe(customized);
+  });
+
   test('enables channel scheduling without promoting IM senders to global owners', async () => {
     fs.writeFileSync(configPath, JSON.stringify({
       commands: { ownerAllowFrom: ['gateway-client', '*'] },
@@ -228,6 +241,35 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(config.commands.ownerAllowFrom).toEqual(['gateway-client']);
     expect(config.cron).toMatchObject({ enabled: true, allowChannelScheduling: true });
     expect(sync.sync('repeat-channel-scheduling')).toMatchObject({ ok: true, changed: false });
+  });
+
+  test.each([true, false])('removes retired response guidance without replacing user instructions, model available=%s', async modelAvailable => {
+    if (!modelAvailable) mockRuntimeState.rawApiConfig.config = null;
+    const workspace = path.join(stateDir, 'workspace-main');
+    const agentsMdPath = path.join(workspace, 'AGENTS.md');
+    const marker = '<!-- LobsterAI managed: do not edit below this line -->';
+    const customInstructions = '# My project\nUse a formal tone and output JSON when requested.';
+    fs.mkdirSync(workspace, { recursive: true });
+    fs.writeFileSync(agentsMdPath, `${customInstructions}\n\n${marker}\n\n## StarPath Response Quality\nOld managed instructions.\n`);
+    const sync = await createSync({
+      getCoworkConfig: () => ({
+        workingDirectory: tmpDir,
+        systemPrompt: 'You are a technical writing assistant.',
+        executionMode: 'local',
+        agentEngine: 'openclaw',
+        memoryEnabled: false,
+      }),
+    });
+
+    expect(sync.sync('response-quality').ok).toBe(true);
+    const contents = fs.readFileSync(agentsMdPath, 'utf8');
+    expect(contents.startsWith(`${customInstructions}\n\n${marker}`)).toBe(true);
+    expect(contents).toContain('You are a technical writing assistant.');
+    expect(contents).not.toContain('## StarPath Response Quality');
+    expect(contents).not.toContain('Old managed instructions.');
+
+    expect(sync.sync('response-quality-resync').ok).toBe(true);
+    expect(fs.readFileSync(agentsMdPath, 'utf8')).toBe(contents);
   });
 
   describe('managed model policy', () => {
@@ -2849,39 +2891,50 @@ describe('OpenClawConfigSync runtime config output', () => {
     });
   });
 
-  test('writes enabled memory-core dreaming config when dreaming is on', async () => {
-    const sync = await createSync({
-      getCoworkConfig: () => ({
-        workingDirectory: tmpDir,
-        systemPrompt: '',
-        executionMode: 'local',
-        agentEngine: 'openclaw',
-        memoryEnabled: false,
-        memoryImplicitUpdateEnabled: false,
-        memoryLlmJudgeEnabled: false,
-        memoryGuardLevel: 'balanced',
-        memoryUserMemoriesMaxItems: 100,
-        skipMissedJobs: false,
-        dreamingEnabled: true,
-        dreamingFrequency: '0 4 * * *',
-      }),
-    });
+  test('retires previously enabled dreaming without deleting memory retention or stored preferences', async () => {
+    const legacyPreferences = {
+      workingDirectory: tmpDir,
+      systemPrompt: '',
+      executionMode: 'local',
+      agentEngine: 'openclaw',
+      memoryEnabled: false,
+      memoryImplicitUpdateEnabled: false,
+      memoryLlmJudgeEnabled: false,
+      memoryGuardLevel: 'balanced',
+      memoryUserMemoriesMaxItems: 100,
+      skipMissedJobs: false,
+      dreamingEnabled: true,
+      dreamingFrequency: '0 4 * * *',
+    };
+    fs.writeFileSync(configPath, JSON.stringify({
+      plugins: {
+        entries: {
+          'memory-core': {
+            enabled: true,
+            config: {
+              retention: { shortTermDays: 14 },
+              dreaming: { enabled: true, frequency: legacyPreferences.dreamingFrequency },
+            },
+          },
+        },
+      },
+    }));
+    const sync = await createSync({ getCoworkConfig: () => legacyPreferences });
 
-    const result = sync.sync('dreaming-enabled');
-    expect(result.ok).toBe(true);
-
+    expect(sync.sync('retire-legacy-dreaming').ok).toBe(true);
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     expect(config.plugins.slots.memory).toBe('memory-core');
     expect(config.plugins.allow).toContain('memory-core');
     expect(config.plugins.entries['memory-core']).toEqual({
       enabled: true,
       config: {
-        dreaming: {
-          enabled: true,
-          frequency: '0 4 * * *',
-        },
+        retention: { shortTermDays: 14 },
+        dreaming: { enabled: false },
       },
     });
+    expect(legacyPreferences.dreamingEnabled).toBe(true);
+    expect(legacyPreferences.dreamingFrequency).toBe('0 4 * * *');
+    expect(sync.sync('retire-legacy-dreaming-again').changed).toBe(false);
   });
 
   test('maps OpenAI OAuth mode to the ChatGPT Responses provider', async () => {
@@ -3859,7 +3912,7 @@ describe('OpenClawConfigSync runtime config output', () => {
 
     const agentsMdPath = path.join(stateDir, 'workspace-main', 'AGENTS.md');
     const agentsMd = fs.readFileSync(agentsMdPath, 'utf8');
-    expect(agentsMd).toContain('LobsterAI does not support sandbox browser execution in this version.');
+    expect(agentsMd).toContain('StarPath does not support sandbox browser execution in this version.');
     expect(agentsMd).toContain('For every `browser` tool call, set `target="host"` explicitly.');
     expect(agentsMd).toContain('never tell the user to enable Chrome remote debugging');
   });

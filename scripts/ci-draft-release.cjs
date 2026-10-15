@@ -2,6 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const product = require('../src/shared/product/product.json');
 const { spawnSync } = require('node:child_process');
 const { hashFile, readJson, rootDir, targets } = require('./ci-common.cjs');
 
@@ -78,7 +79,7 @@ function existingRelease(context, gh = invokeGh) {
 }
 
 function sourceStamp(context) {
-  return `Unsigned LobsterAI ${context.version} build from commit ${context.sourceCommit}.`;
+  return `Unsigned ${product.englishName} ${context.version} build from commit ${context.sourceCommit}.`;
 }
 
 function assertDraftSource(context, tag, release) {
@@ -87,8 +88,8 @@ function assertDraftSource(context, tag, release) {
   if (typeof release.target_commitish !== 'string' || !release.target_commitish.trim()) throw new Error('Invalid existing draft source hint.');
   if (release.target_commitish === context.sourceCommit) return;
   const stamps = typeof release.body === 'string'
-    ? release.body.split(/\r?\n/).filter(line => /^Unsigned LobsterAI .+ build from commit [a-f0-9]{40}\.$/.test(line)) : [];
-  if (!tag || stamps.length !== 1 || stamps[0] !== sourceStamp(context)) {
+    ? release.body.split(/\r?\n/).filter(line => /^Unsigned (?:NovaPath|StarPath|LobsterAI) .+ build from commit [a-f0-9]{40}\.$/.test(line)) : [];
+  if (!tag || stamps.length !== 1 || stamps[0].replace(/^Unsigned (?:NovaPath|StarPath|LobsterAI) /, `Unsigned ${product.englishName} `) !== sourceStamp(context)) {
     throw new Error(`Draft release ${context.tag} targets another commit or lacks its exact source stamp; refusing these packages.`);
   }
 }
@@ -117,7 +118,7 @@ function publishArtifacts(context, files, notes, gh = invokeGh) {
     ? [['release', 'upload', context.tag, ...files, '--clobber', '--repo', context.repository],
       ['release', 'edit', context.tag, '--notes-file', notes, '--repo', context.repository]]
     : [['release', 'create', context.tag, ...files, '--draft', '--verify-tag', '--repo', context.repository,
-      '--title', `LobsterAI ${context.version} (${context.tag})`, '--notes-file', notes]];
+      '--title', `${product.englishName} ${context.version} (${context.tag})`, '--notes-file', notes]];
   for (const args of commands) {
     console.log(`[ci-release] gh ${args.join(' ')}`);
     const result = gh(args);

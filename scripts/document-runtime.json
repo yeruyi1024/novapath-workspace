@@ -1,0 +1,12 @@
+{
+  "release": "20261009",
+  "pythonVersion": "3.12.15",
+  "targets": {
+    "mac-arm64": { "triple": "aarch64-apple-darwin", "wheelPlatform": "macosx_11_0_arm64", "sha256": "233f8e15255b3e1d1fd47ea5dd5230dfed803f371138e896e54d98c60ae19f6f" },
+    "mac-x64": { "triple": "x86_64-apple-darwin", "wheelPlatform": "macosx_10_13_x86_64", "sha256": "fb3187d95334813b88940db0f1ca57b84cedfd552739c3a5771c3ea0e49988c9" },
+    "win-x64": { "triple": "x86_64-pc-windows-msvc", "wheelPlatform": "win_amd64", "sha256": "11ed9f8a6ac64fb1b5a55e40e305a6744a3f77a70863c8f8197a6e4349abc64a" },
+    "win-arm64": { "triple": "aarch64-pc-windows-msvc", "wheelPlatform": "win_arm64", "sha256": "e2c1d6de6311d95b7bfaf3c46587cb5682e43415c19fcbef97595cb0b262f614" },
+    "linux-x64": { "triple": "x86_64-unknown-linux-gnu", "wheelPlatform": "manylinux_2_28_x86_64", "sha256": "ffa8f85f1b56e88b687f08d743d817015524b86a9365fd921243132b80f1a36d" },
+    "linux-arm64": { "triple": "aarch64-unknown-linux-gnu", "wheelPlatform": "manylinux_2_28_aarch64", "sha256": "2e1ba0e7f22e01c534caebf7f09e7820322bc0d055271d3434af671e8400f96f" }
+  }
+}

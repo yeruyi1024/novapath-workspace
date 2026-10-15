@@ -477,6 +477,7 @@ export interface CoworkMessageMetadata {
   isError?: boolean;
   isStreaming?: boolean;
   isFinal?: boolean;
+  responsePhase?: 'commentary' | 'final';
   /** True while the model is still streaming this tool call's arguments. */
   isGenerating?: boolean;
   liveEditDiff?: CoworkLiveEditDiff;

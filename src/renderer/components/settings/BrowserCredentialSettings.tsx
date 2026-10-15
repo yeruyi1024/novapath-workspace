@@ -169,13 +169,13 @@ const BrowserCredentialSettings: React.FC = () => {
         : i18nService.t('browserCredentialEncryptionUnavailable');
 
   return (
-    <section className="space-y-3">
+    <section className="settings-section">
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h4 className="text-sm font-medium text-foreground">
+        <div className="settings-section-header min-w-0">
+          <h3 className="settings-section-title">
             {i18nService.t('browserCredentialManagerTitle')}
-          </h4>
-          <p className="mt-1 text-sm text-secondary">
+          </h3>
+          <p className="settings-section-description">
             {i18nService.t('browserCredentialManagerDescription')}
           </p>
         </div>
@@ -225,16 +225,16 @@ const BrowserCredentialSettings: React.FC = () => {
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-background">
+      <div className="settings-list">
         {loading ? (
-          <div className="px-3 py-3 text-sm text-secondary">
+          <div className="settings-list-row settings-list-row-description">
             {i18nService.t('loading')}
           </div>
         ) : credentials.length > 0 ? (
-          credentials.map((credential, index) => (
+          credentials.map((credential) => (
             <div
               key={credential.id}
-              className={`flex min-h-14 items-center gap-3 px-3 py-2 ${index > 0 ? 'border-t border-border' : ''}`}
+              className="settings-list-row settings-preference-row justify-start"
             >
               <KeyIcon className="h-4 w-4 shrink-0 text-secondary" />
               <div className="min-w-0 flex-1">
@@ -253,7 +253,7 @@ const BrowserCredentialSettings: React.FC = () => {
             </div>
           ))
         ) : (
-          <div className="px-3 py-3 text-sm text-secondary">
+          <div className="settings-list-row settings-list-row-description">
             {i18nService.t('browserCredentialEmpty')}
           </div>
         )}

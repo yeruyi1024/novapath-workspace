@@ -127,6 +127,7 @@ import {
   CoworkSessionStatusValue,
 } from '../../types/cowork';
 import type { MediaAttachmentRef } from '../../types/mediaGeneration';
+import { resolveTruncatedFileLink } from '../../utils/resolveTruncatedFileLink';
 import { parseUserMessageForDisplay } from '../../utils/userMessageDisplay';
 import {
   AgentBrowserInAppPanel,
@@ -497,9 +498,9 @@ const buildRailItems = (
       messageId: primaryMessageId,
       turnIndex: index,
       absoluteIndex: messageOffsetById.get(primaryMessageId) ?? items.length,
-      label: turn.userMessage ? getRailLabel(userContent, `Turn ${index + 1}`) : 'LobsterAI',
+      label: turn.userMessage ? getRailLabel(userContent, `Turn ${index + 1}`) : i18nService.t('productName'),
       summary: assistantContent
-        ? getRailLabel(assistantContent, 'LobsterAI', COWORK_RAIL_TOOLTIP_PREVIEW_MAX_LENGTH)
+        ? getRailLabel(assistantContent, i18nService.t('productName'), COWORK_RAIL_TOOLTIP_PREVIEW_MAX_LENGTH)
         : '',
       contentLen: userContent.length + assistantContent.length,
       isUser: false,
@@ -567,7 +568,7 @@ const buildRailItemsFromIndex = (
       messageId: current.messageId,
       turnIndex: loadedTurnIndex,
       absoluteIndex: current.messageOffset,
-      label: 'LobsterAI',
+      label: i18nService.t('productName'),
       summary: current.preview,
       contentLen: current.contentLen,
       isUser: false,
@@ -1173,7 +1174,7 @@ const composeExportCanvas = async (
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error('Failed to load logo'));
-    img.src = 'logo.png';
+    img.src = 'logo.svg';
   });
 
   // Logo with rounded clipping
@@ -1198,11 +1199,11 @@ const composeExportCanvas = async (
 
   ctx.fillStyle = brandColor;
   ctx.font = `600 ${brandFontSize}px ${fontStack}`;
-  ctx.fillText('LobsterAI — 全场景办公助手 Agent', textX, footerCenterY - taglineFontSize / 2 - 2);
+  ctx.fillText(i18nService.t('productName'), textX, footerCenterY - taglineFontSize / 2 - 2);
 
   ctx.fillStyle = subtitleColor;
   ctx.font = `400 ${taglineFontSize}px ${fontStack}`;
-  ctx.fillText('国内大厂首个开源桌面级 Agent，网易有道出品', textX, footerCenterY + brandFontSize / 2 + 3);
+  ctx.fillText(i18nService.t('workspaceLocalHint'), textX, footerCenterY + brandFontSize / 2 + 3);
 
   ctx.restore(); // card clip
 
@@ -5008,6 +5009,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
     if (hrefPath) {
+      const recoveredPath = resolveTruncatedFileLink(
+        // Markdown's file URL encoder also escapes existing percent escapes.
+        // Decode that extra layer only for matching a shortened file URL.
+        /^file:\/\//i.test(hrefValue) ? safeDecodeURIComponent(hrefPath.path) : hrefPath.path,
+        sessionArtifacts.flatMap(artifact => artifact.filePath
+          ? [currentSession?.cwd
+            ? toAbsolutePathFromCwd(artifact.filePath, currentSession.cwd)
+            : artifact.filePath]
+          : []),
+      );
+      if (recoveredPath) return recoveredPath;
       if (hrefPath.isRelative && currentSession?.cwd) {
         return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
       }
@@ -5032,7 +5044,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     return null;
-  }, [currentSession?.cwd]);
+  }, [currentSession?.cwd, sessionArtifacts]);
 
   const mapDisplayText = useCallback((value: string): string => {
     return value;
@@ -6057,7 +6069,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       {/* Header — spans full width */}
       <div
         data-skin-session-titlebar="true"
-        className={`draggable relative z-30 flex h-12 shrink-0 items-center justify-between overflow-visible border-b border-border bg-background ${
+        className={`workspace-conversation-header draggable relative z-30 flex h-12 shrink-0 items-center justify-between overflow-visible bg-background ${
           isArtifactPanelExpanded ? 'pl-0 pr-4' : 'px-4'
         }`}
       >
@@ -6068,6 +6080,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <button
                 type="button"
                 onClick={onToggleSidebar}
+                aria-label={i18nService.t('expand')}
+                title={i18nService.t('expand')}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
                 <SidebarToggleIcon className="h-4 w-4" isCollapsed={true} />
@@ -6075,6 +6089,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <button
                 type="button"
                 onClick={onNewChat}
+                aria-label={i18nService.t('newChat')}
+                title={i18nService.t('newChat')}
                 className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-secondary hover:bg-surface-raised transition-colors"
               >
                 <ComposeIcon className="h-4 w-4" />
@@ -6449,7 +6465,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           onScroll={handleMessagesScroll}
           onWheel={handleMessagesWheel}
           onMouseUp={handleAssistantTextSelection}
-          className={`relative h-full min-h-0 overflow-y-auto pt-3${exportImageProgress ? ' cowork-export-capturing' : ''}`}
+          className={`workspace-conversation-scroll relative h-full min-h-0 overflow-y-auto pb-6 pt-4${exportImageProgress ? ' cowork-export-capturing' : ''}`}
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           {selectedTextAction && !exportImageProgress && (
@@ -6628,12 +6644,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           document.body
         )}
         {!exportImageProgress && shouldShowScrollToBottom && (
-          <div className="pointer-events-none absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center gap-2 px-3">
+          <div className="pointer-events-none absolute bottom-4 right-8 z-20 flex items-center justify-end">
             <button
               type="button"
               onClick={handleScrollToBottom}
               onWheel={handleScrollToBottomWheel}
-              className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground/85 shadow-[0_2px_10px_rgba(15,23,42,0.12)] transition-colors hover:bg-surface-raised hover:text-foreground dark:shadow-[0_2px_14px_rgba(0,0,0,0.36)]"
+              className="pointer-events-auto inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/80 bg-surface/90 text-foreground/85 shadow-[0_2px_10px_rgba(15,23,42,0.15)] backdrop-blur transition-all hover:scale-105 hover:bg-surface-raised hover:text-foreground dark:shadow-[0_2px_14px_rgba(0,0,0,0.4)]"
               aria-label={i18nService.t('coworkScrollToBottom')}
               title={i18nService.t('coworkScrollToBottom')}
             >
@@ -6646,8 +6662,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       {/* Input Area */}
       <div
         ref={promptInputAreaRef}
-        className={`relative shrink-0 ${COWORK_DETAIL_GUTTER_CLASS} ${
-          isArtifactPanelExpanded ? 'z-50 bg-background pb-2 pt-1' : 'pb-4 pt-0'
+        className={`workspace-conversation-dock relative shrink-0 ${COWORK_DETAIL_GUTTER_CLASS} ${
+          isArtifactPanelExpanded ? 'z-50 bg-background pb-2 pt-1' : 'pb-2 pt-0'
         } ${isArtifactPanelExpanded && isExpandedPromptInputHidden ? 'hidden' : ''}`}
       >
         {isArtifactPanelExpanded && !isExpandedPromptInputHidden && (

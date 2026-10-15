@@ -11,6 +11,7 @@ import {
   type HtmlShareStatus as HtmlShareStatusValue,
 } from '@shared/htmlShare/constants';
 import { LibraryNavigationEvent } from '@shared/library/constants';
+import { PRODUCT_FEATURES } from '@shared/product';
 import {
   type PublishingQuotaErrorData,
   PublishingResourceKind,
@@ -85,6 +86,7 @@ import {
 } from './artifactSubscriptionGate';
 import ArtifactSubscriptionPromptDialog from './ArtifactSubscriptionPromptDialog';
 import { formatHtmlShareFailure } from './htmlShareErrorPresentation';
+import LegacyPublishingUnavailableDialog from './LegacyPublishingUnavailableDialog';
 import {
   createPublishingAnalyticsAttempt,
   createPublishingAnalyticsDialog,
@@ -828,6 +830,7 @@ export function ArtifactFileShareProvider({ sessionId, children }: ArtifactFileS
       artifact: Artifact,
       context: ArtifactFileShareOpenContext,
     ): Promise<void> => {
+      if (!PRODUCT_FEATURES.fileSharing) return;
       const sourceType = getArtifactFileShareSourceType(artifact);
       analyticsDialogRef.current = null;
       const analyticsAttempt = createPublishingAnalyticsAttempt({
@@ -1695,7 +1698,7 @@ export function ArtifactFileShareProvider({ sessionId, children }: ArtifactFileS
         )
       : null;
 
-  const subscriptionPromptPortal = subscriptionPrompt ? (
+  const subscriptionPromptPortal = subscriptionPrompt ? (PRODUCT_FEATURES.legacyPublishing ? (
     <ArtifactSubscriptionPromptDialog
       feature={subscriptionPrompt.feature}
       reason={subscriptionPrompt.reason}
@@ -1705,9 +1708,11 @@ export function ArtifactFileShareProvider({ sessionId, children }: ArtifactFileS
       onLearnBenefits={openSubscriptionPage}
       analyticsAttempt={analyticsAttemptRef.current}
     />
-  ) : null;
+  ) : (
+    <LegacyPublishingUnavailableDialog onClose={closeSubscriptionPrompt} />
+  )) : null;
 
-  const publishingQuotaPortal = publishingQuota ? (
+  const publishingQuotaPortal = publishingQuota ? (PRODUCT_FEATURES.legacyPublishing ? (
     <PublishingQuotaLimitDialog
       quota={publishingQuota}
       onClose={() => setPublishingQuota(null)}
@@ -1719,9 +1724,11 @@ export function ArtifactFileShareProvider({ sessionId, children }: ArtifactFileS
         window.dispatchEvent(new Event(LibraryNavigationEvent.OpenCloud));
       }}
     />
-  ) : null;
+  ) : (
+    <LegacyPublishingUnavailableDialog onClose={() => setPublishingQuota(null)} />
+  )) : null;
 
-  const trialNoticePortal = trialNotice ? (
+  const trialNoticePortal = trialNotice ? (PRODUCT_FEATURES.legacyPublishing ? (
     <PublishingTrialNoticeDialog
       feature={ArtifactSubscriptionFeature.Share}
       quota={trialNotice.quota}
@@ -1730,7 +1737,9 @@ export function ArtifactFileShareProvider({ sessionId, children }: ArtifactFileS
       onSubscribe={openTrialSubscriptionPage}
       analyticsAttempt={analyticsAttemptRef.current}
     />
-  ) : null;
+  ) : (
+    <LegacyPublishingUnavailableDialog onClose={closeTrialNotice} />
+  )) : null;
 
   return (
     <ArtifactFileShareContext.Provider value={contextValue}>

@@ -1,5 +1,6 @@
 import { type ProviderConfig, ProviderRegistry } from '@shared/providers';
 
+import { PLATFORM_MODEL_BASE_URL } from '../shared/auth/platformConfig';
 import {
   type BrowserWebAccessConfig,
   defaultBrowserWebAccessConfig,
@@ -43,15 +44,19 @@ export const ShortcutAction = {
   OpenSettingsModel: 'openSettingsModel',
   OpenSettingsIm: 'openSettingsIm',
   OpenSettingsBrowser: 'openSettingsBrowser',
-  OpenSettingsEmail: 'openSettingsEmail',
   OpenSettingsMemory: 'openSettingsMemory',
-  OpenSettingsDreaming: 'openSettingsDreaming',
   OpenSettingsPlugins: 'openSettingsPlugins',
   OpenSettingsShortcuts: 'openSettingsShortcuts',
   OpenSettingsAbout: 'openSettingsAbout',
 } as const;
 
 export type ShortcutAction = typeof ShortcutAction[keyof typeof ShortcutAction];
+
+// Compatibility identifiers only; retired settings must not bind these keys.
+export const RetiredSettingsShortcut = {
+  Email: 'openSettingsEmail',
+  Dreaming: 'openSettingsDreaming',
+} as const;
 
 export type ShortcutConfig = Record<ShortcutAction, string> & {
   [key: string]: string | undefined;
@@ -114,6 +119,8 @@ export interface AppConfig {
   };
   providers?: Record<string, ProviderConfig>;
   providerModelMigrationVersions?: Record<string, number>;
+  // Identity of the user-configured StarPath gateway; never reuse another provider slot.
+  platformProviderId?: string;
   // 主题配置
   theme: 'light' | 'dark' | 'system';
   // Optional for configs created before exact default theme persistence was introduced.
@@ -167,6 +174,7 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
     };
   }
 
+  providers.custom_0 = { enabled: false, apiKey: '', baseUrl: PLATFORM_MODEL_BASE_URL, apiFormat: 'openai', models: [] };
   return providers;
 };
 
@@ -174,17 +182,15 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
 export const defaultConfig: AppConfig = {
   api: {
     key: '',
-    baseUrl: 'https://api.deepseek.com',
+    baseUrl: PLATFORM_MODEL_BASE_URL,
   },
   model: {
-    availableModels: [
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false },
-    ],
-    defaultModel: 'deepseek-reasoner',
-    defaultModelProvider: 'deepseek',
+    availableModels: [],
+    defaultModel: '',
   },
   providers: buildDefaultProviders(),
-  theme: 'system',
+  platformProviderId: 'custom_0',
+  theme: 'light',
   uiFontSize: FontPreferences.UiFontSizeDefault,
   uiFontSizeMigrationVersion: UI_FONT_SIZE_MIGRATION_VERSION,
   codeFontSize: FontPreferences.CodeFontSizeDefault,
@@ -193,17 +199,13 @@ export const defaultConfig: AppConfig = {
   useSystemProxy: false,
   artifactAutoPreviewEnabled: true,
   sqliteAutoBackupEnabled: false,
-  usageAnalyticsEnabled: true,
+  usageAnalyticsEnabled: false,
   notificationSettings: defaultNotificationSettings,
   browserWebAccess: defaultBrowserWebAccessConfig,
   app: {
     port: 3000,
     isDevelopment: process.env.NODE_ENV === 'development',
-    // Default to production (official) services. Source-launched dev builds run
-    // with NODE_ENV=development, but must not auto-target the internal-only test
-    // endpoints (*.inner.youdao.com) — external/open-source users can't reach
-    // them. Flip test mode via the hidden switch in Settings → About when the
-    // internal endpoints are actually needed.
+    // Retained for compatibility; service destinations come from product.json.
     testMode: false,
   },
   shortcuts: {
@@ -240,9 +242,7 @@ export const defaultConfig: AppConfig = {
     [ShortcutAction.OpenSettingsModel]: '',
     [ShortcutAction.OpenSettingsIm]: '',
     [ShortcutAction.OpenSettingsBrowser]: '',
-    [ShortcutAction.OpenSettingsEmail]: '',
     [ShortcutAction.OpenSettingsMemory]: '',
-    [ShortcutAction.OpenSettingsDreaming]: '',
     [ShortcutAction.OpenSettingsPlugins]: '',
     [ShortcutAction.OpenSettingsShortcuts]: '',
     [ShortcutAction.OpenSettingsAbout]: '',
@@ -254,7 +254,6 @@ export const CONFIG_KEYS = {
   APP_CONFIG: 'app_config',
   AUTH: 'auth_state',
   CONVERSATIONS: 'conversations',
-  PROVIDERS_EXPORT_KEY: 'providers_export_key',
   SKILLS: 'skills',
 };
 

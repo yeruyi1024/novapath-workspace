@@ -8,6 +8,7 @@ import {
   LogReporterProduct,
   LogReporterStoreKey,
 } from '../../shared/analytics/constants';
+import { PRODUCT_FEATURES, PRODUCT_SERVICES } from '../../shared/product';
 import type { SqliteStore } from '../sqliteStore';
 import { getKeyfromAttribution } from './keyfromAttribution';
 
@@ -178,7 +179,7 @@ export class MainLogReporter {
       const config = this.options.store.get<{ usageAnalyticsEnabled?: boolean }>(
         LogReporterStoreKey.AppConfig,
       );
-      return config?.usageAnalyticsEnabled !== false;
+      return PRODUCT_FEATURES.analytics && Boolean(PRODUCT_SERVICES.analyticsUrl) && config?.usageAnalyticsEnabled === true;
     } catch (error) {
       console.warn(
         `[MainLogReporter] failed to read usage analytics setting; skipped event (${getErrorName(error)})`,

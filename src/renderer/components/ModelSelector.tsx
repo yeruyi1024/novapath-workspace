@@ -18,6 +18,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
+import { PRODUCT_FEATURES } from '../../shared/product';
 import { getProviderIcon, ProviderIconId } from '../providers/uiRegistry';
 import { authService } from '../services/auth';
 import { i18nService } from '../services/i18n';
@@ -29,6 +30,8 @@ import { RootState } from '../store';
 import type { Model } from '../store/slices/modelSlice';
 import { getModelIdentityKey, isSameModelIdentity, setSelectedModel } from '../store/slices/modelSlice';
 import Modal from './common/Modal';
+import { CoworkUiEvent } from './cowork/constants';
+import { getModelSelectionGuide } from './modelSelector/modelSelectionGuide';
 import ModelThinkingMenu, {
   getModelThinkingLevelLabel,
 } from './modelSelector/ModelThinkingMenu';
@@ -151,7 +154,7 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
 }) => {
   const agenticNotReadyPrompt = promptKind === ModelAccessPromptKind.AgenticNotReady;
   const loginPrompt = promptKind === ModelAccessPromptKind.Login;
-  const purchaseOffer = useModelPurchaseOffer(promptKind === ModelAccessPromptKind.Subscribe, onClose);
+  const purchaseOffer = useModelPurchaseOffer(PRODUCT_FEATURES.promotions && promptKind === ModelAccessPromptKind.Subscribe, onClose);
   const resolvedTitleKey = titleKey ?? (
     agenticNotReadyPrompt
       ? 'modelSelectorAgenticNotReadyTitle'
@@ -176,6 +179,11 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
   };
 
   const handlePrimary = async () => {
+    if (!PRODUCT_FEATURES.account && !agenticNotReadyPrompt) {
+      onClose();
+      window.dispatchEvent(new CustomEvent(CoworkUiEvent.OpenModelSettings));
+      return;
+    }
     if (promptKind === ModelAccessPromptKind.Login) {
       onClose();
       await authService.login();
@@ -197,10 +205,10 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-base font-semibold leading-6 text-foreground">
-            {i18nService.t(resolvedTitleKey)}
+            {i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetup' : resolvedTitleKey)}
           </div>
           <div className="mt-1.5 text-sm leading-5 text-secondary">
-            {purchaseOffer.description ?? i18nService.t(resolvedDescriptionKey)}
+            {purchaseOffer.description ?? i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetupHint' : resolvedDescriptionKey)}
           </div>
           {purchaseOffer.offer?.expiresAtEpochMs != null && (
             <div className="mt-3">
@@ -223,9 +231,9 @@ export const ModelAccessPromptModal: React.FC<ModelAccessPromptModalProps> = ({
         disabled={purchaseOffer.isRefreshing}
         className="mt-5 w-full rounded-lg bg-primary px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/90 disabled:cursor-wait disabled:opacity-50"
       >
-        {i18nService.t(resolvedPrimaryButtonKey)}
+        {i18nService.t(!PRODUCT_FEATURES.account && !agenticNotReadyPrompt ? 'gatewaySetup' : resolvedPrimaryButtonKey)}
       </button>
-      {loginPrompt && showLearnMore && (
+      {PRODUCT_FEATURES.account && loginPrompt && showLearnMore && (
         <button
           type="button"
           onClick={() => { void openSubscriptionPage(); }}
@@ -494,6 +502,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     : 'font-medium text-sm';
   const triggerIconClassName = compact ? 'h-3.5 w-3.5' : 'h-4 w-4';
   const resolveModelIconProviderKey = (model: Model): string => {
+    const guide = getModelSelectionGuide(model);
+    if (guide) return guide.providerKey;
     const providerKey = model.providerKey?.trim();
     if (providerKey && providerKey !== ProviderName.LobsteraiServer) return providerKey;
 
@@ -834,9 +844,11 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     }
 
     return (
-      <div className="px-3 py-1.5 rounded-xl bg-surface text-secondary text-sm">
-        {i18nService.t('modelSelectorNoModels')}
-      </div>
+      <button type="button" title={i18nService.t('modelSelectorNoModels')}
+        onClick={() => window.dispatchEvent(new CustomEvent(CoworkUiEvent.OpenModelSettings))}
+        className="rounded-md px-2 py-1.5 text-xs text-secondary hover:bg-surface-raised hover:text-foreground">
+        {i18nService.t('workspaceModelDisconnected')}
+      </button>
     );
   }
 
@@ -868,6 +880,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     hoverTimerRef.current = setTimeout(() => {
       if (
         !model.description
+        && !getModelSelectionGuide(model)
         && !model.costMultiplier
         && !model.supportsImage
         && !model.supportsThinking
@@ -943,6 +956,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   };
 
   const renderModelItem = (model: Model) => {
+    const guide = getModelSelectionGuide(model);
     const selected = isSelected(model);
     const agenticBlocked = isModelAgenticBlocked(model);
     const restricted = model.accessible === false;
@@ -975,6 +989,9 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         <span className={`min-w-0 truncate text-[13px] leading-5 ${selected ? 'font-medium' : 'font-normal'}`}>
           {model.name}
         </span>
+        {guide && <span className="shrink-0 rounded-md bg-primary/5 px-1.5 py-0.5 text-[10px] leading-none text-secondary">
+          {i18nService.t(guide.badgeKey)}
+        </span>}
         {hasThinkingProtocol && model.thinkingConfig && (
           <span className="shrink-0 text-[11px] font-medium text-secondary whitespace-nowrap">
             {getModelThinkingLevelLabel(resolveThinkingLevel(model) ?? model.thinkingConfig.defaultLevel)}
@@ -1047,6 +1064,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
   const renderHoverCard = () => {
     if (!hoveredModel) return null;
+    const guide = getModelSelectionGuide(hoveredModel);
+    const description = hoveredModel.description?.trim() || (guide ? i18nService.t(guide.descriptionKey) : '');
     const hasThinkingProtocol = supportsConfigurableModelThinkingProtocol(hoveredModel);
     const thinkingConfigurable = thinkingSelectionEnabled && canConfigureModelThinking(hoveredModel);
     const card = (
@@ -1060,8 +1079,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         className="w-[220px] rounded-xl border border-border bg-surface p-3 shadow-popover pointer-events-auto"
       >
         <div className="text-[13px] font-semibold text-foreground leading-5">{hoveredModel.name}</div>
-        {hoveredModel.description && (
-          <div className="mt-1 text-[11px] text-secondary leading-4">{hoveredModel.description}</div>
+        {description && (
+          <div className="mt-1 text-[11px] text-secondary leading-5 [overflow-wrap:anywhere]">{description}</div>
         )}
         {isModelAgenticBlocked(hoveredModel) && (
           <div className="mt-2 rounded-lg bg-amber-500/10 px-2 py-1.5 text-[11px] leading-4 text-amber-700 dark:text-amber-300">

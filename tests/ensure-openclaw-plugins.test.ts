@@ -5,6 +5,8 @@ import path from 'node:path';
 import { describe, expect, test, vi } from 'vitest';
 
 const {
+  selectBuildPlugins,
+  pruneUnselectedBuildPlugins,
   buildOpenClawPluginInstallArgs,
   buildGitEnv,
   buildNpmPackInvocation,
@@ -22,6 +24,30 @@ const {
 } = require('../scripts/ensure-openclaw-plugins.cjs');
 
 describe('ensure-openclaw-plugins', () => {
+  test('excludes opt-in legacy channels even when cached, and retains ordinary plugins', () => {
+    const plugins = [{ id: 'mail' }, { id: 'legacy', installByDefault: false }];
+    expect(selectBuildPlugins(plugins)).toEqual([plugins[0]]);
+    expect(selectBuildPlugins(plugins, ' legacy ')).toEqual(plugins);
+    expect(() => selectBuildPlugins(plugins, 'typo')).toThrow('Unknown extra plugin');
+  });
+
+  test('removes stale build copies but keeps explicitly requested plugins and caches', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'starpath-plugin-selection-'));
+    try {
+      const runtime = path.join(root, 'runtime');
+      const plugin = { id: 'legacy', npm: 'legacy', installByDefault: false };
+      const installed = path.join(runtime, 'third-party-extensions', 'legacy');
+      const old = path.join(runtime, 'extensions', 'legacy');
+      const cache = path.join(root, 'cache', 'legacy');
+      for (const directory of [installed, old, cache]) fs.mkdirSync(directory, { recursive: true });
+      pruneUnselectedBuildPlugins(runtime, [plugin], 'legacy');
+      expect(fs.existsSync(installed)).toBe(true);
+      pruneUnselectedBuildPlugins(runtime, [plugin]);
+      expect(fs.existsSync(installed)).toBe(false);
+      expect(fs.existsSync(old)).toBe(false);
+      expect(fs.existsSync(cache)).toBe(true);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
   test('ships official Discord in the trusted root and removes the old config-origin copy', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'openclaw-discord-layout-'));
     try {

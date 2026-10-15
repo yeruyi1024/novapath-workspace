@@ -36,15 +36,15 @@ const SettingRow: React.FC<{
   control?: React.ReactNode;
   children?: React.ReactNode;
 }> = ({ title, description, control, children }) => (
-  <div>
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0 flex-1">
-        <h4 className="text-sm font-medium text-foreground">{title}</h4>
-        {description ? <div className="mt-1 text-sm text-secondary">{description}</div> : null}
-        {children ? <div className="mt-3">{children}</div> : null}
+  <div className="settings-list-row">
+    <div className="settings-list-row-main">
+      <div className="settings-list-row-text">
+        <h4 className="settings-list-row-title">{title}</h4>
+        {description ? <div className="settings-list-row-description">{description}</div> : null}
       </div>
-      {control ? <div className="shrink-0">{control}</div> : null}
+      {control ? <div className="settings-browser-control">{control}</div> : null}
     </div>
+    {children}
   </div>
 );
 
@@ -55,11 +55,11 @@ const HostnameList: React.FC<{
   onAdd: () => void;
   onRemove: (hostname: string) => void;
 }> = ({ title, description, hostnames, onAdd, onRemove }) => (
-  <section className="space-y-2">
+  <section className="settings-section">
     <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <h4 className="text-sm font-medium text-foreground">{title}</h4>
-        <p className="mt-1 text-sm text-secondary">{description}</p>
+      <div className="settings-section-header min-w-0">
+        <h3 className="settings-section-title">{title}</h3>
+        <p className="settings-section-description">{description}</p>
       </div>
       <button
         type="button"
@@ -71,14 +71,12 @@ const HostnameList: React.FC<{
       </button>
     </div>
 
-    <div className="overflow-hidden rounded-lg border border-border bg-background">
+    <div className="settings-list">
       {hostnames.length > 0 ? (
-        hostnames.map((hostname, index) => (
+        hostnames.map((hostname) => (
           <div
             key={hostname}
-            className={`flex min-h-12 items-center justify-between gap-3 px-3 py-2 ${
-              index > 0 ? 'border-t border-border' : ''
-            }`}
+            className="settings-list-row settings-preference-row"
           >
             <span className="truncate text-sm text-foreground">{hostname}</span>
             <button
@@ -92,7 +90,7 @@ const HostnameList: React.FC<{
           </div>
         ))
       ) : (
-        <div className="px-3 py-3 text-sm text-secondary">
+        <div className="settings-list-row settings-list-row-description">
           {i18nService.t('browserHostnameListEmpty')}
         </div>
       )}
@@ -167,14 +165,15 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
 
   return (
     <>
-      <div className="space-y-8">
+      <div className="settings-engine-page">
+        <div className="settings-list">
         <SettingRow
           title={i18nService.t('browserDisplayModeTitle')}
           description={value.displayMode === BrowserDisplayMode.InApp
             ? i18nService.t('browserDisplayModeInAppDescription')
             : i18nService.t('browserDisplayModeExternalDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-display-mode"
                 value={value.displayMode}
@@ -202,7 +201,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
               ? i18nService.t('browserCredentialUseModeOncePerTaskDescription')
               : i18nService.t('browserCredentialUseModeAlwaysAskDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-credential-use-mode"
                 value={value.credentialUseMode}
@@ -234,7 +233,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
             ? i18nService.t('browserCredentialSaveModeNeverDescription')
             : i18nService.t('browserCredentialSaveModeAskDescription')}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-credential-save-mode"
                 value={value.credentialSaveMode}
@@ -260,7 +259,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
           title={i18nService.t('browserNetworkSectionTitle')}
           description={networkModeDescription}
           control={(
-            <div className="w-[300px]">
+            <div className="w-full">
               <ThemedSelect
                 id="browser-network-mode"
                 value={value.networkMode}
@@ -273,6 +272,7 @@ const BrowserWebAccessSettings: React.FC<BrowserWebAccessSettingsProps> = ({
             </div>
           )}
         />
+        </div>
 
         <HostnameList
           title={i18nService.t('browserBlockedHostnames')}

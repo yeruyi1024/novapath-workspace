@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
 import { DecisionModelErrorCode, DecisionModelProvider } from '../../shared/decisionModel/constants';
+import { PRODUCT } from '../../shared/product';
 import {
   buildDecisionRequest,
   type DecisionEvaluateInput,
@@ -171,8 +172,8 @@ describe('buildDecisionRequest', () => {
 
     expect(request.url).toBe(OPENROUTER_DECISIONS_URL);
     expect(request.headers.Authorization).toBe(`Bearer ${API_KEY}`);
-    expect(request.headers['HTTP-Referer']).toBe('https://lobsterai.youdao.com');
-    expect(request.headers['X-Title']).toBe('LobsterAI');
+    expect(request.headers['HTTP-Referer']).toBe('https://openrouter.ai');
+    expect(request.headers['X-Title']).toBe(PRODUCT.name);
     expect(JSON.parse(request.body)).toEqual({
       model: OPENROUTER_JEV_MODEL,
       state: ticketInput.state,

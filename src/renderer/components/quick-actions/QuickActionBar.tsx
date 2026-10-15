@@ -1,38 +1,23 @@
 import React from 'react';
 
 import type { LocalizedQuickAction } from '../../types/quickAction';
-import AcademicCapIcon from '../icons/AcademicCapIcon';
-import ChartBarIcon from '../icons/ChartBarIcon';
-import DevicePhoneMobileIcon from '../icons/DevicePhoneMobileIcon';
-import DocumentTextIcon from '../icons/DocumentTextIcon';
-import GlobeAltIcon from '../icons/GlobeAltIcon';
-import PresentationChartBarIcon from '../icons/PresentationChartBarIcon';
+import FileTypeIcon from '../icons/fileTypes/FileTypeIcon';
 
 interface QuickActionBarProps {
   actions: LocalizedQuickAction[];
+  disabled?: boolean;
   selectedActionId?: string | null;
   onActionSelect: (actionId: string) => void;
 }
 
-// 图标映射
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  PresentationChartBarIcon,
-  GlobeAltIcon,
-  DevicePhoneMobileIcon,
-  DocumentTextIcon,
-  ChartBarIcon,
-  AcademicCapIcon,
-};
-
-const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedActionId, onActionSelect }) => {
+const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedActionId, onActionSelect, disabled }) => {
   if (actions.length === 0) {
     return null;
   }
 
   return (
-    <div data-skin-quick-actions="true" className="flex flex-wrap items-center justify-center gap-2">
+    <div data-skin-quick-actions="true" className="flex flex-wrap items-center justify-center gap-2.5">
       {actions.map((action) => {
-        const IconComponent = iconMap[action.icon];
         const isSelected = action.id === selectedActionId;
 
         return (
@@ -40,21 +25,22 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, selectedAction
             key={action.id}
             type="button"
             aria-pressed={isSelected}
+            disabled={disabled}
             onClick={() => onActionSelect(action.id)}
-            className={`group flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[length:var(--lobster-text-sidebarCompact)] font-normal leading-5 transition-all duration-200 ease-out active:translate-y-0 active:scale-[0.97] ${
+            className={`workspace-office-action group flex min-h-9 items-center gap-2 rounded-lg border px-3 py-2 text-[12px] leading-4 font-medium transition-colors duration-150 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
               isSelected
-                ? 'border-[color-mix(in_srgb,var(--lobster-primary)_50%,transparent)] bg-primary-muted text-primary'
-                : 'border-border-subtle bg-surface text-secondary hover:-translate-y-px hover:border-primary/30 hover:bg-surface-raised hover:text-foreground hover:shadow-subtle'
+                ? 'border-primary/30 bg-primary-muted text-primary'
+                : 'border-border-subtle bg-surface text-secondary hover:border-border hover:bg-surface-raised hover:text-foreground'
             }`}
           >
-            {IconComponent && (
-              <IconComponent
-                className={`h-3.5 w-3.5 transition-colors duration-200 ${
-                  isSelected ? 'text-primary' : 'text-secondary group-hover:text-primary'
-                }`}
+            <span aria-hidden="true" className="shrink-0">
+              <FileTypeIcon
+                fileName={`document.${action.skillMapping}`}
+                className="h-4 w-4"
+                monochrome={false}
               />
-            )}
-            <span>{action.label}</span>
+            </span>
+            <span className="tracking-tight">{action.label}</span>
           </button>
         );
       })}

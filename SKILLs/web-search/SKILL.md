@@ -2,7 +2,7 @@
 name: web-search
 description: Real-time web search using Playwright-controlled browser. Use this skill when you need current information, latest documentation, recent news, or any data beyond your knowledge cutoff (January 2025).
 official: true
-version: 1.0.2
+version: 2.0.0
 ---
 
 # Web Search Skill
@@ -29,7 +29,7 @@ Use the web-search skill when you need:
 
 ```
 ┌──────────┐    Bash    ┌─────────┐    HTTP    ┌──────────────┐    CDP    ┌────────┐
-│  Claude  │───────────▶│ CLI.sh  │───────────▶│ Bridge Server│──────────▶│ Chrome │
+│  StarPath assistant  │───────────▶│ CLI.sh  │───────────▶│ Bridge Server│──────────▶│ Chrome │
 │          │            │         │            │ (localhost)  │ Playwright│        │
 └──────────┘            └─────────┘            └──────────────┘            └────────┘
                                                       │
@@ -39,7 +39,7 @@ Use the web-search skill when you need:
 ```
 
 **Architecture:**
-1. **CLI Script** - Simple bash interface for Claude
+1. **CLI Script** - Simple bash interface for StarPath assistant
 2. **Bridge Server** - Express HTTP API (auto-started by Electron)
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
@@ -442,13 +442,13 @@ bash scripts/start-server.sh
 bash scripts/search.sh "test" 1
 ```
 
-## Examples for Claude
+## Examples for StarPath assistant
 
 ### Example 1: User Asks About Latest Framework
 
 **User:** "What are the new features in Next.js 15?"
 
-**Claude's approach:**
+**StarPath assistant's approach:**
 ```bash
 # Search for Next.js 15 features
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
@@ -460,7 +460,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Next.js 15 new features" 5
 
 **User:** "I'm getting 'Cannot find module' error in TypeScript"
 
-**Claude's approach:**
+**StarPath assistant's approach:**
 ```bash
 # Search for the specific error
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module error solution" 5
@@ -472,7 +472,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "TypeScript Cannot find module 
 
 **User:** "What happened in AI this month?"
 
-**Claude's approach:**
+**StarPath assistant's approach:**
 ```bash
 # Search for recent AI news
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
@@ -484,7 +484,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "AI news January 2026" 10
 
 **User:** "How do I use React Server Components?"
 
-**Claude's approach:**
+**StarPath assistant's approach:**
 ```bash
 # Search for RSC documentation and tutorials
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide tutorial" 5
@@ -496,7 +496,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "React Server Components guide 
 
 **User:** "Should I use Vite or webpack in 2026?"
 
-**Claude's approach:**
+**StarPath assistant's approach:**
 ```bash
 # Search for recent comparisons
 bash "$SKILLS_ROOT/web-search/scripts/search.sh" "Vite vs webpack 2026 comparison" 5

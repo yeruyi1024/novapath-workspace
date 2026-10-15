@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="starpath" x1="4" y1="4" x2="124" y2="124" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4568E8"/>
+      <stop offset="1" stop-color="#8864D8"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="32" fill="url(#starpath)"/>
+  <path d="M82 25C86 36 91 41 102 45C91 49 86 54 82 65C78 54 73 49 62 45C73 41 78 36 82 25Z" fill="#FAFAFA"/>
+  <path d="M35 47C21 63 28 86 47 93C65 100 91 91 97 72M31 76C44 77 57 68 65 59" stroke="#FAFAFA" stroke-width="7" stroke-linecap="round"/>
+</svg>

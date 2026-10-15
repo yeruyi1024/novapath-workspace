@@ -2,6 +2,8 @@
 name: local-tools
 description: Access local system resources including Calendar on macOS and Windows. Use this skill when you need to manage user's schedule directly on their device.
 official: true
+metadata:
+  version: 2.0.0
 ---
 
 # Local Tools Skill
@@ -22,7 +24,7 @@ Use the local-tools skill when you need to:
 
 ```
 ┌──────────┐    Bash/PowerShell    ┌─────────────────────────────────────────────────────────────┐
-│  Claude  │──────────────────────▶│  calendar.sh / calendar.ps1                                 │
+│  StarPath assistant  │──────────────────────▶│  calendar.sh / calendar.ps1                                 │
 │          │                       │  ├─ macOS: osascript -l JavaScript (JXA) ──▶ Calendar.app   │
 │          │                       │  └─ Windows: PowerShell ──▶ Outlook COM API                 │
 └──────────┘                       └─────────────────────────────────────────────────────────────┘
@@ -98,7 +100,7 @@ In all examples below, `<skill-dir>/scripts/calendar.sh` is a placeholder. Repla
 bash "<skill-dir>/scripts/calendar.sh" search --query "birthday"
 
 # If permission error returned, directly tell user:
-# "Calendar access permission is required. Please open System Settings > Privacy & Security > Calendar, and authorize Terminal or LobsterAI"
+# "Calendar access permission is required. Please open System Settings > Privacy & Security > Calendar, and authorize Terminal or StarPath"
 ```
 
 ### List Events
@@ -232,7 +234,7 @@ When using the `list` command with time ranges:
 1. **Always use ISO 8601 format**: `YYYY-MM-DDTHH:mm:ss`
 2. **Use local timezone**: Do NOT use UTC or timezone suffixes (like +08:00 or Z)
 3. **Calculate dates yourself**: Do NOT use shell command substitution like `$(date ...)`
-4. **Claude should compute dates**: Based on current date, calculate target dates directly
+4. **StarPath assistant should compute dates**: Based on current date, calculate target dates directly
 5. **Examples**:
    - Today at midnight: `2026-02-13T00:00:00`
    - Today at end of day: `2026-02-13T23:59:59`
@@ -247,14 +249,14 @@ When using the `list` command with time ranges:
 
 ```bash
 # User asks: "What meetings do I have today?"
-# Claude's approach: Calculate today's date and query full day from 00:00 to 23:59
-# IMPORTANT: Claude should replace 2026-02-13 with the actual current date
+# StarPath assistant's approach: Calculate today's date and query full day from 00:00 to 23:59
+# IMPORTANT: StarPath assistant should replace 2026-02-13 with the actual current date
 bash "<skill-dir>/scripts/calendar.sh" list \
   --start "2026-02-13T00:00:00" \
   --end "2026-02-13T23:59:59"
 
 # User asks: "What's on my schedule tomorrow?"
-# Claude should calculate tomorrow's date (e.g., if today is 2026-02-13, tomorrow is 2026-02-14)
+# StarPath assistant should calculate tomorrow's date (e.g., if today is 2026-02-13, tomorrow is 2026-02-14)
 bash "<skill-dir>/scripts/calendar.sh" list \
   --start "2026-02-14T00:00:00" \
   --end "2026-02-14T23:59:59"
@@ -264,7 +266,7 @@ bash "<skill-dir>/scripts/calendar.sh" list \
 
 ```bash
 # User asks: "Schedule a meeting for tomorrow at 3 PM"
-# Claude's approach:
+# StarPath assistant's approach:
 bash "<skill-dir>/scripts/calendar.sh" create \
   --title "Meeting" \
   --start "2026-02-13T15:00:00" \
@@ -276,7 +278,7 @@ bash "<skill-dir>/scripts/calendar.sh" create \
 
 ```bash
 # User asks: "Find all meetings about the project"
-# Claude's approach:
+# StarPath assistant's approach:
 bash "<skill-dir>/scripts/calendar.sh" search \
   --query "project" \
   --calendar "Work"
@@ -286,7 +288,7 @@ bash "<skill-dir>/scripts/calendar.sh" search \
 
 ```bash
 # User asks: "Am I free tomorrow afternoon?"
-# Claude's approach:
+# StarPath assistant's approach:
 # 1. List tomorrow's events
 # 2. Analyze time slots
 # 3. Report availability
@@ -408,7 +410,7 @@ fi
 ```
 Error: Calendar access permission is required
 ```
-**Solution:** Open System Settings > Privacy & Security > Calendar, authorize Terminal or LobsterAI
+**Solution:** Open System Settings > Privacy & Security > Calendar, authorize Terminal or StarPath
 
 **Script Not Found:**
 ```

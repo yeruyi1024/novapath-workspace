@@ -17,6 +17,8 @@ import type {
   AsrRealtimeSessionRequest,
   AsrRealtimeSessionResult,
 } from '../../shared/asr/constants';
+import type { GatewayAsrRequest, GatewayAsrResult, GatewayAsrStatus } from '../../shared/asr/gateway';
+import type { LocalAsrProgress } from '../../shared/asr/local';
 import type {
   AuthLifecycleEvent,
   AuthLoginResult,
@@ -24,6 +26,7 @@ import type {
   AuthSessionChangedEvent,
   AuthSessionStatus,
 } from '../../shared/auth/constants';
+import type { MaasAPI } from '../../shared/auth/maas';
 import type {
   BrowserCredentialAvailabilityResponse,
   BrowserCredentialDeleteRequest,
@@ -1582,6 +1585,15 @@ interface IElectronAPI {
     onChanged: (callback: (payload: LibraryChangedPayload) => void) => () => void;
   };
   asr: {
+    localStatus: () => Promise<GatewayAsrStatus>;
+    transcribeLocal: (input: GatewayAsrRequest) => Promise<GatewayAsrResult>;
+    cancelLocal: (requestId: string) => Promise<void>;
+    prepareLocal: (requestId: string) => Promise<GatewayAsrResult>;
+    cancelLocalPrepare: (requestId: string) => Promise<void>;
+    onLocalProgress: (callback: (progress: LocalAsrProgress) => void) => () => void;
+    gatewayStatus: () => Promise<GatewayAsrStatus>;
+    transcribeGateway: (input: GatewayAsrRequest) => Promise<GatewayAsrResult>;
+    cancelGateway: (requestId: string) => Promise<void>;
     createRealtimeSession: (options: AsrRealtimeSessionRequest) => Promise<AsrRealtimeSessionResult>;
   };
   artifact: {
@@ -1636,6 +1648,8 @@ interface IElectronAPI {
     set: (enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   };
   appInfo: {
+    initialAppearance?: 'light' | 'dark';
+    reloadWindow: () => Promise<boolean>;
     getVersion: () => Promise<string>;
     getSystemLocale: () => Promise<string>;
     getKeyfromAttribution: () => Promise<{
@@ -2030,6 +2044,7 @@ interface IElectronAPI {
       input: ActivityHostExecuteActionInput,
     ) => Promise<ActivityResult<ActivityActionResponse>>;
   };
+  maas: MaasAPI;
   auth: {
     login: (loginUrl?: string) => Promise<AuthLoginResult>;
     exchange: (

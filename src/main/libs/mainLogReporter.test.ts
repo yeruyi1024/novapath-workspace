@@ -1,3 +1,12 @@
+vi.mock('../../shared/product', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../shared/product')>();
+  return {
+    ...actual,
+    PRODUCT_FEATURES: { ...actual.PRODUCT_FEATURES, analytics: true },
+    PRODUCT_SERVICES: { ...actual.PRODUCT_SERVICES, analyticsUrl: 'https://metrics.example.com/events' },
+  };
+});
+
 import { describe, expect, test, vi } from 'vitest';
 
 import {
@@ -72,8 +81,8 @@ describe('MainLogReporter', () => {
 
   test('sends a main-process event with persisted attribution context', async () => {
     const store = createStore({
-      // Legacy app_config rows do not contain usageAnalyticsEnabled and remain opted in.
-      [LogReporterStoreKey.AppConfig]: { language: 'en' },
+      // Sending requires explicit user consent.
+      [LogReporterStoreKey.AppConfig]: { language: 'en', usageAnalyticsEnabled: true },
       [LogReporterStoreKey.AuthUser]: { yid: 'user-2' },
       [LogReporterStoreKey.InstallationUuid]: 'installation-2',
       'keyfrom.attribution.v1': {

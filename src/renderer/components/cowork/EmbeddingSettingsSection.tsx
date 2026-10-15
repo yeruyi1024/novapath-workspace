@@ -34,7 +34,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   return (
-    <div className="space-y-3 rounded-xl border px-4 py-4 border-border">
+    <div className="settings-embedding-section space-y-5">
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <div className="text-sm font-medium text-foreground">
@@ -48,6 +48,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = ({
           type="button"
           role="switch"
           aria-checked={embeddingEnabled}
+          aria-label={i18nService.t('coworkMemoryEmbeddingEnabled')}
           onClick={() => onEmbeddingEnabledChange(!embeddingEnabled)}
           className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
             embeddingEnabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'

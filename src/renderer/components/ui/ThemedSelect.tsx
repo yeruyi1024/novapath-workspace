@@ -57,36 +57,33 @@ const ThemedSelect: React.FC<ThemedSelectProps> = ({
             id={id}
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className={`flex items-center justify-between w-full rounded-lg bg-surface border-border border focus:border-primary focus:ring-1 focus:ring-primary/40 text-foreground px-4 py-2.5 text-sm ${className}`}
+            className={`flex items-center justify-between w-full min-h-[32px] rounded-lg bg-surface border-border border text-foreground px-3 py-1.5 text-xs font-medium shadow-sm transition-colors hover:bg-surface-raised focus:border-primary focus:ring-1 focus:ring-primary/40 focus:outline-none ${className}`}
             aria-haspopup="listbox"
             aria-expanded={isOpen}
           >
             <span className="min-w-0 truncate text-left">{selectedOption?.label || value}</span>
-            <ChevronDownIcon className="w-4 h-4 ml-2 shrink-0" />
+            <ChevronDownIcon className="w-3.5 h-3.5 ml-2 shrink-0 text-secondary" />
           </button>
 
           {isOpen && (
-            <div className="absolute z-10 w-full mt-1 overflow-auto rounded-md popover-enter shadow-popover max-h-60 focus:outline-none">
+            <div className="absolute z-20 w-full mt-1 overflow-auto rounded-lg shadow-popover max-h-60 focus:outline-none">
               <ul
-                className="py-1 overflow-auto text-sm bg-surface border border-border rounded-lg"
+                className="py-1 overflow-auto text-xs bg-surface border border-border rounded-lg shadow-elevated"
                 role="listbox"
                 aria-labelledby={id}
               >
                 {options.map((option) => (
                   <li
                     key={option.value}
-                    className={`cursor-pointer select-none relative py-1.5 pl-3 pr-9 hover:bg-surface-raised ${
-                      option.value === value ? 'bg-surface-raised' : ''
+                    className={`cursor-pointer select-none relative py-1.5 px-3 hover:bg-surface-raised flex items-center justify-between ${
+                      option.value === value ? 'bg-surface-raised text-primary font-medium' : 'text-foreground font-normal'
                     }`}
                     role="option"
                     aria-selected={option.value === value}
                     onClick={() => handleOptionClick(option.value)}
                   >
-                    <span className={`block truncate text-foreground ${
-                      option.value === value ? 'font-medium' : 'font-normal'
-                    }`}>
-                      {option.label}
-                    </span>
+                    <span className="truncate">{option.label}</span>
+                    {option.value === value && <span className="ml-2 text-primary font-bold">✓</span>}
                   </li>
                 ))}
               </ul>

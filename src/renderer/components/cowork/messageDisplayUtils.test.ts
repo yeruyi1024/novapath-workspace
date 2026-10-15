@@ -700,9 +700,9 @@ test('activity current action text is a verb phrase for the latest step', () => 
     .toBe('正在使用 web_fetch');
   // Session orchestration tools get plain-language labels instead of raw names.
   expect(getActivityCurrentActionText(activityToolItem('tool-5', 'sessions_yield')))
-    .toBe('正在等待子 Agent 完成');
+    .toBe('正在等待子任务完成');
   expect(getActivityStepDisplay(activityToolItem('tool-6', 'sessions_yield')).name)
-    .toBe('等待子 Agent 完成');
+    .toBe('等待子任务完成');
 });
 
 test('diff stats count added and removed lines', () => {

@@ -3,7 +3,9 @@ import React from 'react';
 import { type Artifact, ArtifactTypeValue } from '@/types/artifact';
 
 import { isWorkspaceDiffArtifact } from '../../../shared/artifactPreview/workspaceChanges';
+import { artifactRendererBoundaryKey } from './artifactRendererIdentity';
 import type { ArtifactSelectedTextContext } from './artifactSelectedText';
+import PreviewErrorBoundary from './PreviewErrorBoundary';
 import CodeRenderer from './renderers/CodeRenderer';
 import DocumentRenderer from './renderers/DocumentRenderer';
 import HtmlRenderer from './renderers/HtmlRenderer';
@@ -22,7 +24,7 @@ interface ArtifactRendererProps {
   sourceView?: boolean;
 }
 
-const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, selectedTextContext, sourceView = false }) => {
+const ArtifactRendererContent: React.FC<ArtifactRendererProps> = ({ artifact, selectedTextContext, sourceView = false }) => {
   if (isWorkspaceDiffArtifact(artifact) && !sourceView) {
     return <WorkspaceDiffRenderer artifact={artifact} selectedTextContext={selectedTextContext} />;
   }
@@ -62,5 +64,15 @@ const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact, selectedT
       );
   }
 };
+
+const ArtifactRenderer: React.FC<ArtifactRendererProps> = props => (
+  <PreviewErrorBoundary key={artifactRendererBoundaryKey(
+    props.artifact,
+    props.sourceView ?? false,
+    Boolean(window.electron?.artifact?.markdown),
+  )} resetKey={`${props.artifact.contentVersion ?? ''}:${props.sourceView ?? false}`}>
+    <ArtifactRendererContent {...props} />
+  </PreviewErrorBoundary>
+);
 
 export default ArtifactRenderer;

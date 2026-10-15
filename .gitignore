@@ -26,6 +26,8 @@ resources/mingit/
 resources/MinGit-*.zip
 resources/PortableGit-*.7z.exe
 resources/python-win/
+resources/document-runtime/
+resources/asr-runtime/
 resources/python-*.zip
 
 # SKILLs runtime files
@@ -59,5 +61,5 @@ openspec/
 # Local CI workspaces and generated artifacts
 .ci-openclaw/
 .ci-artifacts/
-artifacts/
+/artifacts/
 logs/

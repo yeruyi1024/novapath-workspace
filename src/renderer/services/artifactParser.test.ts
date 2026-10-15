@@ -19,6 +19,12 @@ import {
 } from './artifactParser';
 
 describe('normalizeArtifactFilePath', () => {
+  test('preserves native filename characters and decodes URL paths only once', () => {
+    expect(normalizeArtifactFilePath('/work/方案 #1 100%20.pptx')).toBe('/work/方案 #1 100%20.pptx');
+    expect(normalizeArtifactFilePath('file:///work/%E6%96%B9%E6%A1%88%20%231%20100%2520.pptx'))
+      .toBe('/work/方案 #1 100%20.pptx');
+    expect(normalizeArtifactFilePath('file://server/share/My%20Deck.pptx')).toBe('//server/share/My Deck.pptx');
+  });
   test('strips MEDIA prefix from paths parsed as bare file paths', () => {
     expect(normalizeArtifactFilePath('MEDIA:/Users/admin/work/test/test0623/generated-video.mp4'))
       .toBe('/Users/admin/work/test/test0623/generated-video.mp4');
@@ -61,6 +67,10 @@ describe('normalizeFilePathForDedup', () => {
 });
 
 describe('parseFileLinksFromMessage', () => {
+  test('preserves encoded hash and percent characters in a reply file reference', () => {
+    const artifacts = parseFileLinksFromMessage('[演示](file:///work/report%2520%23.pptx)', 'msg1', 'sess1');
+    expect(artifacts[0].filePath).toBe('/work/report%20#.pptx');
+  });
   test('strips leading / from Windows file:// link path', () => {
     const content = '文件：[hello.pptx](file:///D:/workspace/hello.pptx)';
     const artifacts = parseFileLinksFromMessage(content, 'msg1', 'sess1');
@@ -971,9 +981,9 @@ describe('parseToolArtifact', () => {
 });
 
 describe('toAbsoluteArtifactPath', () => {
-  test('keeps absolute POSIX and Windows paths unchanged', () => {
+  test('keeps absolute locations and normalizes Windows separators', () => {
     expect(toAbsoluteArtifactPath('/home/user/a.md', '/cwd')).toBe('/home/user/a.md');
-    expect(toAbsoluteArtifactPath('D:\\ws\\a.md', '/cwd')).toBe('D:\\ws\\a.md');
+    expect(toAbsoluteArtifactPath('D:\\ws\\a.md', '/cwd')).toBe('D:/ws/a.md');
   });
 
   test('strips file:// prefixes and Windows leading slash', () => {
@@ -1078,5 +1088,14 @@ describe('parseFilePathsFromText — find command output scenario', () => {
     const content = 'B-01-seedream.png\nB-02-chart.png';
     const artifacts = parseFilePathsFromText(content, 'msg1', 'sess1');
     expect(artifacts).toHaveLength(0);
+  });
+});
+
+
+describe('artifact reference path normalization', () => {
+  test('decodes file URLs exactly once and normalizes relative segments', () => {
+    expect(toAbsoluteArtifactPath('file:///work/My%20Deck%2520.pptx')).toBe('/work/My Deck%20.pptx');
+    expect(toAbsoluteArtifactPath('./slides/../deck.pptx', '/work')).toBe('/work/deck.pptx');
+    expect(toAbsoluteArtifactPath('..\\deck.pptx', 'D:\\work\\slides')).toBe('D:/work/deck.pptx');
   });
 });

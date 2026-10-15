@@ -9,6 +9,7 @@ import {
 } from '../shared/activity/constants';
 import { AgentIpcChannel, AgentLegacyIdentityCleanupStatus } from '../shared/agent/constants';
 import { AppIpcChannel } from '../shared/app/constants';
+import { readStartupAppearance } from '../shared/app/startupAppearance';
 import { AppSettingsIpc } from '../shared/appSettings/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { ArtifactPreviewIpc } from '../shared/artifactPreview/constants';
@@ -19,11 +20,14 @@ import {
   AsrIpcChannel,
   type AsrRealtimeSessionRequest,
 } from '../shared/asr/constants';
+import { GatewayAsrIpc, type GatewayAsrRequest } from '../shared/asr/gateway';
+import { LocalAsrIpc, type LocalAsrProgress } from '../shared/asr/local';
 import {
   AuthIpcChannel,
   type AuthLifecycleEvent,
   type AuthSessionChangedEvent,
 } from '../shared/auth/constants';
+import { type MaasAPI, MaasIpc,type MaasLoginInput } from '../shared/auth/maas';
 import {
   type BrowserCredentialAvailabilityResponse,
   type BrowserCredentialDeleteRequest,
@@ -715,8 +719,6 @@ contextBridge.exposeInMainWorld('electron', {
     readMemoryFileRaw: () => ipcRenderer.invoke(CoworkIpcChannel.MemoryReadRaw),
     writeMemoryFileRaw: (input: { content: string }) =>
       ipcRenderer.invoke(CoworkIpcChannel.MemoryWriteRaw, input),
-    getDreamingStatus: () => ipcRenderer.invoke('cowork:dreaming:status'),
-    getDreamDiary: () => ipcRenderer.invoke('cowork:dreaming:diary'),
     readBootstrapFile: (filename: string, options?: { agentId?: string }) =>
       ipcRenderer.invoke(CoworkIpcChannel.BootstrapRead, filename, options),
     writeBootstrapFile: (filename: string, content: string, options?: { agentId?: string }) =>
@@ -1035,6 +1037,19 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   asr: {
+    localStatus: () => ipcRenderer.invoke(LocalAsrIpc.Status),
+    transcribeLocal: (input: GatewayAsrRequest) => ipcRenderer.invoke(LocalAsrIpc.Transcribe, input),
+    cancelLocal: (requestId: string) => ipcRenderer.invoke(LocalAsrIpc.Cancel, requestId),
+    prepareLocal: (requestId: string) => ipcRenderer.invoke(LocalAsrIpc.Prepare, requestId),
+    cancelLocalPrepare: (requestId: string) => ipcRenderer.invoke(LocalAsrIpc.CancelPrepare, requestId),
+    onLocalProgress: (callback: (progress: LocalAsrProgress) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, progress: LocalAsrProgress) => callback(progress);
+      ipcRenderer.on(LocalAsrIpc.Progress, handler);
+      return () => ipcRenderer.removeListener(LocalAsrIpc.Progress, handler);
+    },
+    gatewayStatus: () => ipcRenderer.invoke(GatewayAsrIpc.Status),
+    transcribeGateway: (input: GatewayAsrRequest) => ipcRenderer.invoke(GatewayAsrIpc.Transcribe, input),
+    cancelGateway: (requestId: string) => ipcRenderer.invoke(GatewayAsrIpc.Cancel, requestId),
     createRealtimeSession: (options: AsrRealtimeSessionRequest) =>
       ipcRenderer.invoke(AsrIpcChannel.CreateRealtimeSession, options),
   },
@@ -1094,6 +1109,8 @@ contextBridge.exposeInMainWorld('electron', {
     set: (enabled: boolean) => ipcRenderer.invoke(AppSettingsIpc.SetPreventSleep, enabled),
   },
   appInfo: {
+    initialAppearance: readStartupAppearance(process.argv),
+    reloadWindow: () => ipcRenderer.invoke(AppIpcChannel.ReloadWindow),
     getVersion: () => ipcRenderer.invoke('app:getVersion'),
     getSystemLocale: () => ipcRenderer.invoke('app:getSystemLocale'),
     getKeyfromAttribution: () => ipcRenderer.invoke(AppIpcChannel.GetKeyfromAttribution),
@@ -1356,6 +1373,16 @@ contextBridge.exposeInMainWorld('electron', {
   networkStatus: {
     send: (status: 'online' | 'offline') => ipcRenderer.send('network:status-change', status),
   },
+  maas: {
+    snapshot: () => ipcRenderer.invoke(MaasIpc.Snapshot),
+    billing: () => ipcRenderer.invoke(MaasIpc.Billing),
+    subscriptions: () => ipcRenderer.invoke(MaasIpc.Subscriptions),
+    login: (input: MaasLoginInput) => ipcRenderer.invoke(MaasIpc.Login, input),
+    openLogin: (origin: string) => ipcRenderer.invoke(MaasIpc.OpenLogin, origin),
+    status: (origin: string) => ipcRenderer.invoke(MaasIpc.Status, origin),
+    sendSMS: (input: { origin: string; phone: string }) => ipcRenderer.invoke(MaasIpc.SendSMS, input),
+    logout: () => ipcRenderer.invoke(MaasIpc.Logout),
+  } satisfies MaasAPI,
   auth: {
     login: (loginUrl?: string) => ipcRenderer.invoke(AuthIpcChannel.Login, { loginUrl }),
     exchange: (code: string) => ipcRenderer.invoke(AuthIpcChannel.Exchange, { code }),

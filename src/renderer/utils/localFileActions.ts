@@ -24,7 +24,7 @@ export const getShellFailureMessage = (
     case ShellOpenFailureReason.OpenFailed:
     case ShellOpenFailureReason.Unknown:
     default:
-      return result?.error || i18nService.t(fallbackKey);
+      return i18nService.t(fallbackKey);
   }
 };
 
@@ -32,7 +32,9 @@ export const showShellFailureToast = (
   result: ShellActionResult | undefined | null,
   fallbackKey = 'openFileFailed',
 ): void => {
-  showToast(getShellFailureMessage(result, fallbackKey));
+  window.dispatchEvent(new CustomEvent('app:showToast', {
+    detail: { message: getShellFailureMessage(result, fallbackKey), tone: 'error' },
+  }));
 };
 
 const logLocalFileActionFailure = (

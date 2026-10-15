@@ -9,6 +9,8 @@ import {
   ArtifactTypeValue,
 } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
+import { normalizeShellFilePath } from './shellAppsCache';
+import { resolveWorkspacePath } from './workspacePath';
 
 /**
  * Normalize a local artifact path from markdown, MEDIA tokens, or tool metadata.
@@ -21,25 +23,8 @@ export function normalizeArtifactFilePath(filePath: string): string {
   } else {
     normalized = normalized.replace(/^MEDIA:\s*/i, '').trim();
   }
-  if (normalized.startsWith('file:///')) {
-    normalized = normalized.slice(7);
-  } else if (normalized.startsWith('file://')) {
-    normalized = normalized.slice(7);
-  } else if (normalized.startsWith('file:/')) {
-    normalized = normalized.slice(5);
-  } else if (normalized.startsWith('localfile:///')) {
-    normalized = normalized.slice(12);
-  } else if (normalized.startsWith('localfile://')) {
-    normalized = normalized.slice(12);
-  }
-  const queryIndex = normalized.search(/[?#]/);
-  if (queryIndex >= 0) {
-    normalized = normalized.slice(0, queryIndex);
-  }
-  try {
-    normalized = decodeURIComponent(normalized);
-  } catch {
-    // Keep the original value if it contains a literal percent sign.
+  if (/^(?:file|localfile):/i.test(normalized)) {
+    normalized = normalizeShellFilePath(normalized.replace(/^localfile:/i, 'file:'));
   }
   // Strip leading / before drive letter (e.g. /D:/path from file:///D:/path)
   if (/^\/[A-Za-z]:/.test(normalized)) normalized = normalized.slice(1);
@@ -71,24 +56,13 @@ export function normalizeProjectDirectoryForDedup(projectDirectory: string): str
  * session working directory.
  */
 export function toAbsoluteArtifactPath(filePath: string, cwd?: string): string {
-  let rawPath = filePath;
-  if (rawPath.startsWith('file:///')) {
-    rawPath = rawPath.slice(7);
-  } else if (rawPath.startsWith('file://')) {
-    rawPath = rawPath.slice(7);
-  } else if (rawPath.startsWith('file:/')) {
-    rawPath = rawPath.slice(5);
+  try {
+    return resolveWorkspacePath(filePath, cwd?.trim());
+  } catch {
+    // Detection can encounter incomplete references; preserve them for display.
+    // Actual file loading validates again and never guesses a process cwd.
+    return filePath;
   }
-  // Strip leading / before Windows drive letter (e.g. /D:/path from file:///D:/path)
-  if (/^\/[A-Za-z]:/.test(rawPath)) {
-    rawPath = rawPath.slice(1);
-  }
-  if (rawPath.startsWith('/') || /^[A-Za-z]:/.test(rawPath) || rawPath.startsWith('~')) {
-    return rawPath;
-  }
-  const base = cwd?.trim().replace(/[\\/]+$/, '');
-  if (!base) return rawPath;
-  return `${base}/${rawPath.replace(/^\.\//, '')}`;
 }
 
 /**
@@ -845,18 +819,17 @@ function resolveLocalHrefPath(rawHref: string): string | null {
   }
   if (!href || href.startsWith('#') || href.startsWith('//')) return null;
   if (/^(?:file|localfile):/i.test(href)) {
-    let decoded = href;
-    try {
-      decoded = decodeURIComponent(href);
-    } catch {
-      // Keep the original value if it contains a literal percent sign.
-    }
-    return normalizeArtifactFilePath(decoded) || null;
+    return normalizeArtifactFilePath(href) || null;
   }
   const isWindowsAbsolute = /^[A-Za-z]:[\\/]/.test(href);
   // Any other scheme (http:, https:, mailto:, tel:, ...) is not a local path.
   if (!isWindowsAbsolute && /^[a-z][a-z0-9+.-]*:/i.test(href)) return null;
 
+  try {
+    href = decodeURIComponent(href);
+  } catch {
+    // Keep native paths containing a literal percent sign.
+  }
   const candidate = normalizeArtifactFilePath(href);
   if (!candidate) return null;
   const isPosixAbsolute = candidate.startsWith('/');

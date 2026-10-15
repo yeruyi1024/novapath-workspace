@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import FileTypeIcon from '@/components/icons/fileTypes/FileTypeIcon';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 import { openLocalPathWithToast } from '@/utils/localFileActions';
@@ -53,6 +54,9 @@ function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading
 
   useEffect(() => {
     let cancelled = false;
+    setData(null);
+    setError(null);
+    setLoading(true);
 
     const load = async () => {
       if (artifact.content) {
@@ -79,7 +83,7 @@ function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading
         } catch (e) {
           if (!cancelled) setError(e instanceof Error ? e.message : String(e));
         }
-        setLoading(false);
+        if (!cancelled) setLoading(false);
         return;
       }
 
@@ -89,7 +93,7 @@ function useFileContent(artifact: Artifact): { data: ArrayBuffer | null; loading
 
     load();
     return () => { cancelled = true; };
-  }, [artifact.content, artifact.filePath]);
+  }, [artifact.content, artifact.filePath, artifact.contentVersion]);
 
   return { data, loading, error };
 }
@@ -188,7 +192,7 @@ const DocxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div role="alert" className="flex items-center justify-center h-full text-red-500 text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
@@ -313,7 +317,11 @@ function getPdfJsAssetUrl(assetPath: string): string {
     return new URL(`/pdfjs/${assetPath}`, window.location.origin).href;
   }
 
-  return new URL(`../pdfjs/${assetPath}`, import.meta.url).href;
+  // Resolve public assets from the renderer entry. Vite rewrites dynamic
+  // import.meta.url templates into module globs, but these files are copied
+  // after bundling and are not source modules.
+  const assetRoot = new URL('./pdfjs/', window.location.href);
+  return new URL(assetPath, assetRoot).href;
 }
 
 const PdfCanvasSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
@@ -362,24 +370,31 @@ const PdfCanvasSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) =>
 
   // Load PDF document
   useEffect(() => {
+    setError(null);
+    setPdfDoc(null);
+    setPageCount(0);
     if (loadError) { setError(loadError); return; }
     if (!data) return;
 
     let cancelled = false;
+    let loadingTask: { destroy: () => Promise<void> } | null = null;
 
     const loadPdf = async () => {
       try {
         const pdfjsLib = await import('pdfjs-dist');
+        if (cancelled) return;
         pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.mjs', import.meta.url).href;
 
-        const pdf = await pdfjsLib.getDocument({
+        const task = pdfjsLib.getDocument({
           data: new Uint8Array(data),
           cMapUrl: getPdfJsAssetUrl('cmaps/'),
           cMapPacked: true,
           standardFontDataUrl: getPdfJsAssetUrl('standard_fonts/'),
           disableFontFace: false,
           useSystemFonts: true,
-        }).promise;
+        });
+        loadingTask = task;
+        const pdf = await task.promise;
         if (cancelled) return;
 
         setPdfDoc(pdf);
@@ -390,12 +405,15 @@ const PdfCanvasSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) =>
     };
 
     loadPdf();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      void loadingTask?.destroy().catch(() => {});
+    };
   }, [data, loadError]);
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div role="alert" className="flex items-center justify-center h-full text-red-500 text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
@@ -436,6 +454,7 @@ const PdfPageCanvas: React.FC<{
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
   const [height, setHeight] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -448,6 +467,7 @@ const PdfPageCanvas: React.FC<{
     }
 
     let cancelled = false;
+    setError(null);
 
     const renderPage = async () => {
       try {
@@ -476,7 +496,8 @@ const PdfPageCanvas: React.FC<{
         renderTaskRef.current = null;
       } catch (e) {
         // Ignore cancellation errors
-        if (e instanceof Error && e.message.includes('Rendering cancelled')) return;
+        if (cancelled || (e instanceof Error && e.name === 'RenderingCancelledException')) return;
+        setError(e instanceof Error ? e.message : String(e));
       }
     };
 
@@ -491,101 +512,20 @@ const PdfPageCanvas: React.FC<{
   }, [pdfDoc, pageNumber, width]);
 
   return (
+    <div>
+      {error && <p role="alert" className="p-4 text-sm text-red-500">{t('artifactDocumentError')}: {error}</p>}
     <canvas
       ref={canvasRef}
       className="mx-auto block bg-white shadow-md rounded-sm"
       style={{ minHeight: height || 200 }}
     />
-  );
-};
-
-const NativePdfSubRenderer: React.FC<{ artifact: Artifact; onFallback: () => void }> = ({ artifact, onFallback }) => {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useRegisterOfficePreviewZoomControls(null);
-
-  useEffect(() => {
-    if (!artifact.filePath || !window.electron?.artifact?.createPreviewSession) {
-      onFallback();
-      return;
-    }
-
-    let cancelled = false;
-    let sessionId: string | null = null;
-
-    const createSession = async () => {
-      try {
-        setLoading(true);
-        const filePath = normalizeLocalFilePath(artifact.filePath!);
-        const result = await window.electron?.artifact?.createPreviewSession(filePath);
-        if (cancelled) {
-          if (result?.success && result.sessionId) {
-            void window.electron?.artifact?.destroyPreviewSession(result.sessionId);
-          }
-          return;
-        }
-
-        if (!result?.success || !result.url || !result.sessionId) {
-          throw new Error(result?.error || t('artifactDocumentError'));
-        }
-
-        sessionId = result.sessionId;
-        setPreviewUrl(`${result.url}#toolbar=0&navpanes=0`);
-        setLoading(false);
-      } catch {
-        if (!cancelled) {
-          onFallback();
-        }
-      }
-    };
-
-    createSession();
-
-    return () => {
-      cancelled = true;
-      if (sessionId) {
-        void window.electron?.artifact?.destroyPreviewSession(sessionId);
-      }
-    };
-  }, [artifact.contentVersion, artifact.filePath, onFallback]);
-
-  return (
-    <div className="relative h-full flex flex-col overflow-hidden bg-[#f5f5f5]">
-      {loading && (
-        <div className="absolute inset-0 flex items-center justify-center text-muted text-sm">
-          {t('artifactDocumentLoading')}
-        </div>
-      )}
-      {previewUrl && (
-        <iframe
-          src={previewUrl}
-          className="w-full h-full border-0"
-          title={artifact.title || artifact.fileName || t('artifactDocumentPreviewTitle')}
-          onError={onFallback}
-        />
-      )}
     </div>
   );
 };
 
-const PdfSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
-  const [useCanvasFallback, setUseCanvasFallback] = useState(false);
-
-  useEffect(() => {
-    setUseCanvasFallback(false);
-  }, [artifact.contentVersion, artifact.filePath]);
-
-  const handleFallback = useCallback(() => {
-    setUseCanvasFallback(true);
-  }, []);
-
-  if (!artifact.filePath || artifact.content || useCanvasFallback) {
-    return <PdfCanvasSubRenderer artifact={artifact} />;
-  }
-
-  return <NativePdfSubRenderer artifact={artifact} onFallback={handleFallback} />;
-};
+// Use the bundled reader for consistent loading, errors and recovery on every OS.
+// Chromium's embedded PDF viewer can load an iframe successfully but remain blank.
+const PdfSubRenderer = PdfCanvasSubRenderer;
 
 // --- Pptx Sub-Renderer ---
 
@@ -1245,7 +1185,7 @@ const LegacyPptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) =
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div role="alert" className="flex items-center justify-center h-full text-red-500 text-sm p-4">
         {t('artifactDocumentError')}: {error}
       </div>
     );
@@ -1446,8 +1386,8 @@ const FileInfoFallback: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
-      <div className="text-5xl">
-        {ext === '.pptx' ? '📊' : ext === '.xlsx' ? '📑' : '📄'}
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface">
+        <FileTypeIcon fileName={artifact.fileName || artifact.filePath || artifact.title} className="h-9 w-9" />
       </div>
       <div className="text-center">
         <div className="text-sm font-medium">{artifact.fileName || artifact.title}</div>

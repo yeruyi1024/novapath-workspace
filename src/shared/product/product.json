@@ -1,0 +1,32 @@
+{
+  "name": "星途 NovaPath",
+  "slug": "novapath",
+  "appId": "com.starpath.desktop",
+  "supportEmail": "",
+  "services": {
+    "apiBaseUrl": "",
+    "portalBaseUrl": "",
+    "updateUrl": "",
+    "manualUpdateUrl": "",
+    "downloadUrl": "",
+    "skillStoreUrl": "https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/skill-store",
+    "kitStoreUrl": "",
+    "mcpMarketplaceUrl": "https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/mcp-marketplace",
+    "loginConfigUrl": "",
+    "analyticsUrl": "",
+    "docsUrl": "",
+    "communityUrl": "",
+    "termsUrl": ""
+  },
+  "features": {
+    "account": false,
+    "promotions": false,
+    "analytics": false,
+    "fileSharing": false,
+    "legacyPublishing": false
+  },
+  "englishName": "NovaPath",
+  "storageName": "星途 StarPath",
+  "shortName": "星途",
+  "dataDirectory": "API Console"
+}

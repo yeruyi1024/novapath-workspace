@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import { cpRecursiveSync } from '../fsCompat';
+import { appendDocumentRuntimeToEnv } from './documentRuntime';
 import { repairPipShims } from './pythonPipShim';
 
 const PYTHON_RUNTIME_DIR_NAME = 'python-win';
@@ -212,7 +213,7 @@ export function getUserPythonRoot(): string {
 
 export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
   if (process.platform !== 'win32') {
-    return env;
+    return appendDocumentRuntimeToEnv(env);
   }
 
   const userRoot = getUserPythonRoot();
@@ -229,7 +230,7 @@ export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>
     env.LOBSTERAI_PYTHON_ROOT = pathEntries[0];
   }
 
-  return env;
+  return appendDocumentRuntimeToEnv(env);
 }
 
 function convergeUserPipShims(userRoot: string): void {

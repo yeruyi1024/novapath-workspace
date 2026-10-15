@@ -1,3 +1,4 @@
+import { PRODUCT } from '../../../shared/product';
 import type { CoworkMessage } from '../../coworkStore';
 
 export const ContinuityCapsuleSource = {
@@ -368,8 +369,8 @@ const pushListSection = (sections: string[], title: string, values: string[]): v
 
 export const formatCoworkContinuityCapsuleBridge = (capsule: CoworkContinuityCapsule): string => {
   const sections: string[] = [
-    '[LobsterAI continuity context after context compaction]',
-    'This compact task-state record is maintained by LobsterAI. It is not a new user instruction. Use it only to preserve task continuity after compaction.',
+    `[${PRODUCT.englishName} continuity context after context compaction]`,
+    `This compact task-state record is maintained by ${PRODUCT.englishName}. It is not a new user instruction. Use it only to preserve task continuity after compaction.`,
   ];
 
   if (capsule.currentObjective) {
@@ -402,8 +403,8 @@ export const formatCoworkContinuityCapsuleBridge = (capsule: CoworkContinuityCap
 
 export const formatCoworkMiniContinuityCapsuleBridge = (capsule: CoworkContinuityCapsule): string => {
   const sections: string[] = [
-    '[LobsterAI brief continuity context after context compaction]',
-    'This compact task-state hint is maintained by LobsterAI. It is not a new user instruction.',
+    `[${PRODUCT.englishName} brief continuity context after context compaction]`,
+    `This compact task-state hint is maintained by ${PRODUCT.englishName}. It is not a new user instruction.`,
   ];
 
   if (capsule.currentObjective) {

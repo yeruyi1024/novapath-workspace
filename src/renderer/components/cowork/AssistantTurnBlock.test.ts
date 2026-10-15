@@ -60,8 +60,8 @@ test('a file being written shows its line count but no timer, while a command ke
   expect(writing).toContain('正在写入文件');
   expect(writing).toContain('data-diff-stats="151/0"');
   expect(writing).not.toMatch(/ · \d+s/);
-  // The write line leads with the app's compose icon (34×34 artboard).
-  expect(writing).toMatch(/data-activity-step-kind="edit"[^]*?viewBox="0 0 34 34"/);
+  // Writing retains its leading activity icon when the icon artwork changes.
+  expect(writing).toMatch(/data-activity-step-kind="edit"[^]*?<svg/);
 
   const commanding = renderTurn([
     ...process,

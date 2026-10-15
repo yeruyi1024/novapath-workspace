@@ -36,11 +36,39 @@ beforeEach(() => {
 
 afterEach(() => {
   manager.stopWatching();
+  vi.restoreAllMocks();
   if (!path.resolve(fixture.root).startsWith(path.resolve(os.tmpdir()) + path.sep)) {
     throw new Error('Refusing to remove a non-fixture directory');
   }
   fs.rmSync(fixture.root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
+
+test('does not lose a definition arriving between scan and watcher attachment', async () => {
+  const dir = path.join(root, 'installing');
+  const original = fs.watch;
+  vi.spyOn(fs, 'watch').mockImplementation((...args: Parameters<typeof fs.watch>) => {
+    if (String(args[0]) === dir && !fs.existsSync(path.join(dir, 'SKILL.md'))) {
+      fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: installing\ndescription: installation\n---\nBody');
+    }
+    return original(...args);
+  });
+  fs.mkdirSync(dir);
+  await vi.waitFor(() => expect(notified).toHaveBeenCalledTimes(1), { timeout: 4000 });
+  expect(notified.mock.calls[0][0].source).toBe(SkillChangeSource.Watcher);
+  await pause(400);
+  expect(notified).toHaveBeenCalledTimes(1);
+});
+
+test('recovers missing native events without repeatedly notifying unchanged definitions', async () => {
+  vi.spyOn(fs, 'watch').mockReturnValue({ close: vi.fn() } as unknown as fs.FSWatcher);
+  manager.startWatching();
+  const dir = path.join(root, 'silent-install');
+  fs.mkdirSync(dir);
+  fs.writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: silent-install\ndescription: installation\n---\nBody');
+  await vi.waitFor(() => expect(notified).toHaveBeenCalledTimes(1), { timeout: 4000 });
+  await pause(2300);
+  expect(notified).toHaveBeenCalledTimes(1);
+}, 10000);
 
 test('real native watchers suppress metadata noise and same-content writes but deliver edits', async () => {
   const content = fs.readFileSync(definition, 'utf8');

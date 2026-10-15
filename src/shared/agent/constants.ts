@@ -1,3 +1,5 @@
+import { PRODUCT } from '../product';
+
 export const AgentId = {
   Main: 'main',
 } as const;
@@ -57,5 +59,5 @@ export const LegacyAgentName = {
 } as const;
 
 export const DefaultAgentProfile = {
-  Name: 'LobsterAI',
+  Name: PRODUCT.name,
 } as const;
