@@ -16,9 +16,12 @@ interface Props {
 
 export default function AppearanceSettings(props: Props) {
   return (
-    <div className="settings-appearance-page space-y-8">
-      <section className="settings-appearance-section">
-        <h4 className="settings-section-title">{i18nService.t('starpathColorMode')}</h4>
+    <div className="settings-appearance-page">
+      <section className="settings-section">
+        <header className="settings-section-header">
+          <h3 className="settings-section-title">{i18nService.t('starpathColorMode')}</h3>
+          <p className="settings-section-description">{i18nService.t('starpathAppearanceHint')}</p>
+        </header>
         <div className="settings-theme-grid" role="group" aria-label={i18nService.t('starpathColorMode')}>
           {(['light', 'dark', 'system'] as const).map(mode => {
             const Icon = mode === 'light' ? SunIcon : mode === 'dark' ? MoonIcon : ComputerDesktopIcon;
@@ -37,19 +40,20 @@ export default function AppearanceSettings(props: Props) {
             );
           })}
         </div>
-        <p className="mt-3 text-xs leading-5 text-secondary">{i18nService.t('starpathAppearanceHint')}</p>
       </section>
-      <section className="settings-appearance-section">
-        <h4 className="settings-section-title">{i18nService.t('starpathTypography')}</h4>
+      <section className="settings-section">
+        <header className="settings-section-header">
+          <h3 className="settings-section-title">{i18nService.t('starpathTypography')}</h3>
+        </header>
         <div className="settings-typography-layout">
-          <div className="settings-typography-controls">
+          <div className="settings-list settings-typography-controls">
             {([
               { id: 'ui-font-size', title: 'uiFontSize', description: 'uiFontSizeDescription', value: props.uiFontSize,
                 min: FontPreferences.UiFontSizeMin, max: FontPreferences.UiFontSizeMax, onChange: props.onUiFontSizeChange },
               { id: 'code-font-size', title: 'codeFontSize', description: 'codeFontSizeDescription', value: props.codeFontSize,
                 min: FontPreferences.CodeFontSizeMin, max: FontPreferences.CodeFontSizeMax, onChange: props.onCodeFontSizeChange },
             ]).map(row => (
-              <div key={row.id} className="settings-preference-row">
+              <div key={row.id} className="settings-list-row settings-preference-row">
                 <div className="min-w-0"><label htmlFor={row.id} className="text-sm text-foreground">{i18nService.t(row.title)}</label>
                   <p id={`${row.id}-description`} className="mt-1 text-xs leading-5 text-secondary">{i18nService.t(row.description)}</p></div>
                 <div className="flex shrink-0 items-center gap-2">

@@ -977,7 +977,7 @@ const App: React.FC = () => {
     toastTimerRef.current = window.setTimeout(() => {
       setToastMessage(null);
       toastTimerRef.current = null;
-    }, detail.actionLabel && detail.onAction ? 6000 : 2200);
+    }, detail.tone === 'error' || (detail.actionLabel && detail.onAction) ? 6000 : 2200);
   }, []);
 
   const startUserInitiatedUpdateFlow = useCallback((reason: string) => {
@@ -2126,6 +2126,7 @@ const App: React.FC = () => {
       {toastMessage && (
         <Toast
           message={toastMessage.message}
+          tone={toastMessage.tone}
           actionLabel={toastMessage.actionLabel}
           onAction={toastMessage.onAction}
           closeLabel={i18nService.t('close')}

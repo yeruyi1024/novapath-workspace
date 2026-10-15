@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import PromptPanel from './PromptPanel';
@@ -27,7 +26,7 @@ const OfficeQuickActions: React.FC<OfficeQuickActionsProps> = ({ disabled, onPro
     && skills.some(skill => skill.id === action.skillMapping && skill.enabled));
 
   return (
-    <div className="mt-5 w-full space-y-4">
+    <div className="mt-5 w-full space-y-3">
       <QuickActionBar
         actions={officeActions}
         selectedActionId={officeActions.find(action => activeSkillIds.includes(action.skillMapping)
@@ -49,14 +48,11 @@ const OfficeQuickActions: React.FC<OfficeQuickActionsProps> = ({ disabled, onPro
         }}
       />
       {openAction && !disabled && (
-        <div className="rounded-2xl border border-border-subtle bg-surface p-4">
-          <PromptPanel
-            action={openAction}
-            onPromptSelect={(prompt) => { onPromptSelect(prompt); setOpenActionId(null); }}
-            onClose={() => setOpenActionId(null)}
-          />
-          <p className="mt-3 text-xs leading-5 text-muted">{i18nService.t('officeQuickActionsDraftHint')}</p>
-        </div>
+        <PromptPanel
+          action={openAction}
+          onPromptSelect={(prompt) => { onPromptSelect(prompt); setOpenActionId(null); }}
+          onClose={() => setOpenActionId(null)}
+        />
       )}
     </div>
   );

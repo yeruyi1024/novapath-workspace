@@ -127,6 +127,7 @@ import {
   CoworkSessionStatusValue,
 } from '../../types/cowork';
 import type { MediaAttachmentRef } from '../../types/mediaGeneration';
+import { resolveTruncatedFileLink } from '../../utils/resolveTruncatedFileLink';
 import { parseUserMessageForDisplay } from '../../utils/userMessageDisplay';
 import {
   AgentBrowserInAppPanel,
@@ -5008,6 +5009,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     const hrefPath = hrefValue ? normalizeLocalPath(hrefValue) : null;
     if (hrefPath) {
+      const recoveredPath = resolveTruncatedFileLink(
+        // Markdown's file URL encoder also escapes existing percent escapes.
+        // Decode that extra layer only for matching a shortened file URL.
+        /^file:\/\//i.test(hrefValue) ? safeDecodeURIComponent(hrefPath.path) : hrefPath.path,
+        sessionArtifacts.flatMap(artifact => artifact.filePath
+          ? [currentSession?.cwd
+            ? toAbsolutePathFromCwd(artifact.filePath, currentSession.cwd)
+            : artifact.filePath]
+          : []),
+      );
+      if (recoveredPath) return recoveredPath;
       if (hrefPath.isRelative && currentSession?.cwd) {
         return toAbsolutePathFromCwd(hrefPath.path, currentSession.cwd);
       }
@@ -5032,7 +5044,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
 
     return null;
-  }, [currentSession?.cwd]);
+  }, [currentSession?.cwd, sessionArtifacts]);
 
   const mapDisplayText = useCallback((value: string): string => {
     return value;
@@ -6651,7 +6663,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div
         ref={promptInputAreaRef}
         className={`workspace-conversation-dock relative shrink-0 ${COWORK_DETAIL_GUTTER_CLASS} ${
-          isArtifactPanelExpanded ? 'z-50 bg-background pb-2 pt-1' : 'pb-4 pt-0'
+          isArtifactPanelExpanded ? 'z-50 bg-background pb-2 pt-1' : 'pb-2 pt-0'
         } ${isArtifactPanelExpanded && isExpandedPromptInputHidden ? 'hidden' : ''}`}
       >
         {isArtifactPanelExpanded && !isExpandedPromptInputHidden && (

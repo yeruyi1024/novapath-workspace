@@ -3213,7 +3213,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
       className={`workspace-send-button flex ${largeSendButtonSizeClass} shrink-0 items-center justify-center rounded-full transition-all ${
         canUseSubmitButton
           ? 'bg-primary text-primary-foreground shadow-subtle hover:bg-primary-hover active:scale-95'
-          : 'cursor-not-allowed bg-neutral-300 text-white dark:bg-neutral-700 dark:text-neutral-500'
+          : 'cursor-not-allowed bg-surface-raised text-muted/50 border border-border-subtle'
       }`}
       aria-label={i18nService.t('sendMessage')}
       title={sendButtonTitle}
@@ -4102,8 +4102,8 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
                   disabled={!canSubmit}
                   className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition-all ${
                     canSubmit
-                      ? 'bg-neutral-950 text-white shadow-subtle hover:bg-neutral-800 active:scale-95 dark:bg-white dark:text-neutral-950 dark:hover:bg-neutral-200'
-                      : 'cursor-not-allowed bg-neutral-300 text-white dark:bg-neutral-700 dark:text-neutral-500'
+                      ? 'bg-primary text-primary-foreground shadow-subtle hover:bg-primary-hover active:scale-95'
+                      : 'cursor-not-allowed bg-surface-raised text-muted/50 border border-border-subtle'
                   }`}
                   aria-label={i18nService.t('sendMessage')}
                   title={sendButtonTitle}

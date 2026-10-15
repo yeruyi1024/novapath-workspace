@@ -325,8 +325,8 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
       }}
       className={`group relative rounded-lg cursor-pointer transition-colors duration-150 ${compact ? 'workspace-chat-row flex min-h-9 items-center px-2.5 py-1.5' : 'p-3'} ${
         isActive
-          ? compact ? 'bg-primary-muted' : 'bg-black/[0.06] dark:bg-white/[0.08]'
-          : 'hover:bg-black/[0.04] dark:hover:bg-white/[0.05]'
+          ? 'bg-primary-muted text-primary'
+          : 'hover:bg-surface-raised'
       }`}
     >
       {/* Content area */}
@@ -341,7 +341,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                 onToggleSelection();
               }}
               onClick={(e) => e.stopPropagation()}
-              className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
+              className="h-4 w-4 rounded border-border accent-primary cursor-pointer"
             />
           </div>
         )}
@@ -350,8 +350,8 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             {/* Status indicator */}
             {showStatusIndicator && (
               <span
-                className={`block w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 ${
-                  showRunningIndicator ? 'shadow-[0_0_6px_rgba(59,130,246,0.5)] animate-pulse' : ''
+                className={`block w-2 h-2 rounded-full bg-primary flex-shrink-0 ${
+                  showRunningIndicator ? 'shadow-[0_0_8px_var(--lobster-primary)] animate-pulse' : ''
                 }`}
                 title={showRunningIndicator ? i18nService.t(statusLabels[session.status]) : undefined}
               />

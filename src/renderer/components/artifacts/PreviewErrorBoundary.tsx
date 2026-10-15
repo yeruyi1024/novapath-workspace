@@ -2,9 +2,29 @@ import { Component, type ReactNode } from 'react';
 
 import { i18nService } from '../../services/i18n';
 
+interface PreviewErrorBoundaryProps {
+  children: ReactNode;
+  resetKey?: string;
+}
+
+interface PreviewErrorBoundaryState {
+  failed: boolean;
+  resetKey?: string;
+}
+
 /** File renderers and lazy editors must never take down the conversation shell. */
-export default class PreviewErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
+export default class PreviewErrorBoundary extends Component<PreviewErrorBoundaryProps, PreviewErrorBoundaryState> {
+  state: PreviewErrorBoundaryState = { failed: false, resetKey: this.props.resetKey };
+
+  static getDerivedStateFromProps(
+    props: PreviewErrorBoundaryProps,
+    state: PreviewErrorBoundaryState,
+  ): PreviewErrorBoundaryState | null {
+    return props.resetKey !== state.resetKey
+      ? { failed: false, resetKey: props.resetKey }
+      : null;
+  }
+
   static getDerivedStateFromError(): { failed: boolean } { return { failed: true }; }
   componentDidCatch(error: Error): void {
     // Do not include paths, contents, or upstream response messages in diagnostics.

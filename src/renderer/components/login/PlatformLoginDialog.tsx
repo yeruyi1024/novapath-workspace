@@ -1,4 +1,4 @@
-import { ShieldCheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { XMarkIcon } from '@heroicons/react/24/outline';
 import React, { useEffect, useId, useRef } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -39,18 +39,19 @@ export default function PlatformLoginDialog({ onClose, onSuccess }: Props) {
   };
 
   return <Modal onClose={onClose} onEscape={onClose}
-    overlayClassName="fixed inset-0 z-[10060] flex items-center justify-center overflow-y-auto bg-black/30 p-5 backdrop-blur-sm"
-    className="platform-login-dialog non-draggable relative w-full max-w-[440px] rounded-2xl border border-border bg-background p-8 text-foreground shadow-xl">
+    overlayClassName="fixed inset-0 z-[10060] flex items-center justify-center overflow-y-auto bg-black/40 p-5 backdrop-blur-md"
+    className="platform-login-dialog non-draggable relative w-full max-w-[440px] rounded-2xl border border-border bg-surface p-8 text-foreground shadow-2xl">
     <div ref={ref} data-platform-dialog role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} onKeyDown={trapFocus} className="outline-none">
-      <button type="button" onClick={onClose} aria-label={t('close')} className="absolute right-4 top-4 rounded-lg p-2 text-secondary hover:bg-surface-raised focus-visible:outline focus-visible:outline-2">
+      <button type="button" onClick={onClose} aria-label={t('close')} className="absolute right-4 top-4 rounded-xl p-2 text-secondary hover:bg-surface-raised hover:text-foreground focus-visible:outline focus-visible:outline-2 transition-colors">
         <XMarkIcon className="h-5 w-5" />
       </button>
-      <div className="mb-7 flex items-center gap-3"><img src="logo.svg" alt="" className="h-10 w-10" /><span className="text-sm font-semibold">{t('productName')}</span></div>
-      <p className="platform-login-eyebrow text-primary">{t('maasWelcomeBack')}</p>
-      <h2 id={titleId} className="text-2xl font-semibold tracking-tight">{t('maasLoginTitle')}</h2>
-      <p className="mt-3 text-sm leading-6 text-secondary">{t('maasInlineLoginHint')}</p>
+      <div className="flex flex-col items-center text-center">
+        <img src="logo.svg" alt="" className="mb-4 h-11 w-11 select-none rounded-xl shadow-sm" draggable={false} />
+        <h2 id={titleId} className="text-xl font-semibold tracking-tight">{t('maasLoginCardTitle')}</h2>
+        <p className="mt-1.5 text-[13px] leading-5 text-secondary">{t('maasLoginCardSubtitle')}</p>
+      </div>
       <PlatformLoginForm origin={accountState.origin} onSuccess={() => { onSuccess?.(); onClose(); }} />
-      <div className="platform-login-security"><ShieldCheckIcon aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /><p>{t('maasLoginSecurity')}</p></div>
+      <p className="mt-6 text-center text-[13px] leading-5 tracking-wide text-muted">{t('maasLoginTagline')}</p>
     </div>
   </Modal>;
 }

@@ -1,3 +1,4 @@
+import { PRODUCT_FEATURES } from '@shared/product';
 import type { PublishingSubscriptionRecoveryMode } from '@shared/publishing/constants';
 import { type MouseEvent, useEffect, useRef } from 'react';
 
@@ -27,7 +28,7 @@ const PublishingSubscriptionRecoveryButton = ({
   const label = i18nService.t(getPublishingSubscriptionRecoveryLabelKey(recoveryMode));
 
   useEffect(() => {
-    if (!onExposure || !exposureKey || reportedExposureKeyRef.current === exposureKey) {
+    if (!PRODUCT_FEATURES.legacyPublishing || !onExposure || !exposureKey || reportedExposureKeyRef.current === exposureKey) {
       return undefined;
     }
     const report = (): void => {
@@ -50,6 +51,8 @@ const PublishingSubscriptionRecoveryButton = ({
     observer.observe(element);
     return () => observer.disconnect();
   }, [compact, exposureKey, onExposure]);
+
+  if (!PRODUCT_FEATURES.legacyPublishing) return null;
 
   return (
     <button

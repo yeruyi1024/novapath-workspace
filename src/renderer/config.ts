@@ -190,7 +190,7 @@ export const defaultConfig: AppConfig = {
   },
   providers: buildDefaultProviders(),
   platformProviderId: 'custom_0',
-  theme: 'system',
+  theme: 'light',
   uiFontSize: FontPreferences.UiFontSizeDefault,
   uiFontSizeMigrationVersion: UI_FONT_SIZE_MIGRATION_VERSION,
   codeFontSize: FontPreferences.CodeFontSizeDefault,

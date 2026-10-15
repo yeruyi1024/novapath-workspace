@@ -833,7 +833,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
               {/* Prompt Input Area - Large version with folder selector */}
               <div
-                className="relative z-30 mt-6 w-full animate-fade-in-up"
+                className="relative z-30 mt-8 w-full animate-fade-in-up"
                 style={{ animationDelay: '180ms', animationFillMode: 'both' }}
               >
                 <CoworkPromptInput

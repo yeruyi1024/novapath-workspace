@@ -1,24 +1,35 @@
-import { CalendarDaysIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, CheckCircleIcon, CheckIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { useId } from 'react';
 
 import type { MaasPlan, MaasSubscription } from '../../../shared/auth/maasSubscriptions';
 import { MaasSubscriptionStatus } from '../../../shared/auth/maasSubscriptions';
 import { i18nService } from '../../services/i18n';
 import { formatPlanDuration, formatPlanPrice, subscriptionStatusKey } from './platformAccountPresentation';
+import { getPlanPromotion } from './platformPlanPromotion';
 
 export function PlatformPlanCard({ plan, subscribed, locale }: { plan: MaasPlan; subscribed: boolean; locale: string }) {
   const t = (key: string) => i18nService.t(key);
   const hintId = useId();
-  return <article className="platform-plan-card" data-subscribed={subscribed || undefined}>
+  const { recommended, highlights } = getPlanPromotion(plan.id, i18nService.getLanguage());
+  return <article className="platform-plan-card" data-subscribed={subscribed || undefined} data-recommended={(recommended && !subscribed) || undefined}>
     <div className="platform-plan-card-heading"><h3>{plan.title || `${t('maasPlanNumber')} ${plan.id}`}</h3>
       {subscribed && <span className="platform-account-status"><CheckCircleIcon aria-hidden="true" className="h-3.5 w-3.5" />{t('maasCurrentPlan')}</span>}
+      {recommended && !subscribed && <span className="platform-plan-badge">{t('maasPlanRecommended')}</span>}
     </div>
     <p className="platform-plan-description">{plan.subtitle || t('maasPlanDescriptionPending')}</p>
+    {highlights.length > 0 && <ul className="platform-plan-highlights">
+      {highlights.map(item => <li key={item}><CheckIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{item}</li>)}
+    </ul>}
     <div className="platform-plan-purchase">
-      <p className="platform-plan-price"><span>{formatPlanPrice(plan, locale)}</span>{/^[a-z]{3}$/i.test(plan.currency) && <span className="platform-plan-currency">{plan.currency.toUpperCase()}</span>}</p>
-      <p className="platform-plan-duration"><ClockIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{formatPlanDuration(plan, locale, t)}</p>
-      <div className="platform-plan-card-footer"><button type="button" disabled className={`platform-subscribe-button ${subscribed ? 'platform-subscribe-button-current' : ''}`} aria-describedby={hintId}>{t(subscribed ? 'maasCurrentPlan' : 'maasSubscribeSoon')}</button>
-        <p id={hintId} className="text-[11px] leading-5 text-muted">{t(subscribed ? 'maasCurrentPlanHint' : 'maasPurchaseComingSoon')}</p>
+      <p className="platform-plan-price"><span>{formatPlanPrice(plan, locale)}</span>
+        {/^[a-z]{3}$/i.test(plan.currency) && <span className="platform-plan-currency">{plan.currency.toUpperCase()}</span>}
+        <span className="platform-plan-currency">/ {formatPlanDuration(plan, locale, t)}</span></p>
+      <div className="platform-plan-state" data-current={subscribed || undefined}>
+        <button type="button" disabled className={`platform-subscribe-button ${subscribed ? 'platform-subscribe-button-current' : ''}`} aria-describedby={hintId}>
+          {subscribed ? <CheckCircleIcon aria-hidden="true" className="h-4 w-4 shrink-0" /> : <ClockIcon aria-hidden="true" className="h-4 w-4 shrink-0" />}
+          {t(subscribed ? 'maasCurrentPlan' : 'maasSubscribeSoon')}
+        </button>
+        <p id={hintId} className="platform-plan-hint">{t(subscribed ? 'maasCurrentPlanHint' : 'maasPurchaseComingSoon')}</p>
       </div>
     </div>
   </article>;

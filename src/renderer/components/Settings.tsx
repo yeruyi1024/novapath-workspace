@@ -62,6 +62,7 @@ import BrowserWebAccessSettings from './settings/BrowserWebAccessSettings';
 import MemoryEntriesSettings from './settings/MemoryEntriesSettings';
 import PlatformAccountSettings from './settings/PlatformAccountSettings';
 import { resolveSettingsEscapeAction, SettingsEscapeAction } from './settings/settingsEscape';
+import { SettingsListRow, SettingsSection } from './settings/SettingsLayout';
 import SettingsNavigation, { SettingsTab } from './settings/SettingsNavigation';
 import SettingsNavigationIcon from './settings/SettingsNavigationIcon';
 import SettingsNotice from './settings/SettingsNotice';
@@ -752,12 +753,12 @@ const ShortcutRecorder: React.FC<{
 
   return (
     <div className="flex items-center gap-2">
-      <span
+      <kbd
         title={displayValue || i18nService.t('shortcutNotSet')}
-        className="min-w-[5.5rem] max-w-[9rem] truncate rounded-full bg-surface-raised px-3 py-1 text-center text-xs font-medium text-secondary"
+        className="inline-flex min-w-[5.5rem] max-w-[9rem] items-center justify-center truncate rounded-lg border border-border/80 bg-surface-raised/80 px-2.5 py-1 text-center font-mono text-xs font-medium text-foreground shadow-xs"
       >
         {displayValue || i18nService.t('shortcutNotSet')}
-      </span>
+      </kbd>
       <button
         type="button"
         onClick={() => setRecording(true)}
@@ -765,7 +766,7 @@ const ShortcutRecorder: React.FC<{
         aria-label={editLabel}
         className="pointer-events-none inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-secondary opacity-0 transition-colors hover:bg-surface-raised hover:text-foreground group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
       >
-        <EditIcon className="h-4 w-4" />
+        <EditIcon className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -796,17 +797,16 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
       <div className="relative">
         <div
           onClick={() => setOpen(!open)}
-          className={`w-28 rounded-lg border px-2.5 py-1 text-xs cursor-pointer select-none text-center outline-none transition-colors
-            dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset dark:text-claude-darkText text-claude-text
-            ${open
-              ? 'border-claude-accent ring-1 ring-claude-accent/30'
-              : 'dark:border-claude-darkBorder border-claude-border hover:border-claude-accent/50'
-            }`}
+          className={`w-28 rounded-lg border px-2.5 py-1 text-xs cursor-pointer select-none text-center font-mono font-medium outline-none transition-colors shadow-xs ${
+            open
+              ? 'border-primary ring-1 ring-primary/30 bg-surface text-foreground'
+              : 'border-border bg-surface-raised/80 text-foreground hover:border-primary/50'
+          }`}
         >
           {currentLabel}
         </div>
         {open && (
-          <div className="absolute right-0 mt-1 z-50 min-w-[160px] rounded-xl border dark:border-claude-darkBorder border-claude-border dark:bg-claude-darkSurfaceInset bg-claude-surfaceInset shadow-elevated py-1">
+          <div className="absolute right-0 mt-1 z-50 min-w-[160px] rounded-xl border border-border bg-surface shadow-popover py-1">
             {SEND_SHORTCUT_OPTIONS.map((option) => {
               const label = isMacPlatform ? option.labelMac : option.label;
               const isActive = value === option.value;
@@ -815,14 +815,14 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
                   key={option.value}
                   type="button"
                   onClick={() => { onChange(option.value); setOpen(false); }}
-                  className={`flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors
-                    ${isActive
-                      ? 'dark:text-claude-accent text-claude-accent font-medium'
-                      : 'dark:text-claude-darkText text-claude-text'
-                    } hover:bg-claude-accent/10`}
+                  className={`flex items-center justify-between w-full px-3 py-1.5 text-xs transition-colors ${
+                    isActive
+                      ? 'text-primary font-medium bg-primary/10'
+                      : 'text-foreground hover:bg-surface-raised'
+                  }`}
                 >
                   <span>{label}</span>
-                  {isActive && <span className="text-claude-accent">✓</span>}
+                  {isActive && <span className="text-primary font-bold">✓</span>}
                 </button>
               );
             })}
@@ -849,17 +849,17 @@ const SettingsSwitch: React.FC<{
       void onClick();
     }}
     disabled={disabled}
-    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
-      disabled ? 'opacity-50 cursor-not-allowed' : ''
+    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 ${
+      disabled ? 'cursor-not-allowed opacity-40' : ''
     } ${
       checked
-        ? 'bg-primary'
-        : 'bg-gray-300 dark:bg-gray-600'
+        ? 'border border-primary bg-primary shadow-[0_0_8px_var(--lobster-primary-muted)]'
+        : 'border border-border/80 bg-surface-raised hover:bg-border/30'
     }`}
   >
     <span
-      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-        checked ? 'translate-x-6' : 'translate-x-1'
+      className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out ${
+        checked ? 'translate-x-[17.5px]' : 'translate-x-[2.5px]'
       }`}
     />
   </button>
@@ -867,16 +867,23 @@ const SettingsSwitch: React.FC<{
 
 const SettingsToggleRow: React.FC<{
   title: string;
-  description: string;
+  description?: string;
   checked: boolean;
   disabled?: boolean;
   onToggle: () => void | Promise<void>;
 }> = ({ title, description, checked, disabled, onToggle }) => (
-  <div>
-    <div className="flex items-center justify-between gap-4">
-      <h4 className="min-w-0 flex-1 text-sm font-medium text-foreground">
+  <div className="flex items-center justify-between gap-4">
+    <div className="min-w-0 flex-1">
+      <h4 className="text-[13px] font-medium leading-snug text-foreground">
         {title}
       </h4>
+      {description && (
+        <p className="mt-0.5 text-xs leading-relaxed text-secondary">
+          {description}
+        </p>
+      )}
+    </div>
+    <div className="shrink-0 flex items-center">
       <SettingsSwitch
         checked={checked}
         label={title}
@@ -884,32 +891,23 @@ const SettingsToggleRow: React.FC<{
         onClick={onToggle}
       />
     </div>
-    <p className="mt-1 text-sm text-secondary">
-      {description}
-    </p>
   </div>
 );
 
-// Shared section heading and preference rows for the General page.
+// General-page wrappers over the shared settings layout primitives.
 const SettingsGroup: React.FC<{
   title: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
 }> = ({ title, children, footer }) => (
-  <section className="settings-group">
-    <h4 className="settings-section-title">
-      {title}
-    </h4>
-    <div className="settings-group-rows">
-      {children}
-    </div>
-    {footer}
-  </section>
+  <SettingsSection title={title} footer={footer}>{children}</SettingsSection>
 );
 
-// A single padded row inside a SettingsGroup card.
-const SettingsRow: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="settings-group-row">{children}</div>
+const SettingsRow: React.FC<{ children: React.ReactNode; className?: string }> = ({
+  children,
+  className = '',
+}) => (
+  <SettingsListRow className={className}>{children}</SettingsListRow>
 );
 
 const Settings: React.FC<SettingsProps> = ({
@@ -2526,12 +2524,10 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="space-y-8">
             {/* Group: General basics */}
             <SettingsGroup title={i18nService.t('settingsGroupBasics')}>
-              <SettingsRow>
-                <div className="flex items-center justify-between gap-4">
-                  <h4 className="text-sm font-medium text-foreground">
-                    {i18nService.t('language')}
-                  </h4>
-                  <div className="w-[140px] shrink-0">
+              <SettingsListRow
+                title={i18nService.t('language')}
+                control={(
+                  <div className="w-[140px]">
                     <ThemedSelect
                       id="language"
                       value={language}
@@ -2546,8 +2542,8 @@ const Settings: React.FC<SettingsProps> = ({
                       ]}
                     />
                   </div>
-                </div>
-              </SettingsRow>
+                )}
+              />
 
               <SettingsRow>
                 <SettingsToggleRow
@@ -2660,38 +2656,38 @@ const Settings: React.FC<SettingsProps> = ({
               }
             >
               <SettingsRow>
-                <div>
-                  <div className="flex items-center justify-between gap-4">
-                    <h4 className="min-w-0 flex-1 text-sm font-medium text-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-[13px] font-medium leading-snug text-foreground">
                       {i18nService.t('taskCompletionNotificationMode')}
                     </h4>
-                    <div className="w-[180px] shrink-0">
-                      <ThemedSelect
-                        id="task-completion-notification-mode"
-                        value={taskCompletionNotificationMode}
-                        onChange={(value) => {
-                          setTaskCompletionNotificationMode(value as TaskCompletionNotificationMode);
-                        }}
-                        options={[
-                          {
-                            value: TaskCompletionNotificationMode.Always,
-                            label: i18nService.t('taskCompletionNotificationModeAlways'),
-                          },
-                          {
-                            value: TaskCompletionNotificationMode.Unfocused,
-                            label: i18nService.t('taskCompletionNotificationModeUnfocused'),
-                          },
-                          {
-                            value: TaskCompletionNotificationMode.Off,
-                            label: i18nService.t('taskCompletionNotificationModeOff'),
-                          },
-                        ]}
-                      />
-                    </div>
+                    <p className="mt-0.5 text-xs leading-relaxed text-secondary">
+                      {i18nService.t('taskCompletionNotificationModeDescription')}
+                    </p>
                   </div>
-                  <p className="mt-1 text-sm text-secondary">
-                    {i18nService.t('taskCompletionNotificationModeDescription')}
-                  </p>
+                  <div className="w-[160px] shrink-0">
+                    <ThemedSelect
+                      id="task-completion-notification-mode"
+                      value={taskCompletionNotificationMode}
+                      onChange={(value) => {
+                        setTaskCompletionNotificationMode(value as TaskCompletionNotificationMode);
+                      }}
+                      options={[
+                        {
+                          value: TaskCompletionNotificationMode.Always,
+                          label: i18nService.t('taskCompletionNotificationModeAlways'),
+                        },
+                        {
+                          value: TaskCompletionNotificationMode.Unfocused,
+                          label: i18nService.t('taskCompletionNotificationModeUnfocused'),
+                        },
+                        {
+                          value: TaskCompletionNotificationMode.Off,
+                          label: i18nService.t('taskCompletionNotificationModeOff'),
+                        },
+                      ]}
+                    />
+                  </div>
                 </div>
               </SettingsRow>
 
@@ -2728,10 +2724,10 @@ const Settings: React.FC<SettingsProps> = ({
               <SettingsRow>
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-medium text-foreground">
+                    <h4 className="text-[13px] font-medium text-foreground">
                       {i18nService.t('coworkTempUsageTitle')}
                     </h4>
-                    <p className="mt-1 text-sm text-secondary">
+                    <p className="mt-0.5 text-xs leading-relaxed text-secondary">
                       {tempStorageUsageBytes === null
                         ? i18nService.t('coworkTempUsageLoading')
                         : i18nService.t('coworkTempUsageLabel')
@@ -2740,8 +2736,7 @@ const Settings: React.FC<SettingsProps> = ({
                               '{cleanable}',
                               formatBackupSize(tempStorageCleanableBytes ?? 0) || '0 B',
                             )}
-                    </p>
-                    <p className="mt-1 text-sm text-secondary">
+                      {' · '}
                       {i18nService.t('coworkTempUsageManualNote')}
                     </p>
                   </div>
@@ -2751,7 +2746,7 @@ const Settings: React.FC<SettingsProps> = ({
                       void handleOpenTempCleanConfirm();
                     }}
                     disabled={isLoadingTempCleanPreview || isCleaningTempStorage || tempStorageCleanableBytes === 0}
-                    className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-60"
+                    className="shrink-0 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLoadingTempCleanPreview
                       ? i18nService.t('coworkTempPreviewLoading')
@@ -2759,7 +2754,7 @@ const Settings: React.FC<SettingsProps> = ({
                   </button>
                 </div>
                 {tempStorageCleanResult && (
-                  <p className="mt-2 text-sm text-secondary">{tempStorageCleanResult}</p>
+                  <p className="mt-2 text-xs text-secondary">{tempStorageCleanResult}</p>
                 )}
               </SettingsRow>
 
@@ -2793,11 +2788,11 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'coworkAgentEngine':
         return (
-          <div className="space-y-8 pb-2">
+          <div className="settings-engine-page">
             {isOpenClawAgentEngine && (
               <>
                 <section className="space-y-3">
-                  <h4 className="text-sm font-medium text-foreground">
+                  <h4 className="settings-section-title">
                     {i18nService.t('openClawRuntimeStatusTitle')}
                   </h4>
 
@@ -2866,7 +2861,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </section>
 
                 <section className="space-y-3">
-                  <h4 className="text-sm font-medium text-foreground">
+                  <h4 className="settings-section-title">
                     {i18nService.t('openClawBackgroundRuntimeTitle')}
                   </h4>
 
@@ -2965,7 +2960,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </section>
 
                 <section className="space-y-3">
-                  <h4 className="text-sm font-medium text-foreground">
+                  <h4 className="settings-section-title">
                     {i18nService.t('openClawMaintenanceTitle')}
                   </h4>
 
@@ -3210,7 +3205,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'shortcuts':
         return (
-          <div className="space-y-4">
+          <div className="settings-engine-page">
             <div className="relative">
               <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-secondary" />
               <input
@@ -3220,68 +3215,66 @@ const Settings: React.FC<SettingsProps> = ({
                 className="h-9 w-full rounded-xl border border-border bg-surface pl-9 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-secondary/70 focus:border-primary focus:ring-1 focus:ring-primary/25"
               />
             </div>
-            <p className="text-xs leading-5 text-secondary">
+            <p className="settings-section-description">
               {i18nService.t('shortcutScopeHint')}
             </p>
-            <div className="overflow-hidden rounded-xl border border-border bg-surface">
-              {filteredShortcutGroups.length > 0 ? filteredShortcutGroups.map((group, groupIndex) => (
-                <div key={group.titleKey}>
-                  <div className={`border-border-subtle bg-surface-raised/60 px-4 py-2 text-xs font-medium uppercase tracking-wide text-secondary ${
-                    groupIndex === 0 ? '' : 'border-t'
-                  }`}>
+            <div className="settings-engine-page">
+              {filteredShortcutGroups.length > 0 ? filteredShortcutGroups.map((group) => (
+                <div key={group.titleKey} className="settings-section">
+                  <h3 className="settings-section-title">
                     {i18nService.t(group.titleKey)}
+                  </h3>
+                  <div className="settings-list">
+                    {group.commands.map((command) => {
+                      const value = shortcuts[command.key] ?? '';
+                      const commandLabel = getShortcutCommandText(command, 'labelKey');
+                      return (
+                        <div
+                          key={command.key}
+                          className="settings-list-row settings-preference-row"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-[13px] font-medium text-foreground">
+                              {commandLabel}
+                            </div>
+                            <div className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-secondary">
+                              {getShortcutCommandText(command, 'descriptionKey')}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center justify-end gap-2">
+                            {command.inputType === 'send' ? (
+                              <SendShortcutSelect
+                                value={value}
+                                onChange={(nextValue) => handleShortcutChange(command.key, nextValue)}
+                              />
+                            ) : (
+                              <ShortcutRecorder
+                                value={value}
+                                label={commandLabel}
+                                onChange={(nextValue) => handleShortcutChange(command.key, nextValue)}
+                              />
+                            )}
+                            {value ? (
+                              <button
+                                type="button"
+                                onClick={() => handleShortcutChange(command.key, '')}
+                                title={i18nService.t('shortcutClear')}
+                                aria-label={i18nService.t('shortcutClear')}
+                                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
+                              >
+                                <TrashIcon className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <span className="h-6 w-6 shrink-0" aria-hidden="true" />
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  {group.commands.map((command, commandIndex) => {
-                    const value = shortcuts[command.key] ?? '';
-                    const commandLabel = getShortcutCommandText(command, 'labelKey');
-                    return (
-                      <div
-                        key={command.key}
-                        className={`group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 ${
-                          commandIndex === 0 ? '' : 'border-t border-border-subtle'
-                        }`}
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-xs font-medium text-foreground">
-                            {commandLabel}
-                          </div>
-                          <div className="mt-0.5 line-clamp-2 text-xs text-secondary">
-                            {getShortcutCommandText(command, 'descriptionKey')}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-end gap-2">
-                          {command.inputType === 'send' ? (
-                            <SendShortcutSelect
-                              value={value}
-                              onChange={(nextValue) => handleShortcutChange(command.key, nextValue)}
-                            />
-                          ) : (
-                            <ShortcutRecorder
-                              value={value}
-                              label={commandLabel}
-                              onChange={(nextValue) => handleShortcutChange(command.key, nextValue)}
-                            />
-                          )}
-                          {value ? (
-                            <button
-                              type="button"
-                              onClick={() => handleShortcutChange(command.key, '')}
-                              title={i18nService.t('shortcutClear')}
-                              aria-label={i18nService.t('shortcutClear')}
-                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-secondary transition-colors hover:bg-surface-raised hover:text-foreground"
-                            >
-                              <TrashIcon className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <span className="h-6 w-6 shrink-0" aria-hidden="true" />
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
                 </div>
               )) : (
-                <div className="px-4 py-8 text-center text-sm text-secondary">
+                <div className="rounded-xl border border-border-subtle bg-surface px-4 py-8 text-center text-xs text-secondary">
                   {i18nService.t('shortcutNoResults')}
                 </div>
               )}
@@ -3330,8 +3323,8 @@ const Settings: React.FC<SettingsProps> = ({
             <span className="text-xs text-secondary mt-1">v{appVersion}</span>
 
             {/* Info Card */}
-            <div className="w-full mt-8 rounded-xl border border-border overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 border-b border-border">
+            <div className="settings-list mt-8 w-full">
+              <div className="settings-list-row settings-preference-row flex-wrap">
                 <span className="shrink-0 text-sm text-foreground">{i18nService.t('aboutVersion')}</span>
                 <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                   <span className="text-sm text-secondary">{appVersion}</span>
@@ -3356,7 +3349,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               </div>
               {ABOUT_CONTACT_EMAIL && (
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 border-b border-border">
+              <div className="settings-list-row settings-preference-row flex-wrap">
                 <span className="shrink-0 text-sm text-foreground">{i18nService.t('aboutContactEmail')}</span>
                 <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                   <button
@@ -3379,7 +3372,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               )}
               {ABOUT_USER_COMMUNITY_URL && (
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 border-b border-border">
+              <div className="settings-list-row settings-preference-row flex-wrap">
                 <span className="shrink-0 text-sm text-foreground">{i18nService.t('aboutUserCommunity')}</span>
                 <button
                   type="button"
@@ -3394,7 +3387,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               )}
               {ABOUT_USER_MANUAL_URL && (
-              <div className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3${testModeUnlocked ? ' border-b border-border' : ''}`}>
+              <div className="settings-list-row settings-preference-row flex-wrap">
                 <span className="shrink-0 text-sm text-foreground">{i18nService.t('aboutUserManual')}</span>
                 <button
                   type="button"
@@ -3409,7 +3402,7 @@ const Settings: React.FC<SettingsProps> = ({
               </div>
               )}
               {testModeUnlocked && (
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+                <div className="settings-list-row settings-preference-row flex-wrap">
                   <span className="shrink-0 text-sm text-foreground">{i18nService.t('testMode')}</span>
                   <button
                     type="button"

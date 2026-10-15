@@ -51,7 +51,8 @@ const EditableMarkdownFile: React.FC<EditableMarkdownFileProps> = ({ artifact, s
       const closingArtifact = artifactRef.current;
       void document.flush().then(() => {
         const finalState = document.getSnapshot();
-        if (finalState.ready && finalState.status === MarkdownSaveState.Saved) {
+        if (finalState.ready && finalState.status === MarkdownSaveState.Saved
+          && closingArtifact.content !== finalState.content) {
           dispatch(addArtifact({
             sessionId: closingArtifact.sessionId,
             artifact: { ...closingArtifact, content: finalState.content, contentVersion: Date.now() },

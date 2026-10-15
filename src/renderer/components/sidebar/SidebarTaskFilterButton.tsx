@@ -27,8 +27,8 @@ const SidebarTaskFilterButton: React.FC<SidebarTaskFilterButtonProps> = ({
       onClick={onClick}
       className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors ${
         isActive
-          ? 'bg-blue-500/10 text-blue-500'
-          : 'text-secondary hover:bg-black/[0.03] dark:hover:bg-white/[0.04]'
+          ? 'bg-primary-muted text-primary'
+          : 'text-secondary hover:bg-surface-raised hover:text-foreground'
       } ${className}`}
       aria-label={label}
       aria-pressed={isActive}
@@ -37,7 +37,7 @@ const SidebarTaskFilterButton: React.FC<SidebarTaskFilterButtonProps> = ({
       <SidebarFilterIcon className="h-4 w-4" />
       {hasUnreadCompletedTasks && (
         <span
-          className="absolute right-1 top-1 h-[7px] w-[7px] rounded-full bg-blue-500"
+          className="absolute right-1 top-1 h-[7px] w-[7px] rounded-full bg-primary"
           aria-hidden="true"
         />
       )}

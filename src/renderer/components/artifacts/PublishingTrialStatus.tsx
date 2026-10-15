@@ -1,3 +1,4 @@
+import { PRODUCT_FEATURES } from '@shared/product';
 import { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -104,7 +105,7 @@ interface PublishingTrialStatusProps {
 }
 
 export const PublishingTrialStatus = ({ status }: PublishingTrialStatusProps) => {
-  if (!status.isTrial) return null;
+  if (!PRODUCT_FEATURES.legacyPublishing || !status.isTrial) return null;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
       <span className="rounded-md bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-500/15 dark:text-orange-300">

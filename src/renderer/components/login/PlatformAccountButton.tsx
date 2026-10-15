@@ -19,10 +19,10 @@ export default function PlatformAccountButton({ onShowSettings }: Props) {
   const t = (key: string) => i18nService.t(key);
 
   return <div className="platform-sidebar-account">
-    <CardOverflowMenu menuWidthPx={232} triggerClassName="platform-sidebar-profile platform-sidebar-brand"
+    <CardOverflowMenu menuWidthPx={216} menuClassName="platform-account-menu" triggerClassName="platform-sidebar-profile platform-sidebar-brand"
       triggerLabel={t('maasAccountMenu')}
       triggerContent={<>
-      <img src="logo.svg" alt="" className="h-7 w-7 shrink-0" />
+      <img src="logo.svg" alt="" className="h-6 w-6 shrink-0 rounded-md" />
       <span className="min-w-0 flex-1 truncate text-left text-[13px] font-medium text-foreground">{t('productName')}</span>
       <ChevronUpDownIcon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted" />
       </>}

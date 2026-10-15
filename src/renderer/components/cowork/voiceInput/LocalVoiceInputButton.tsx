@@ -1,3 +1,4 @@
+import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState } from 'react';
 
 import type { LocalAsrProgress } from '../../../../shared/asr/local';
@@ -7,6 +8,7 @@ import { type GatewayVoiceError, type GatewayVoicePhase } from '../../../service
 import { LocalVoiceSession } from '../../../services/voiceInput/localVoiceSession';
 import { startRealtimeVoiceRecording } from '../../../services/voiceInput/realtimeAudioRecorder';
 import MicrophoneIcon from '../../icons/MicrophoneIcon';
+import LocalVoiceInputActions from './LocalVoiceInputActions';
 
 interface Props {
   disabled: boolean;
@@ -137,7 +139,9 @@ export default function LocalVoiceInputButton({ disabled, buttonClassName, iconC
       <button ref={buttonRef} type="button" disabled={disabled || preparing || checking || phase === 'starting' || phase === 'recognizing'}
         onClick={clickVoice} title={label} aria-label={label} aria-pressed={phase === 'recording'}
         className={`${buttonClassName} ${phase === 'recording' ? 'bg-primary/10 text-primary' : 'text-secondary'} transition-colors hover:bg-surface-raised hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:opacity-40`}>
-        {phase === 'recording' ? <span className="h-[34%] w-[34%] rounded-[3px] bg-current" aria-hidden="true" />
+        {checking || preparing || phase === 'starting' || phase === 'recognizing'
+          ? <ArrowPathIcon aria-hidden="true" className={`${iconClassName} animate-spin motion-reduce:animate-none`} />
+          : phase === 'recording' ? <span className="h-[34%] w-[34%] rounded-[3px] bg-current" aria-hidden="true" />
           : <MicrophoneIcon className={iconClassName} />}
       </button>
       {visible && (
@@ -164,12 +168,10 @@ export default function LocalVoiceInputButton({ disabled, buttonClassName, iconC
             </div>
           )}
           <div className="mt-2 flex items-center justify-end gap-2">
-            <button type="button" onClick={() => { reset(); buttonRef.current?.focus(); }}
-              className="rounded-lg px-2 py-1 text-xs text-secondary hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-              {i18nService.t(error && !preparing ? 'close' : 'cancel')}
-            </button>
+            <LocalVoiceInputActions phase={phase} hasError={Boolean(error && !preparing)}
+              onCancel={() => { reset(); buttonRef.current?.focus(); }} onFinish={clickVoice} />
             {(error === 'model' || error === 'network') && !preparing && <button type="button" onClick={() => { void prepareLocal(); }}
-              className="rounded-lg bg-primary px-2.5 py-1 text-xs font-medium text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              className="rounded-lg bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
               {i18nService.t('localVoiceDownload')}
             </button>}
           </div>

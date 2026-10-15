@@ -9,9 +9,9 @@
     "updateUrl": "",
     "manualUpdateUrl": "",
     "downloadUrl": "",
-    "skillStoreUrl": "",
+    "skillStoreUrl": "https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/skill-store",
     "kitStoreUrl": "",
-    "mcpMarketplaceUrl": "",
+    "mcpMarketplaceUrl": "https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/mcp-marketplace",
     "loginConfigUrl": "",
     "analyticsUrl": "",
     "docsUrl": "",
@@ -21,7 +21,9 @@
   "features": {
     "account": false,
     "promotions": false,
-    "analytics": false
+    "analytics": false,
+    "fileSharing": false,
+    "legacyPublishing": false
   },
   "englishName": "NovaPath",
   "storageName": "星途 StarPath",

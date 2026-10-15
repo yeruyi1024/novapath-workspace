@@ -52,12 +52,12 @@ export default function SettingsNavigation<T extends string>({ tabs, activeTab, 
   return (
     <header className="settings-navigation">
       <div className="settings-brand">
-        <img src="logo.svg" alt="" />
+        <img src="logo.svg" alt="" className="select-none" draggable={false} />
         <div><div className="settings-brand-name">{PRODUCT.shortName}<span>{PRODUCT.englishName}</span></div>
           <p>{i18nService.t('starpathSettingsWorkbench')}</p></div>
       </div>
       <div className="settings-nav-search settings-search-field">
-        <MagnifyingGlassIcon aria-hidden="true" className="h-4 w-4" />
+        <MagnifyingGlassIcon aria-hidden="true" className="h-3.5 w-3.5" />
         <input ref={searchRef} type="text" value={query} onChange={event => setQuery(event.target.value)}
           aria-label={i18nService.t('starpathSettingsSearch')} placeholder={i18nService.t('starpathSettingsSearch')}
           className="settings-field" />

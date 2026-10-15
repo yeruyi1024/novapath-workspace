@@ -1,10 +1,14 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import { i18nService } from '../../services/i18n';
 import {
   formatPublishingTrialExpiry,
   getPublishingRemainingMinutes,
   parsePublishingAccessExpiry,
+  PublishingTrialStatus,
 } from './PublishingTrialStatus';
 
 describe('PublishingTrialStatus', () => {
@@ -22,6 +26,13 @@ describe('PublishingTrialStatus', () => {
     expect(parsePublishingAccessExpiry('2026-08-20T10:00:00+08:00')).toBe(
       Date.parse('2026-08-20T10:00:00+08:00'),
     );
+  });
+
+  test('hides legacy trial badges in NovaPath', () => {
+    expect(PRODUCT_FEATURES.legacyPublishing).toBe(false);
+    expect(renderToStaticMarkup(React.createElement(PublishingTrialStatus, {
+      status: { isTrial: true, isExpired: false, label: 'legacy trial' },
+    }))).toBe('');
   });
 
   test('does not mark missing or malformed expiration values as trials', () => {

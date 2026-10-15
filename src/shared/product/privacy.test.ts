@@ -13,8 +13,11 @@ afterEach(() => {
 });
 
 describe('distribution privacy defaults', () => {
-  test('ships without upstream service destinations or active commercial features', () => {
-    expect(Object.values(PRODUCT_SERVICES).every(value => value === '')).toBe(true);
+  test('only enables public extension catalogs without other upstream services or commercial features', () => {
+    const { skillStoreUrl, mcpMarketplaceUrl, ...otherServices } = PRODUCT_SERVICES;
+    expect(skillStoreUrl).toBe('https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/skill-store');
+    expect(mcpMarketplaceUrl).toBe('https://api-overmind.youdao.com/openapi/get/luna/hardware/lobsterai/prod/mcp-marketplace');
+    expect(Object.values(otherServices).every(value => value === '')).toBe(true);
     expect(Object.values(PRODUCT_FEATURES).every(value => value === false)).toBe(true);
     expect(isAnalyticsEndpointUrl('')).toBe(false);
   });

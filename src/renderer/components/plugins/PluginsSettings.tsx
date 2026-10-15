@@ -503,7 +503,7 @@ export default function PluginsSettings({ handleRef }: PluginsSettingsProps) {
   }
 
   return (
-    <div className="settings-plugins-page space-y-6">
+    <div className="settings-plugins-page settings-engine-page">
       {/* Syncing overlay */}
       {syncing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -555,10 +555,10 @@ export default function PluginsSettings({ handleRef }: PluginsSettingsProps) {
       {/* Toolbar */}
       <div className="settings-page-toolbar">
         <div>
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="settings-section-title">
             {i18nService.t('pluginsTitle')}
           </h3>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="settings-section-description">
             {i18nService.t('pluginsDesc')}
           </p>
         </div>
@@ -592,11 +592,11 @@ export default function PluginsSettings({ handleRef }: PluginsSettingsProps) {
           <p className="text-xs text-muted-foreground mt-1">{i18nService.t('pluginsEmptyHint')}</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="settings-list">
           {plugins.map(plugin => (
             <div
               key={plugin.pluginId}
-              className="flex items-center justify-between rounded-lg border border-border p-4"
+              className="settings-list-row settings-preference-row"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

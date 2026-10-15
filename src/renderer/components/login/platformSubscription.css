@@ -1,13 +1,13 @@
 .platform-subscription-dialog {
   width: 100%;
-  max-width: 1100px;
+  max-width: 920px;
   max-height: calc(100dvh - 48px);
   overflow: hidden;
   border: 1px solid var(--lobster-border-subtle);
-  border-radius: 24px;
+  border-radius: 16px;
   background: var(--lobster-background);
   color: var(--lobster-foreground);
-  box-shadow: 0 24px 80px rgb(0 0 0 / 16%);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 16%);
 }
 
 .platform-subscription-dialog-content {
@@ -17,34 +17,39 @@
   outline: none;
 }
 
-.platform-subscription-dialog-header { position: relative; flex-shrink: 0; padding: 30px 60px 24px; text-align: center; }
-.platform-subscription-brand { display: flex; align-items: center; justify-content: center; gap: 7px; margin-bottom: 14px; color: var(--lobster-text-secondary); font-size: 12px; font-weight: 500; }
-.platform-subscription-brand img { width: 22px; height: 22px; }
-.platform-subscription-dialog-header h2 { font-size: 28px; font-weight: 600; line-height: 1.35; letter-spacing: -0.025em; text-wrap: balance; }
-.platform-subscription-dialog-hint { margin-top: 10px; color: var(--lobster-text-secondary); font-size: 13px; line-height: 1.7; text-wrap: balance; }
-.platform-subscription-close { position: absolute; right: 18px; top: 18px; }
-.platform-subscription-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 30px 24px; scrollbar-gutter: stable; }
-.platform-plan-periods { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 3px; margin: 0 auto 26px; padding: 4px; border: 1px solid var(--lobster-border-subtle); border-radius: 999px; background: var(--lobster-surface-raised); }
-.platform-plan-periods button { min-width: 0; padding: 8px 16px; border-radius: 999px; color: var(--lobster-text-secondary); font-size: 12px; font-weight: 500; line-height: 1.5; }
+.platform-subscription-dialog-header { position: relative; flex-shrink: 0; padding: 26px 56px 24px; text-align: center; }
+.platform-subscription-dialog-header h2 { font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; text-wrap: balance; }
+.platform-subscription-dialog-hint { margin-top: 6px; color: var(--lobster-text-secondary); font-size: 13px; line-height: 1.6; text-wrap: balance; }
+.platform-subscription-close { position: absolute; right: 14px; top: 14px; }
+.platform-subscription-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 28px 24px; scrollbar-gutter: stable; }
+.platform-plan-periods { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 3px; margin: 0 auto 20px; padding: 3px; border: 1px solid var(--lobster-border-subtle); border-radius: 999px; background: var(--lobster-surface-raised); }
+.platform-plan-periods button { min-width: 0; padding: 6px 16px; border-radius: 999px; color: var(--lobster-text-secondary); font-size: 12px; font-weight: 500; line-height: 1.5; }
 .platform-plan-periods button[aria-pressed="true"] { background: var(--lobster-surface); color: var(--lobster-foreground); box-shadow: 0 1px 4px rgb(0 0 0 / 7%); }
 .platform-plan-periods button:hover { color: var(--lobster-foreground); }
 
-.platform-subscription-dialog .platform-plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 16px; }
-.platform-subscription-dialog .platform-plan-grid[data-plan-count="1"] { max-width: 370px; margin: 0 auto; grid-template-columns: minmax(0, 1fr); }
-.platform-subscription-dialog .platform-plan-grid[data-plan-count="2"] { max-width: 760px; margin: 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.platform-subscription-dialog .platform-plan-card { min-height: 360px; padding: 26px; border-radius: 18px; }
-.platform-subscription-dialog .platform-plan-card[data-subscribed] { border-color: var(--lobster-primary); background: color-mix(in srgb, var(--lobster-primary) 3%, var(--lobster-surface)); }
+.platform-subscription-dialog .platform-plan-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; gap: 14px; }
+.platform-subscription-dialog .platform-plan-grid[data-plan-count="1"] { max-width: 320px; margin: 0 auto; grid-template-columns: minmax(0, 1fr); }
+.platform-subscription-dialog .platform-plan-grid[data-plan-count="2"] { max-width: 640px; margin: 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.platform-subscription-dialog .platform-plan-card { min-height: 0; padding: 20px; border-radius: 12px; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.platform-subscription-dialog .platform-plan-card:hover { border-color: var(--lobster-border); box-shadow: 0 4px 16px rgb(0 0 0 / 6%); }
+.platform-subscription-dialog .platform-plan-card[data-subscribed] { border-color: var(--lobster-primary); background: color-mix(in srgb, var(--lobster-primary) 4%, var(--lobster-surface)); box-shadow: 0 0 0 1px var(--lobster-primary); }
 .platform-subscription-dialog .platform-plan-card-heading { align-items: center; gap: 8px; }
-.platform-subscription-dialog .platform-plan-card-heading h3 { min-width: 0; overflow-wrap: anywhere; font-size: 19px; font-weight: 600; line-height: 1.45; letter-spacing: -0.01em; }
-.platform-subscription-dialog .platform-plan-description { min-height: 64px; flex: 1; margin-top: 16px; font-size: 13px; line-height: 1.8; }
-.platform-plan-purchase { width: 100%; padding-top: 18px; }
-.platform-subscription-dialog .platform-plan-price { margin-top: 0; font-size: 38px; font-weight: 500; }
-.platform-subscription-dialog .platform-plan-duration { margin-top: 9px; }
-.platform-subscription-dialog .platform-plan-card-footer { margin-top: 22px; padding-top: 0; }
-.platform-subscribe-button { display: flex; width: 100%; min-height: 44px; align-items: center; justify-content: center; padding: 10px 16px; border: 1px solid var(--lobster-primary); border-radius: 999px; background: var(--lobster-primary); color: var(--lobster-primary-foreground); font-size: 13px; font-weight: 500; line-height: 1.6; cursor: default; }
-.platform-subscribe-button-current { border-color: var(--lobster-border); background: var(--lobster-surface); color: var(--lobster-text-secondary); }
-.platform-subscription-dialog .platform-plan-skeleton { min-height: 360px; padding: 26px; border-radius: 18px; }
-.platform-subscription-no-plans { display: flex; min-height: 280px; flex-direction: column; align-items: center; justify-content: center; padding: 32px; border: 1px dashed var(--lobster-border-subtle); border-radius: 18px; text-align: center; }
+.platform-subscription-dialog .platform-plan-card-heading h3 { min-width: 0; overflow-wrap: anywhere; font-size: 15px; font-weight: 600; line-height: 1.5; }
+.platform-subscription-dialog .platform-plan-description { min-height: 0; flex: 1; margin-top: 8px; font-size: 12.5px; line-height: 1.7; }
+.platform-plan-purchase { width: 100%; padding-top: 20px; }
+.platform-subscription-dialog .platform-plan-price { margin-top: 0; align-items: baseline; gap: 4px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
+.platform-subscription-dialog .platform-plan-currency { color: var(--lobster-text-secondary); font-size: 12px; font-weight: 400; letter-spacing: normal; }
+.platform-subscription-dialog .platform-plan-card[data-recommended] { border-color: color-mix(in srgb, var(--lobster-primary) 55%, var(--lobster-border-subtle)); box-shadow: 0 6px 20px color-mix(in srgb, var(--lobster-primary) 10%, transparent); }
+.platform-plan-badge { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; background: var(--lobster-primary); color: var(--lobster-primary-foreground); font-size: 11px; font-weight: 500; line-height: 1.5; }
+.platform-plan-highlights { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: var(--lobster-text-secondary); font-size: 12.5px; line-height: 1.5; list-style: none; }
+.platform-plan-highlights li { display: flex; align-items: flex-start; gap: 6px; }
+.platform-plan-highlights svg { margin-top: 3px; color: var(--lobster-primary); }
+.platform-plan-state { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--lobster-border-subtle); }
+.platform-plan-hint { color: var(--lobster-text-muted); font-size: 11.5px; line-height: 1.5; }
+.platform-subscribe-button { display: inline-flex; width: 100%; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--lobster-border); border-radius: 8px; background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); font-size: 13px; font-weight: 500; line-height: 1.5; cursor: default; }
+.platform-subscribe-button-current { border-color: color-mix(in srgb, var(--lobster-primary) 30%, transparent); background: var(--lobster-primary-muted); color: var(--lobster-primary); }
+.platform-subscription-dialog .platform-plan-skeleton { min-height: 200px; padding: 20px; border-radius: 12px; }
+.platform-subscription-no-plans { display: flex; min-height: 280px; flex-direction: column; align-items: center; justify-content: center; padding: 32px; border: 1px dashed var(--lobster-border-subtle); border-radius: 12px; text-align: center; }
 
 .platform-subscription-records { margin-top: 24px; border-top: 1px solid var(--lobster-border-subtle); border-bottom: 1px solid var(--lobster-border-subtle); }
 .platform-subscription-records summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 4px; border-radius: 4px; color: var(--lobster-text-secondary); font-size: 13px; cursor: pointer; list-style: none; }
@@ -60,14 +65,13 @@
 
 @media (max-width: 979px) {
   .platform-subscription-dialog .platform-plan-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .platform-subscription-dialog .platform-plan-card { padding: 24px; }
 }
 
 @media (max-width: 679px) {
   .platform-subscription-dialog, .platform-subscription-dialog-content { max-height: calc(100dvh - 24px); }
-  .platform-subscription-dialog { border-radius: 20px; }
+  .platform-subscription-dialog { border-radius: 14px; }
   .platform-subscription-dialog-header { padding: 26px 46px 20px; }
-  .platform-subscription-dialog-header h2 { font-size: 24px; }
+  .platform-subscription-dialog-header h2 { font-size: 18px; }
   .platform-subscription-dialog-hint { font-size: 12px; }
   .platform-subscription-close { right: 12px; top: 12px; }
   .platform-subscription-dialog-body { padding: 0 18px 20px; }
@@ -75,7 +79,6 @@
   .platform-plan-periods button { flex: 1; padding: 8px 10px; font-size: 11px; }
   .platform-subscription-dialog .platform-plan-grid,
   .platform-subscription-dialog .platform-plan-grid[data-plan-count="2"] { grid-template-columns: minmax(0, 1fr); }
-  .platform-subscription-dialog .platform-plan-card { min-height: 320px; padding: 24px; }
-  .platform-subscription-dialog .platform-plan-description { min-height: 44px; }
-  .platform-subscription-sync-row { flex-wrap: wrap; gap: 6px; }
+  .platform-subscription-dialog .platform-plan-card { padding: 18px; }
+    .platform-subscription-sync-row { flex-wrap: wrap; gap: 6px; }
 }

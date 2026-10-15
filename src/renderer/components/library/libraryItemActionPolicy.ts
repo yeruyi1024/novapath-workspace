@@ -1,5 +1,6 @@
 import { LibraryItemKind } from '../../../shared/library/constants';
 import type { LibraryItem } from '../../../shared/library/types';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 
 export const LibraryItemAction = {
   ShareLocal: 'share_local',
@@ -16,7 +17,7 @@ export type LibraryItemAction =
   (typeof LibraryItemAction)[keyof typeof LibraryItemAction];
 
 const LOCAL_ACTIONS = [
-  LibraryItemAction.ShareLocal,
+  ...(PRODUCT_FEATURES.fileSharing ? [LibraryItemAction.ShareLocal] : []),
   LibraryItemAction.ToggleFavorite,
   LibraryItemAction.OpenWithApp,
   LibraryItemAction.RevealLocal,

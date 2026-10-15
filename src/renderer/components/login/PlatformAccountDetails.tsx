@@ -1,23 +1,27 @@
 import './platformAccount.css';
 
-import { ArrowPathIcon, ArrowRightStartOnRectangleIcon, CheckCircleIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, ArrowRightStartOnRectangleIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import type { MaasAccount } from '../../../shared/auth/maas';
+import { formatMaasQuota } from '../../../shared/auth/maasBilling';
 import { i18nService } from '../../services/i18n';
-import { applyMaasResult, refreshMaasAccount, useMaasSession } from '../../services/maasAccount';
+import { applyMaasResult, refreshMaasAccount, refreshMaasBilling, useMaasSession } from '../../services/maasAccount';
 import PlatformAccountAvatar from './PlatformAccountAvatar';
 
 interface Props { account: MaasAccount; onClose?: () => void }
 
 export default function PlatformAccountDetails({ account, onClose }: Props) {
   const session = useMaasSession();
-  useSyncExternalStore(listener => i18nService.subscribe(listener), () => i18nService.getLanguage());
+  const language = useSyncExternalStore(listener => i18nService.subscribe(listener), () => i18nService.getLanguage());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
   const active = useRef(true);
   const t = (key: string) => i18nService.t(key);
   const name = account.displayName || account.username;
+  const billing = session.snapshot.account?.id === account.id && session.snapshot.billing?.accountId === account.id
+    ? session.snapshot.billing : undefined;
+  const locale = language === 'zh' ? 'zh-CN' : 'en-US';
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; };
@@ -26,8 +30,14 @@ export default function PlatformAccountDetails({ account, onClose }: Props) {
   const refresh = async () => {
     if (pending) return;
     setPending(true); setError('');
-    await refreshMaasAccount();
-    if (active.current) setPending(false);
+    try {
+      await refreshMaasAccount();
+      await refreshMaasBilling();
+    } catch {
+      if (active.current) setError(t('maasError_network'));
+    } finally {
+      if (active.current) setPending(false);
+    }
   };
   const logout = async () => {
     if (pending) return;
@@ -48,17 +58,59 @@ export default function PlatformAccountDetails({ account, onClose }: Props) {
       <section className="platform-account-panel">
         <div className="platform-profile-identity">
           <PlatformAccountAvatar name={name} large />
-          <div className="min-w-0 flex-1"><h3 className="break-words text-xl font-semibold tracking-tight">{name}</h3><p className="mt-1 break-all text-sm text-secondary">{account.username}</p></div>
-          <span className="platform-account-status"><CheckCircleIcon aria-hidden="true" className="h-3.5 w-3.5" />{t('maasSignedIn')}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="break-words text-base font-semibold tracking-tight text-foreground">{name}</h3>
+              <span className="platform-account-status">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                {t('maasSignedIn')}
+              </span>
+            </div>
+            <p className="platform-profile-meta" title={account.username}>
+              <span className="truncate">@{account.username}</span>
+              <span aria-hidden="true">·</span>
+              <span className="shrink-0 tabular-nums">#{account.id}</span>
+            </p>
+          </div>
         </div>
-        <div className="platform-account-section-heading"><h3>{t('maasProfileDetails')}</h3>
-          <button type="button" disabled={pending} onClick={() => { void refresh(); }} className="platform-account-text-button"><ArrowPathIcon aria-hidden="true" className={`h-3.5 w-3.5 ${pending ? 'animate-spin motion-reduce:animate-none' : ''}`} />{t(pending ? 'loading' : 'maasRefreshProfile')}</button>
-        </div>
-        <dl className="platform-profile-details">
-          {[['maasDisplayName', name], ['maasUsername', account.username], ['maasAccountId', `#${account.id}`]].map(([label, value]) => <div key={label}><dt>{t(label)}</dt><dd>{value}</dd></div>)}
-        </dl>
+
+        <section className="platform-account-balance" aria-label={t('maasBalance')}>
+          <div className="platform-account-balance-main">
+            <div className="min-w-0">
+              <p className="platform-bento-label">{t('maasBalance')}</p>
+              <p className="platform-account-balance-value">
+                {billing ? formatMaasQuota(billing.quota, billing.display, locale) : '—'}
+              </p>
+            </div>
+            {billing && <div className="platform-account-balance-usage">
+              <span>{t('maasTotalUsage')}</span>
+              <strong>{formatMaasQuota(billing.usedQuota, billing.display, locale)}</strong>
+            </div>}
+          </div>
+          <div className="platform-account-balance-foot">
+            <p className="platform-account-balance-note" role={session.billingError ? 'status' : undefined}>
+              {session.billingError
+                ? t(billing ? 'maasBillingStale' : 'maasBillingUnavailable')
+                : session.billingLoading
+                  ? t('maasBillingSyncing')
+                  : billing
+                    ? t('maasBillingDisplayHint')
+                    : t('maasBillingNotSynced')}
+            </p>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => { void refresh(); }}
+              className="platform-account-refresh-btn"
+              title={t('maasRefreshProfile')}
+              aria-label={t('maasRefreshProfile')}
+            >
+              <ArrowPathIcon aria-hidden="true" className={`h-3.5 w-3.5 ${pending ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+              <span>{t(pending ? 'loading' : 'maasRefreshProfile')}</span>
+            </button>
+          </div>
+        </section>
         {session.error && <p role="alert" className="platform-account-notice text-error">{t(`maasError_${session.error}`)}</p>}
-        <div className="platform-profile-security"><ShieldCheckIcon aria-hidden="true" className="h-4 w-4 shrink-0" /><div><p className="text-xs font-medium text-foreground">{t('maasAccountSecurityTitle')}</p><p className="mt-1 text-xs leading-5 text-secondary">{t('maasLoginSecurity')}</p></div></div>
       </section>
       {error && <p role="alert" className="platform-account-notice text-error">{error}</p>}
     </div>

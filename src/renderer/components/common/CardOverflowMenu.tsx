@@ -16,11 +16,11 @@ const MenuKey = { Dismiss: 'Escape', Next: 'ArrowDown', Previous: 'ArrowUp', Fir
 export const CARD_OVERFLOW_MENU_SURFACE_CLASSNAME =
   'rounded-xl border border-border bg-surface py-1 shadow-popover';
 export const CARD_OVERFLOW_MENU_ITEM_CLASSNAME =
-  `flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left ${MANAGEMENT_BODY_TEXT} transition-colors hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-white/[0.05]`;
+  `flex w-full items-center gap-2 whitespace-nowrap px-3 py-2 text-left ${MANAGEMENT_BODY_TEXT} transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-45`;
 export const CARD_OVERFLOW_MENU_SUBMENU_CLASSNAME =
   'mx-2 mb-1 overflow-y-auto pl-2';
 export const CARD_OVERFLOW_MENU_SUBITEM_CLASSNAME =
-  `flex h-9 w-full items-center gap-2 whitespace-nowrap rounded-md px-2 text-left ${MANAGEMENT_BODY_TEXT} transition-colors hover:bg-black/[0.04] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-white/[0.05]`;
+  `flex h-9 w-full items-center gap-2 whitespace-nowrap rounded-md px-2 text-left ${MANAGEMENT_BODY_TEXT} transition-colors hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-45`;
 export const CARD_OVERFLOW_MENU_SUBMENU_MAX_HEIGHT_PX =
   SUBMENU_MAX_VISIBLE_ITEMS * MENU_ITEM_HEIGHT_PX;
 
@@ -48,6 +48,8 @@ interface CardOverflowMenuProps {
   triggerContent?: React.ReactNode;
   triggerClassName?: string;
   triggerLabel?: string;
+  /** Extra classes for the menu surface, e.g. account-specific styling. */
+  menuClassName?: string;
 }
 
 /** Reusable overflow menu with an optional inline, one-level submenu. */
@@ -59,6 +61,7 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
   triggerContent,
   triggerClassName,
   triggerLabel,
+  menuClassName = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedItemKey, setExpandedItemKey] = useState<string>();
@@ -194,7 +197,7 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
             event.preventDefault(); buttons[next].focus();
           }}
           style={{ top: position.top, left: position.left, width: menuWidthPx }}
-          className={`fixed z-[9999] ${CARD_OVERFLOW_MENU_SURFACE_CLASSNAME}`}
+          className={`fixed z-[9999] ${CARD_OVERFLOW_MENU_SURFACE_CLASSNAME} ${menuClassName}`}
         >
           {items.map(item => {
             const hasChildren = Boolean(item.children);

@@ -37,6 +37,7 @@ import {
 } from '@shared/htmlShare/constants';
 import { LibraryNavigationEvent } from '@shared/library/constants';
 import type { LocalWebService } from '@shared/localWebServices/constants';
+import { PRODUCT_FEATURES } from '@shared/product';
 import {
   type PublishingQuotaErrorData,
   PublishingResourceKind,
@@ -150,6 +151,7 @@ import {
 } from './deploymentAnalytics';
 import FileDirectoryView from './FileDirectoryView';
 import { formatHtmlShareFailure } from './htmlShareErrorPresentation';
+import LegacyPublishingUnavailableDialog from './LegacyPublishingUnavailableDialog';
 import {
   buildLocalServiceDeploymentPermissionPlan,
   canCopyLocalServiceDeploymentLink,
@@ -971,7 +973,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const isBrowserTabActive = !selectedArtifact && activeSpecialTab === ArtifactSpecialTab.Browser;
   const artifactToolbarPublishTarget = resolveArtifactPreviewToolbarPublishTarget(
     selectedArtifact,
-    Boolean(artifactFileShare),
+    PRODUCT_FEATURES.fileSharing && Boolean(artifactFileShare),
   );
   const selectedArtifactId = selectedArtifact?.id ?? null;
   const activeTab = activePreviewTab?.contentView ?? ArtifactContentView.Preview;
@@ -1082,7 +1084,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const browserToolbarPublishTarget = resolveBrowserToolbarPublishTarget({
     htmlArtifact: isBrowserTabActive ? browserHtmlArtifact : null,
     localService: browserLocalService,
-    shareAvailable: Boolean(artifactFileShare),
+    shareAvailable: PRODUCT_FEATURES.fileSharing && Boolean(artifactFileShare),
   });
   const isHtmlSharing =
     htmlSharePhase === HtmlSharePhase.Checking ||
@@ -5160,7 +5162,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         onClick: handleShareBrowserHtmlArtifact,
       };
     }
-    if (browserToolbarPublishTarget?.kind === ArtifactToolbarPublishActionKind.Deploy) {
+    if (PRODUCT_FEATURES.legacyPublishing &&
+      browserToolbarPublishTarget?.kind === ArtifactToolbarPublishActionKind.Deploy) {
       return {
         kind: ArtifactToolbarPublishActionKind.Deploy,
         label: browserDeploymentActionLabel,
@@ -5693,7 +5696,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           </div>,
           document.body,
         )}
-      {subscriptionPrompt && (
+      {subscriptionPrompt && (PRODUCT_FEATURES.legacyPublishing ? (
         <ArtifactSubscriptionPromptDialog
           feature={subscriptionPrompt.feature}
           reason={subscriptionPrompt.reason}
@@ -5707,8 +5710,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               : null
           }
         />
-      )}
-      {publishingQuotaDialog && (
+      ) : (
+        <LegacyPublishingUnavailableDialog onClose={closeSubscriptionPrompt} />
+      ))}
+      {publishingQuotaDialog && (PRODUCT_FEATURES.legacyPublishing ? (
         <PublishingQuotaLimitDialog
           quota={publishingQuotaDialog}
           onClose={closePublishingQuotaDialog}
@@ -5725,8 +5730,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             window.dispatchEvent(new Event(LibraryNavigationEvent.OpenCloud));
           }}
         />
-      )}
-      {nodeDeploymentTrialNotice && (
+      ) : (
+        <LegacyPublishingUnavailableDialog onClose={closePublishingQuotaDialog} />
+      ))}
+      {nodeDeploymentTrialNotice && (PRODUCT_FEATURES.legacyPublishing ? (
         <PublishingTrialNoticeDialog
           feature={ArtifactSubscriptionFeature.Deployment}
           quota={nodeDeploymentTrialNotice.quota}
@@ -5735,7 +5742,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           onSubscribe={openNodeDeploymentTrialSubscriptionPage}
           analyticsAttempt={publishingAnalyticsAttemptRef.current}
         />
-      )}
+      ) : (
+        <LegacyPublishingUnavailableDialog onClose={closeNodeDeploymentTrialNotice} />
+      ))}
       {nodeDeploymentDialog && isNodeDeploymentDialogOpen &&
         createPortal(
           <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/35 px-4">
@@ -6250,7 +6259,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                       {nodeDeploymentCopyButtonLabel}
                     </button>
                   )}
-                  {nodeDeploymentFooterActions.showRecovery
+                  {PRODUCT_FEATURES.legacyPublishing && nodeDeploymentFooterActions.showRecovery
                     && nodeDeploymentRecoveryAnalyticsContext && (
                     <PublishingSubscriptionRecoveryButton
                       recoveryMode={nodeDeploymentRecoveryAnalyticsContext.subscriptionRecoveryMode}

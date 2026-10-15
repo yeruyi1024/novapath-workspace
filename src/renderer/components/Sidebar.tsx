@@ -21,6 +21,7 @@ import PlatformAccountButton from './login/PlatformAccountButton';
 import { ProjectCreateDialog } from './projects/ProjectControls';
 import { ProjectMoveDialog } from './projects/ProjectMoveDialog';
 import { useWorkspaceProjects } from './projects/useWorkspaceProjects';
+import { visibleSidebarChats } from './sidebar/visibleSidebarChats';
 
 interface SidebarProps {
   onShowSettings: () => void;
@@ -57,6 +58,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
   const [pendingDelete, setPendingDelete] = useState<CoworkSessionSummary | null>(null);
   const [error, setError] = useState('');
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [expandedChatGroups, setExpandedChatGroups] = useState<Set<string>>(new Set());
+  const toggleChatGroup = (id: string) => setExpandedChatGroups(previous => {
+    const next = new Set(previous);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const request = useRef(0);
   const refresh = useCallback(async () => {
     const id = ++request.current;
@@ -92,6 +99,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
     onTogglePin={pinned => { void coworkService.setSessionPinned(session.id, pinned).then(refresh); }}
     onToggleSelection={() => undefined} onEnterBatchMode={() => undefined} />;
   const ungrouped = sessions.filter(session => !projectsState.sessionProjects[session.id]);
+  const visibleUngrouped = visibleSidebarChats(ungrouped, expandedChatGroups.has('ungrouped'), currentSessionId);
   const tools = [
     { label: 'skillsAndConnectors', action: onShowSkills, icon: PuzzlePieceIcon, active: activeView === 'skills' || activeView === 'mcp' },
     { label: 'kits', action: onShowKits, icon: Squares2X2Icon, active: activeView === 'kits' },
@@ -123,7 +131,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
         {projectsState.projects.map(project => {
           const children = sessions.filter(session => projectsState.sessionProjects[session.id] === project.id);
           const collapsed = collapsedProjects.has(project.id);
-          return <div key={project.id} className="mb-1">
+          const expanded = expandedChatGroups.has(project.id);
+          const visibleChildren = visibleSidebarChats(children, expanded, currentSessionId);
+          return <div key={project.id} className="workspace-project-group mb-2">
             <div data-selected={projectsState.selectedProjectId === project.id || undefined} className={`workspace-project-row group flex items-center rounded-lg hover:bg-surface-raised ${projectsState.selectedProjectId === project.id ? 'bg-surface-raised' : ''}`}>
               <button type="button" aria-label={`${collapsed ? i18nService.t('expand') : i18nService.t('collapse')} ${project.name}`} aria-expanded={!collapsed}
                 onClick={() => setCollapsedProjects(previous => { const next = new Set(previous); if (collapsed) next.delete(project.id); else next.add(project.id); return next; })}
@@ -139,14 +149,24 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
               ]} />
             </div>
             {!collapsed && children.length > 0 && <div className="workspace-project-chats ml-4 space-y-0.5 pl-1">
-              {children.map(renderSession)}
+              {visibleChildren.map(renderSession)}
+              {(visibleChildren.length < children.length || expanded) && <button type="button"
+                aria-expanded={expanded} onClick={() => toggleChatGroup(project.id)}
+                className="workspace-chat-expand flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs text-secondary hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+                {i18nService.t(expanded ? 'sidebarShowLess' : 'sidebarShowMore')}
+              </button>}
 
             </div>}
           </div>;
         })}
         {projectsState.projects.length === 0 && <button type="button" onClick={() => setCreating(true)} className="mb-3 flex h-9 w-full items-center gap-2 rounded-lg px-2 text-sm text-secondary hover:bg-surface-raised"><FolderPlusIcon className="h-4 w-4" />{i18nService.t('projectCreate')}</button>}
         <div className="mb-1 mt-6 px-2.5 text-[11px] font-medium text-muted">{i18nService.t('projectChats')}</div>
-        {ungrouped.map(renderSession)}
+        {visibleUngrouped.map(renderSession)}
+        {(visibleUngrouped.length < ungrouped.length || expandedChatGroups.has('ungrouped')) && <button type="button"
+          aria-expanded={expandedChatGroups.has('ungrouped')} onClick={() => toggleChatGroup('ungrouped')}
+          className="workspace-chat-expand flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs text-secondary hover:bg-surface-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+          {i18nService.t(expandedChatGroups.has('ungrouped') ? 'sidebarShowLess' : 'sidebarShowMore')}
+        </button>}
         {ungrouped.length === 0 && <p className="px-2 py-2 text-xs text-muted">{i18nService.t('projectNoChats')}</p>}
         {hasMore && <button type="button" className="px-2 py-3 text-xs text-secondary" onClick={() => setLimit(value => value + 100)}>{i18nService.t('libraryLoadMore')}</button>}
       </div>

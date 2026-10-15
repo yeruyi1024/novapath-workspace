@@ -9,37 +9,27 @@ interface IconProps {
   className?: string;
 }
 
-/** Word document icon — blue "W" on a document shape */
-export const WordIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-    <text x="12" y="17.5" textAnchor="middle" fill="currentColor" stroke="none" fontSize="7" fontWeight="bold" fontFamily="Arial, sans-serif">W</text>
+/** Page with folded corner, tinted fill and a solid badge carrying the type label. */
+const BadgedDocumentIcon: React.FC<IconProps & { label: string }> = ({ className, label }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" className={className}>
+    <path d="M6 2.5h8.25L19.5 7.75V20a1.5 1.5 0 01-1.5 1.5H6A1.5 1.5 0 014.5 20V4A1.5 1.5 0 016 2.5z" fill="currentColor" fillOpacity={0.14} stroke="currentColor" strokeWidth={1.25} strokeLinejoin="round" />
+    <path d="M14.25 2.5v4.25a1 1 0 001 1h4.25" stroke="currentColor" strokeWidth={1.25} strokeLinejoin="round" />
+    <rect x="2.5" y="11.5" width="14" height="7" rx="1.75" fill="currentColor" />
+    <text x="9.5" y="16.7" textAnchor="middle" fill="#fff" fontSize="5" fontWeight="700" fontFamily="Arial, sans-serif" letterSpacing="0.2">{label}</text>
   </svg>
 );
 
-/** Excel spreadsheet icon — green "X" on a document shape */
-export const ExcelIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-    <text x="12" y="17.5" textAnchor="middle" fill="currentColor" stroke="none" fontSize="7" fontWeight="bold" fontFamily="Arial, sans-serif">X</text>
-  </svg>
-);
+/** Word document icon */
+export const WordIcon: React.FC<IconProps> = ({ className }) => <BadgedDocumentIcon className={className} label="DOC" />;
 
-/** PowerPoint presentation icon — orange-red "P" on a document shape */
-export const PptIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-    <text x="12" y="17.5" textAnchor="middle" fill="currentColor" stroke="none" fontSize="7" fontWeight="bold" fontFamily="Arial, sans-serif">P</text>
-  </svg>
-);
+/** Excel spreadsheet icon */
+export const ExcelIcon: React.FC<IconProps> = ({ className }) => <BadgedDocumentIcon className={className} label="XLS" />;
 
-/** PDF document icon — red "PDF" label on a document shape */
-export const PdfIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-    <text x="12" y="17" textAnchor="middle" fill="currentColor" stroke="none" fontSize="5.5" fontWeight="bold" fontFamily="Arial, sans-serif">PDF</text>
-  </svg>
-);
+/** PowerPoint presentation icon */
+export const PptIcon: React.FC<IconProps> = ({ className }) => <BadgedDocumentIcon className={className} label="PPT" />;
+
+/** PDF document icon */
+export const PdfIcon: React.FC<IconProps> = ({ className }) => <BadgedDocumentIcon className={className} label="PDF" />;
 
 /** Archive / compressed file icon */
 export const ArchiveIcon: React.FC<IconProps> = ({ className }) => (
@@ -102,13 +92,13 @@ const register = (extensions: string[], info: FileTypeInfo) => {
 };
 
 // Word
-register(['.doc', '.docx'], { icon: WordIcon, color: '#2B579A', label: 'Word' });
+register(['.doc', '.docx'], { icon: WordIcon, color: '#2F6BEB', label: 'Word' });
 // Excel
-register(['.xls', '.xlsx', '.csv'], { icon: ExcelIcon, color: '#217346', label: 'Excel' });
+register(['.xls', '.xlsx', '.csv'], { icon: ExcelIcon, color: '#18A058', label: 'Excel' });
 // PPT
-register(['.ppt', '.pptx'], { icon: PptIcon, color: '#D24726', label: 'PPT' });
+register(['.ppt', '.pptx'], { icon: PptIcon, color: '#F26B1D', label: 'PPT' });
 // PDF
-register(['.pdf'], { icon: PdfIcon, color: '#FF0000', label: 'PDF' });
+register(['.pdf'], { icon: PdfIcon, color: '#E5484D', label: 'PDF' });
 // Archive
 register(['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2'], { icon: ArchiveIcon, color: '#F59E0B', label: 'Archive' });
 // Code

@@ -19,7 +19,6 @@ export default function PlatformSubscriptionDialog({ account, origin, onClose }:
   return <Modal onClose={onClose} onEscape={onClose} overlayClassName="platform-account-overlay non-draggable" className="platform-subscription-dialog">
     <div ref={dialogRef} data-platform-dialog role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} aria-describedby={`${id}-description`} tabIndex={-1} onKeyDown={trapFocus} className="platform-subscription-dialog-content">
       <header className="platform-subscription-dialog-header">
-        <p className="platform-subscription-brand"><img src="logo.svg" alt="" />{t('productName')}</p>
         <h2 id={`${id}-title`}>{t('maasSubscriptionDialogTitle')}</h2>
         <p id={`${id}-description`} className="platform-subscription-dialog-hint">{t('maasSubscriptionDialogHint')}</p>
         <button type="button" onClick={onClose} aria-label={t('close')} className="platform-account-icon-button platform-subscription-close"><XMarkIcon aria-hidden="true" className="h-5 w-5" /></button>

@@ -42,6 +42,7 @@ import type {
   LibrarySessionRef,
   SharedFileItem,
 } from '../../../shared/library/types';
+import { PRODUCT_FEATURES } from '../../../shared/product';
 import {
   normalizePublishingSubscriptionRecoveryMode,
   type PublishingQuotaErrorData,
@@ -81,6 +82,7 @@ import {
   resolveArtifactFileSharePermissionConfirmation,
 } from '../artifacts/artifactFileSharePermission';
 import { ArtifactSubscriptionFeature } from '../artifacts/artifactSubscriptionGate';
+import LegacyPublishingUnavailableDialog from '../artifacts/LegacyPublishingUnavailableDialog';
 import {
   createPublishingAnalyticsAttempt,
   createPublishingAnalyticsDialog,
@@ -513,7 +515,7 @@ const LibraryCloudRecoveryActionCell: React.FC<{
     LibraryCloudAvailabilityFilter.Available,
     now,
   );
-  const showRecovery = Boolean(
+  const showRecovery = PRODUCT_FEATURES.legacyPublishing && Boolean(
     recoveryAnalyticsContext
     && shouldShowPublishingSubscriptionRecovery({
       ownerAccountKey,
@@ -875,7 +877,7 @@ const LibraryShareSettingsView: React.FC<{
   )
     && !hasPendingChanges;
   const canCopyShareInformation = canUseShare && !state.saving && copyResult.copyable;
-  const showRecovery = Boolean(
+  const showRecovery = PRODUCT_FEATURES.legacyPublishing && Boolean(
     recoveryAnalyticsContext
     && shouldShowPublishingSubscriptionRecovery({
       ownerAccountKey,
@@ -1585,7 +1587,7 @@ const LibraryShareSettingsView: React.FC<{
             onConfirm={confirmPendingAction}
           />
         )}
-        {publishingQuota && (
+        {publishingQuota && (PRODUCT_FEATURES.legacyPublishing ? (
           <PublishingQuotaLimitDialog
             quota={publishingQuota}
             analyticsAttempt={publishingAnalyticsAttemptRef.current}
@@ -1603,12 +1605,14 @@ const LibraryShareSettingsView: React.FC<{
               onBack();
             }}
           />
-        )}
+        ) : (
+          <LegacyPublishingUnavailableDialog onClose={() => setPublishingQuota(null)} />
+        ))}
         {deleteConfirmOpen && (
           <LibraryShareDeleteDialog
             fileName={getLibraryDisplayFileName(item)}
             busy={deleting}
-            showFreeQuotaNotice={showFreeShareDeleteQuotaNotice}
+            showFreeQuotaNotice={PRODUCT_FEATURES.legacyPublishing && showFreeShareDeleteQuotaNotice}
             error={deleteError}
             onCancel={() => {
               setDeleteConfirmOpen(false);
