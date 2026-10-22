@@ -1,0 +1,426 @@
+# STREAM-FIX-02: live OpenAI-completions previews with final-phase protection.
+# Pinned source: OpenClaw v2026.8.1 / ea806575e6450e4d1efdfc72c19f04be982a1b9b.
+# Minimal upstream backport; no runtime version upgrade.
+# https://github.com/openclaw/openclaw/commit/3add6f6a8695607957b888189cb4cc9430454285
+# Privacy prerequisites:
+# https://github.com/openclaw/openclaw/commit/a96c281286a0322591506c12bf2c24c9052a557d
+# https://github.com/openclaw/openclaw/commit/757d73980426df41869314a063b17fc847b36511
+# Explicit strict tag mode, final text classification and durable delivery gates stay intact.
+
+diff --git a/packages/ai/src/transports/openai-completions-stream.ts b/packages/ai/src/transports/openai-completions-stream.ts
+--- a/packages/ai/src/transports/openai-completions-stream.ts
++++ b/packages/ai/src/transports/openai-completions-stream.ts
+@@ -407,8 +407,14 @@
+     }
+     appendThinkingDelta({ text: "" });
+   };
+-  const flushReasoningTagTextPartitioner = () => {
+-    for (const delta of reasoningTagTextPartitioner.flush()) {
++  const flushReasoningTagTextPartitioner = (allowRecovery = true) => {
++    const recoverUnclosed =
++      allowRecovery &&
++      !output.openclawDelivery?.textPhaseRequiresTerminal &&
++      output.stopReason !== "length" &&
++      output.stopReason !== "error" &&
++      output.stopReason !== "aborted";
++    for (const delta of reasoningTagTextPartitioner.flush({ recoverUnclosed })) {
+       appendPartitionedVisibleDelta(delta);
+     }
+   };
+@@ -431,15 +437,12 @@
+     }
+     currentTextSource = undefined;
+   };
+-  const beginReasoning = (hasFollowingVisibleText: boolean, forceStrict = false) => {
++  const beginReasoning = (hasFollowingVisibleText: boolean) => {
+     if (!output.openclawDelivery?.textPhaseRequiresTerminal) {
+       output.openclawDelivery = {
+         ...output.openclawDelivery,
+         textPhaseRequiresTerminal: true,
+       };
+-    }
+-    if (forceStrict || reasoningTagTextPartitioner.hasPending()) {
+-      reasoningTagTextPartitioner.markStrict();
+     }
+     // Let following text finish syntax already owned by the Markdown
+     // parser; otherwise packet batching cannot erase a lane boundary.
+@@ -537,15 +540,12 @@
+       const lastVisibleTextIndex = contentDeltas.findLastIndex((delta) => delta.kind === "text");
+       const hasSameChunkVisibleText = reasoningBatch.hasVisibleText || lastVisibleTextIndex !== -1;
+       if (hasReasoningThinking) {
+-        beginReasoning(hasSameChunkVisibleText, true);
++        beginReasoning(hasSameChunkVisibleText);
+         appendReasoningDeltas(reasoningDeltas);
+       }
+       for (const [contentDeltaIndex, contentDelta] of contentDeltas.entries()) {
+         if (contentDelta.kind === "text") {
+-          const routedDeltas = hasReasoningThinking
+-            ? reasoningTagTextPartitioner.push(contentDelta.text)
+-            : reasoningTagTextPartitioner.pushVisible(contentDelta.text);
+-          for (const routedDelta of routedDeltas) {
++          for (const routedDelta of reasoningTagTextPartitioner.pushVisible(contentDelta.text)) {
+             appendPartitionedVisibleDelta(routedDelta);
+           }
+         } else {
+@@ -560,7 +560,7 @@
+       const toolCallDeltas = normalizedDelta.toolCalls;
+       if (toolCallDeltas.length > 0) {
+         sawNativeToolCallDelta = true;
+-        flushReasoningTagTextPartitioner();
++        flushReasoningTagTextPartitioner(false);
+         rememberPendingCommentaryTags(
+           provisionalCommentaryTags,
+           tagPendingCommentaryText(output.content),
+diff --git a/packages/markdown-core/src/reasoning-tags.ts b/packages/markdown-core/src/reasoning-tags.ts
+--- a/packages/markdown-core/src/reasoning-tags.ts
++++ b/packages/markdown-core/src/reasoning-tags.ts
+@@ -79,7 +79,7 @@
+   markStrict(): void;
+   push(chunk: string): ReasoningTagTextDelta[];
+   pushVisible(chunk: string): ReasoningTagTextDelta[];
+-  flush(): ReasoningTagTextDelta[];
++  flush(options?: { recoverUnclosed?: boolean }): ReasoningTagTextDelta[];
+   hasPending(): boolean;
+   /** Whether more input can change buffered Markdown or reasoning-tag ownership. */
+   hasPendingSyntax(): boolean;
+@@ -282,6 +282,7 @@
+     output: ReasoningTagTextDelta[],
+     parsedCodeSpans?: Array<[number, number]>,
+     parsedRetainStart?: number,
++    recoverUnclosed = true,
+   ): boolean => {
+     const previousBlockStart = blockStart;
+     let blockCodeSpans = parsedCodeSpans;
+@@ -294,6 +295,7 @@
+         output,
+         reduceReasoningText("", [], reduction, {
+           final: true,
++          recoverUnclosed,
+           mode: strictMode ? "hide" : "visible",
+           scope: "all",
+         }),
+@@ -340,6 +342,7 @@
+         output,
+         reduceReasoningText(block, blockCodeSpans, reduction, {
+           final,
++          recoverUnclosed,
+           mode: strictMode ? "hide" : "visible",
+           scope: "all",
+           start,
+@@ -390,7 +393,7 @@
+     return true;
+   };
+ 
+-  const consume = (chunk: string, strict: boolean, final: boolean) => {
++  const consume = (chunk: string, strict: boolean, final: boolean, recoverUnclosed = true) => {
+     strictMode ||= strict;
+     const previousLength = source.length;
+     const previousEndedBlankBlock = BLANK_BOUNDARY_RE.test(source);
+@@ -417,7 +420,7 @@
+     }
+     const output: ReasoningTagTextDelta[] = [];
+     if (final) {
+-      processBlock(source.length, true, output);
++      processBlock(source.length, true, output, undefined, undefined, recoverUnclosed);
+     } else {
+       emitSafePrefix(source.length, output);
+       if (!strictMode && holdStart !== undefined && holdStart < source.length) {
+@@ -567,8 +570,8 @@
+     pushVisible(chunk) {
+       return consume(chunk, false, false);
+     },
+-    flush() {
+-      return consume("", strictMode, true);
++    flush(options) {
++      return consume("", strictMode, true, options?.recoverUnclosed);
+     },
+     hasPending() {
+       return (
+diff --git a/packages/markdown-core/src/reasoning-tag-parser.ts b/packages/markdown-core/src/reasoning-tag-parser.ts
+--- a/packages/markdown-core/src/reasoning-tag-parser.ts
++++ b/packages/markdown-core/src/reasoning-tag-parser.ts
+@@ -268,6 +268,7 @@
+ 
+ type ReductionOptions = {
+   final: boolean;
++  recoverUnclosed?: boolean;
+   mode: RecoveryMode;
+   scope: "all" | "leading";
+   start?: number;
+@@ -414,7 +415,7 @@
+         options.mode === "static-preserve" ||
+         (options.mode === "static-strict" && !pending.visibleBefore && !pending.protectedClose) ||
+         (options.mode === "visible" && !pending.protectedClose);
+-      if (recoverAsText) {
++      if (recoverAsText && options.recoverUnclosed !== false) {
+         const value =
+           options.mode === "visible" && pending.visibleBefore
+             ? pending.openTag + pending.content
+diff --git a/src/agents/embedded-agent-subscribe.handlers.messages.update.ts b/src/agents/embedded-agent-subscribe.handlers.messages.update.ts
+--- a/src/agents/embedded-agent-subscribe.handlers.messages.update.ts
++++ b/src/agents/embedded-agent-subscribe.handlers.messages.update.ts
+@@ -203,8 +203,6 @@
+     evtType !== "text_end" && !deliveryPhase && isAnthropicAssistantMessage(partialAssistant);
+   const isCompletionsAssistant = isOpenAiCompletionsAssistantMessage(partialAssistant);
+   const isPhasePendingCompletionsText = !deliveryPhase && isCompletionsAssistant;
+-  const isReasoningCompletionsText =
+-    isCompletionsAssistant && partialAssistant.openclawDelivery?.textPhaseRequiresTerminal === true;
+   const hasResponsesContentIndex =
+     streamContentIndex !== undefined && isResponsesApiAssistantMessage(partialAssistant);
+   let streamItemChanged = false;
+@@ -277,12 +275,6 @@
+   // parsing so long parallel subagent streams do not monopolize the event loop.
+   const skipLiveStream = ctx.params.suppressLiveStreamOutput === true;
+   const shouldUsePhaseAwareBlockReply = Boolean(deliveryPhase);
+-
+-  // A completions stream cannot classify text interrupted by later reasoning
+-  // until terminal. Keep that text out of live reply lanes until its phase resolves.
+-  if (isReasoningCompletionsText) {
+-    return;
+-  }
+ 
+   if (chunk) {
+     ctx.state.deltaBuffer += chunk;
+diff --git a/packages/llm-core/src/types.ts b/packages/llm-core/src/types.ts
+--- a/packages/llm-core/src/types.ts
++++ b/packages/llm-core/src/types.ts
+@@ -351,7 +351,7 @@
+     mediaUrls?: string[];
+     replyToCurrent?: true;
+     replyToId?: string;
+-    /** Provider text phase is unresolved until the assistant turn reaches terminal state. */
++    /** Final text phase is unresolved until terminal; live partials may still stream. */
+     textPhaseRequiresTerminal?: true;
+     /** Parsed once at the assistant write boundary; delivery resolves policy from these facts. */
+     tts?: AssistantDeliveryTtsFacts;
+diff --git a/src/agents/embedded-agent-subscribe.subscribe-embedded-agent-session.reasoning-delivery.test.ts b/src/agents/embedded-agent-subscribe.subscribe-embedded-agent-session.reasoning-delivery.test.ts
+--- a/src/agents/embedded-agent-subscribe.subscribe-embedded-agent-session.reasoning-delivery.test.ts
++++ b/src/agents/embedded-agent-subscribe.subscribe-embedded-agent-session.reasoning-delivery.test.ts
+@@ -504,7 +504,7 @@
+ }
+ 
+ describe("Chat Completions pre-tool narration", () => {
+-  it("withholds reasoning-associated unphased text until terminal phase resolution", () => {
++  it("streams reasoning-associated previews while withholding durable text until terminal", () => {
+     const { session, emit } = createStubSessionHarness();
+     const onPartialReply = vi.fn();
+     const onBlockReply = vi.fn();
+@@ -529,7 +529,8 @@
+       assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "Interim text." },
+     });
+ 
+-    expect(onPartialReply).not.toHaveBeenCalled();
++    expect(onPartialReply).toHaveBeenCalledWith(expect.objectContaining({ text: "Interim text." }));
++    expect(onBlockReply).not.toHaveBeenCalled();
+ 
+     const terminalMessage = {
+       ...message,
+@@ -553,12 +554,12 @@
+     });
+     emit({ type: "message_end", message: terminalMessage });
+ 
+-    expect(onPartialReply).not.toHaveBeenCalled();
++    expect(onPartialReply).toHaveBeenCalledWith(expect.objectContaining({ text: "Interim text." }));
+     expect(onBlockReply).toHaveBeenCalledTimes(1);
+     expect(postedText(onBlockReply)).toBe("Final text.");
+   });
+ 
+-  it("does not deliver interrupted text when producer phase resolution ends in error", () => {
++  it("keeps interrupted text out of durable replies when phase resolution ends in error", () => {
+     const { session, emit } = createStubSessionHarness();
+     const onPartialReply = vi.fn();
+     const onBlockReply = vi.fn();
+@@ -598,7 +599,7 @@
+       },
+     });
+ 
+-    expect(onPartialReply).not.toHaveBeenCalled();
++    expect(onPartialReply).toHaveBeenCalledWith(expect.objectContaining({ text: "Interim text." }));
+     expect(onBlockReply).not.toHaveBeenCalled();
+   });
+ 
+diff --git a/packages/ai/src/transports/openai-completions-stream.reasoning-first-live-text.test.ts b/packages/ai/src/transports/openai-completions-stream.reasoning-first-live-text.test.ts
+new file mode 100644
+--- /dev/null
++++ b/packages/ai/src/transports/openai-completions-stream.reasoning-first-live-text.test.ts
+@@ -0,0 +1,180 @@
++import { describe, expect, it } from "vitest";
++import { processCompletionsStream } from "./openai-completions-stream.js";
++import {
++  createAssistantOutput,
++  makeCompletionsChunk,
++  makeCompletionsModel,
++} from "./openai-completions.test-support.js";
++
++describe("reasoning-first completions", () => {
++  it.each(["reasoning", "reasoning_content"] as const)(
++    "streams visible text after %s before reading another chunk",
++    async (field) => {
++      const model = makeCompletionsModel();
++      for (const sameChunk of [false, true]) {
++        for (const emitReasoning of [false, true]) {
++          const output = createAssistantOutput(model);
++          const text: string[] = [];
++          async function* chunks() {
++            yield makeCompletionsChunk({ [field]: "Think." });
++            yield makeCompletionsChunk({
++              ...(sameChunk ? { [field]: " Done." } : {}),
++              content: "Answer",
++            });
++            expect(text.join("")).toBe("Answer");
++            yield makeCompletionsChunk({ content: " continues." });
++            expect(text.join("")).toBe("Answer continues.");
++            yield makeCompletionsChunk({ [field]: "Reconsider." });
++            yield makeCompletionsChunk({ content: "Final." });
++            expect(text.join("")).toBe("Answer continues.Final.");
++            yield makeCompletionsChunk({}, "stop");
++          }
++          await processCompletionsStream(
++            chunks(),
++            output,
++            model,
++            {
++              push(event) {
++                if (event.type === "text_delta") {
++                  text.push(event.delta);
++                }
++              },
++            },
++            { emitReasoning },
++          );
++          expect(output.stopReason).toBe("stop");
++          expect(output.content.filter((block) => block.type === "text")).toMatchObject([
++            { text: "Answer continues.", textSignature: expect.stringContaining('"commentary"') },
++            { text: "Final.", textSignature: expect.stringContaining('"final_answer"') },
++          ]);
++        }
++      }
++    },
++  );
++
++  it.each(["", "Answer. "])("keeps unfinished reasoning private after %j", async (prefix) => {
++    const model = makeCompletionsModel();
++    const output = createAssistantOutput(model);
++    const text: string[] = [];
++    async function* chunks() {
++      yield makeCompletionsChunk({ reasoning_content: "Native reasoning." });
++      yield makeCompletionsChunk({ content: `${prefix}<think>unfinished reasoning` });
++      yield makeCompletionsChunk({}, "stop");
++    }
++    await processCompletionsStream(
++      chunks(),
++      output,
++      model,
++      {
++        push(event) {
++          if (event.type === "text_delta") {
++            text.push(event.delta);
++          }
++        },
++      },
++      { emitReasoning: false },
++    );
++    expect(text.join("")).toBe(prefix);
++    expect(
++      output.content
++        .filter((block) => block.type === "text")
++        .map((block) => block.text)
++        .join(""),
++    ).toBe(prefix);
++  });
++
++  it("does not deliver late text after cancellation of a reasoning-first stream", async () => {
++    const model = makeCompletionsModel();
++    const output = createAssistantOutput(model);
++    const text: string[] = [];
++    const controller = new AbortController();
++    async function* chunks() {
++      yield makeCompletionsChunk({ reasoning_content: "Think." });
++      yield makeCompletionsChunk({ content: "Visible before stop." });
++      expect(text.join("")).toBe("Visible before stop.");
++      controller.abort();
++      yield makeCompletionsChunk({ content: "Late text must not arrive." });
++    }
++    await expect(
++      processCompletionsStream(
++        chunks(),
++        output,
++        model,
++        {
++          push(event) {
++            if (event.type === "text_delta") {
++              text.push(event.delta);
++            }
++          },
++        },
++        { emitReasoning: true, signal: controller.signal },
++      ),
++    ).rejects.toThrow(/abort/i);
++    expect(text.join("")).toBe("Visible before stop.");
++  });
++
++  it.each(["length", "content_filter"] as const)(
++    "keeps unfinished inline reasoning private on %s termination",
++    async (finishReason) => {
++      const model = makeCompletionsModel();
++      const output = createAssistantOutput(model);
++      const text: string[] = [];
++      async function* chunks() {
++        yield makeCompletionsChunk({ content: "Prefix. <think>private unfinished" });
++        yield makeCompletionsChunk({}, finishReason);
++      }
++      await processCompletionsStream(chunks(), output, model, {
++        push(event) {
++          if (event.type === "text_delta") {
++            text.push(event.delta);
++          }
++        },
++      });
++      expect(text.join("")).toBe("Prefix. ");
++      expect(
++        output.content
++          .filter((block) => block.type === "text")
++          .map((block) => block.text)
++          .join(""),
++      ).toBe("Prefix. ");
++    },
++  );
++
++  it("keeps unfinished inline reasoning private at a native tool boundary", async () => {
++    const model = makeCompletionsModel();
++    const output = createAssistantOutput(model);
++    const text: string[] = [];
++    async function* chunks() {
++      yield makeCompletionsChunk({ content: "Prefix. <think>private unfinished" });
++      yield makeCompletionsChunk({
++        tool_calls: [
++          {
++            index: 0,
++            id: "call-1",
++            type: "function",
++            function: { name: "lookup", arguments: '{"query":"safe"}' },
++          },
++        ],
++      });
++      yield makeCompletionsChunk({}, "tool_calls");
++    }
++    await processCompletionsStream(chunks(), output, model, {
++      push(event) {
++        if (event.type === "text_delta") {
++          text.push(event.delta);
++        }
++      },
++    });
++    expect(text.join("")).toBe("Prefix. ");
++    expect(
++      output.content
++        .filter((block) => block.type === "text")
++        .map((block) => block.text)
++        .join(""),
++    ).toBe("Prefix. ");
++    expect(output.content.filter((block) => block.type === "toolCall")).toMatchObject([
++      { id: "call-1", name: "lookup", arguments: { query: "safe" } },
++    ]);
++    expect(output.stopReason).toBe("toolUse");
++  });
++});

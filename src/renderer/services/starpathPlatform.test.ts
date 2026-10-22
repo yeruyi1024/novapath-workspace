@@ -120,6 +120,51 @@ describe('StarPath gateway configuration', () => {
     expect(() => parsePlatformModels({ data: [{ id: 'valid' }, { id: 1 }] })).toThrow(PlatformErrorCode.InvalidCatalog);
   });
 
+  test('applies observed capabilities only with the explicit matching discovery origin', async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, data: { data: [
+      { id: 'deepseek-flash' }, { id: 'image-model', supportsThinking: true }, { id: 'deepseek-other' },
+    ] } });
+    const models = await syncPlatformModels(fetch, 'http://127.0.0.1:3303/v1', 'test-key', []);
+    expect(models[0]).toEqual({ id: 'deepseek-flash', name: 'deepseek-flash', supportsImage: false, supportsThinking: true });
+    expect(models[1]).not.toHaveProperty('supportsThinking');
+    expect(models[2]).not.toHaveProperty('supportsThinking');
+    expect((await syncPlatformModels(fetch, 'http://127.0.0.1:3313/v1', 'test-key', []))[0]).not.toHaveProperty('supportsThinking');
+    expect(parsePlatformModels({ data: [{ id: 'deepseek-flash' }] })[0]).not.toHaveProperty('supportsThinking');
+  });
+
+  test('repairs cached platform discovery on save while preserving manual opt-out', async () => {
+    const loadForOrigin = async (baseUrl: string) => {
+      vi.resetModules();
+      vi.doMock('../../shared/auth/platformConfig', async (importOriginal) => ({
+        ...await importOriginal<typeof import('../../shared/auth/platformConfig')>(),
+        PLATFORM_MODEL_BASE_URL: baseUrl,
+      }));
+      return import('./starpathPlatform');
+    };
+    try {
+      const baseUrl = 'http://127.0.0.1:3303/v1';
+      const { buildPlatformConfigUpdate: saveConfirmed } = await loadForOrigin(baseUrl);
+      const saved = { enabled: true, apiKey: 'test-key', baseUrl,
+        models: [{ id: 'deepseek-flash', name: 'Saved alias', supportsImage: false }] };
+      const update = saveConfirmed({ custom_0: saved }, 'custom_0', 'deepseek-flash', defaultConfig.model);
+      expect(update.providers?.custom_0.models?.[0]).toMatchObject({ name: 'Saved alias', supportsThinking: true });
+      expect(update.model?.availableModels).toEqual(update.providers?.custom_0.models);
+      const manual = { ...saved, models: [{ ...saved.models[0], supportsThinking: false, customParams: { temperature: 0.2 } }] };
+      const manualUpdate = saveConfirmed({ custom_0: manual }, 'custom_0', 'deepseek-flash', defaultConfig.model);
+      expect(manualUpdate.providers?.custom_0.models).toEqual(manual.models);
+      expect(manualUpdate.model?.availableModels).toEqual(manual.models);
+      expect(saved.models[0]).not.toHaveProperty('supportsThinking');
+
+      const { buildPlatformConfigUpdate: saveUnknown } = await loadForOrigin('https://unconfirmed.example/v1');
+      const unknownUpdate = saveUnknown({ custom_0: saved }, 'custom_0', 'deepseek-flash', defaultConfig.model);
+      expect(unknownUpdate.providers?.custom_0.models).toEqual(saved.models);
+      expect(unknownUpdate.model?.availableModels).toEqual(saved.models);
+    } finally {
+      vi.doUnmock('../../shared/auth/platformConfig');
+      vi.resetModules();
+    }
+  });
+
   test('discovers models through the IPC transport with credentials confined to the authorization header', async () => {
     const fetchApi = vi.fn().mockResolvedValue({ ok: true, status: 200, data: { data: [{ id: 'chat-model' }] } });
     const result = await syncPlatformModels(fetchApi, 'https://gateway.example', ' secret-key ', []);

@@ -6,6 +6,7 @@ import { isDeepStrictEqual } from 'util';
 
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import { AgentId, DefaultAgentProfile } from '../../shared/agent';
+import { getConfirmedPlatformModelCapability, getConfirmedPlatformThinkingConfig } from '../../shared/auth/platformModelCapabilities';
 import {
   BrowserCredentialLoginTool,
   BrowserCredentialMcpServer,
@@ -700,6 +701,7 @@ type OpenClawProviderSelection = {
   primaryModel: string;
   runtimeProfile?: ModelRuntimeProfileType;
   compatibilityOwnerProfile?: ModelRuntimeProfileType;
+  thinkingConfig?: ModelThinkingConfig;
   providerConfig: {
     baseUrl: string;
     api: OpenClawProviderApi;
@@ -1175,7 +1177,13 @@ export const buildProviderSelection = (options: {
   const runtimeProfileDefinition = runtimeProfile
     ? getModelRuntimeProfileDefinition(runtimeProfile)
     : undefined;
-  const thinkingRuntimeConfig = buildOpenClawThinkingRuntimeConfig(options.thinkingConfig);
+  const companyCapability = CUSTOM_PROVIDER_NAME_PATTERN.test(providerName)
+    && api === 'openai-completions' && options.supportsThinking !== false
+    ? getConfirmedPlatformModelCapability(baseUrl, options.modelId) : undefined;
+  const companyThinkingConfig = companyCapability
+    ? getConfirmedPlatformThinkingConfig(baseUrl, options.modelId) : undefined;
+  const thinkingConfig = options.thinkingConfig ?? companyThinkingConfig;
+  const thinkingRuntimeConfig = buildOpenClawThinkingRuntimeConfig(thinkingConfig);
   const resolvedSupportsImage = ProviderRegistry.resolveModelSupportsImage(
     providerName,
     options.modelId,
@@ -1189,7 +1197,7 @@ export const buildProviderSelection = (options: {
   const resolvedSupportsThinking = ProviderRegistry.resolveModelSupportsThinking(
     providerName,
     options.modelId,
-    options.supportsThinking,
+    options.supportsThinking ?? companyCapability?.supportsThinking,
   );
   const modelInput: string[] = runtimeProfileDefinition
     ? [...runtimeProfileDefinition.input]
@@ -1245,6 +1253,7 @@ export const buildProviderSelection = (options: {
     sessionModelId,
     primaryModel: `${descriptor.providerId}/${sessionModelId}`,
     ...(runtimeProfile ? { runtimeProfile } : {}),
+    ...(thinkingConfig ? { thinkingConfig } : {}),
     ...(runtimeProfile && runtimeProfileSource !== ModelRuntimeProfileSource.BuiltIn
       ? { compatibilityOwnerProfile: runtimeProfile }
       : {}),
@@ -1274,10 +1283,10 @@ export const buildProviderSelection = (options: {
                   ...(runtimeProfileDefinition?.compat ?? {}),
                   ...(thinkingRuntimeConfig
                     ? {
-                        supportsReasoningEffort: true,
-                        supportedReasoningEfforts: [
-                          ...thinkingRuntimeConfig.supportedReasoningEfforts,
-                        ],
+                        supportsReasoningEffort: companyCapability && !options.thinkingConfig
+                          ? companyCapability.supportsReasoningEffort : true,
+                        supportedReasoningEfforts: companyCapability && !options.thinkingConfig
+                          ? [] : [...thinkingRuntimeConfig.supportedReasoningEfforts],
                       }
                     : {
                         supportedReasoningEfforts: [
@@ -2133,7 +2142,7 @@ export class OpenClawConfigSync {
       collectThinkingProfile(
         candidateThinkingProfiles,
         providerSelection,
-        apiResolution.providerMetadata?.thinkingConfig,
+        providerSelection.thinkingConfig,
         apiResolution.providerMetadata?.requestCapabilities,
       );
       primaryModel = providerSelection.primaryModel;
@@ -2161,6 +2170,9 @@ export class OpenClawConfigSync {
             maxTokens: m.maxTokens,
           });
           collectCompatibilityOwnerProfile(candidateModelProfiles, sel);
+          if (!candidateThinkingProfiles[sel.primaryModel]) {
+            collectThinkingProfile(candidateThinkingProfiles, sel, sel.thinkingConfig);
+          }
           if (!allProvidersMap[sel.providerId]) {
             allProvidersMap[sel.providerId] = { ...sel.providerConfig, models: [] };
           }

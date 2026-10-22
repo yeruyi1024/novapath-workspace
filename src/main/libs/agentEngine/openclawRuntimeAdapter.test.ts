@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10816,4 +10817,369 @@ test('tool input_delta is ignored in plan mode and for stale runs', () => {
     data: { toolCallId: 'call-2', phase: 'input_delta', name: 'write', diff: { added: 3, removed: 0 } },
   }, 2);
   expect(session.messages.some((message) => message.type === 'tool_use')).toBe(false);
+});
+
+// HISTORY-TEXT-01: a display-capped chat.history projection must not overwrite a
+// full assistant body that was already delivered for the same message.
+const HISTORY_TRUNCATION_MARKER = '\n...(truncated)...';
+const bodyDigest = (value: string | undefined) => `${value?.length ?? -1}:${createHash('sha256').update(value ?? '').digest('hex').slice(0, 16)}`;
+
+function createHistoryTruncationHarness(options: {
+  localText: string;
+  historyMessages: unknown[];
+  messageGet?: (params: Record<string, unknown>) => unknown | Promise<unknown>;
+}) {
+  const { session, store } = createReconcileStore([
+    { id: 'msg-1', type: 'user', content: 'write a long manual', timestamp: 1, metadata: {} },
+    {
+      id: 'msg-2',
+      type: 'assistant',
+      content: options.localText,
+      timestamp: 2,
+      metadata: { isStreaming: true, isFinal: false },
+    },
+  ]);
+  session.status = 'running';
+  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const sessionKey = `agent:main:lobsterai:${session.id}`;
+  const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+  adapter.gatewayClient = {
+    start: () => {},
+    stop: () => {},
+    request: async (method: string, params?: unknown) => {
+      const requestParams = (params ?? {}) as Record<string, unknown>;
+      requests.push({ method, params: requestParams });
+      if (method === 'chat.history') return { messages: options.historyMessages };
+      if (method === 'chat.message.get') {
+        if (!options.messageGet) throw new Error('chat.message.get unavailable');
+        return await options.messageGet(requestParams);
+      }
+      return {};
+    },
+  };
+  const turn = createActiveTurn(session.id, sessionKey, 'run-history-cap');
+  turn.assistantMessageId = 'msg-2';
+  turn.currentText = options.localText;
+  turn.currentAssistantSegmentText = options.localText;
+  adapter.activeTurns.set(session.id, turn);
+  adapter.latestTurnTokenBySession.set(session.id, turn.turnToken);
+  return { adapter, session, turn, requests, sessionKey };
+}
+
+const cappedAssistantHistory = (full: string, overrides: Record<string, unknown> = {}) => ({
+  role: 'assistant',
+  content: [{ type: 'text', text: `${full.slice(0, 8000)}${HISTORY_TRUNCATION_MARKER}` }],
+  __openclaw: { id: 'transcript:assistant-1', truncated: true, reason: 'display-cap', ...overrides },
+});
+
+test('HISTORY-TEXT-01 keeps the full delivered body when chat.history returns a display-capped projection', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const { adapter, session, turn } = createHistoryTruncationHarness({
+    localText: full,
+    historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  const assistant = session.messages.find((message) => message.id === 'msg-2');
+  expect(bodyDigest(assistant?.content)).toBe(bodyDigest(full));
+  expect(assistant?.metadata).toMatchObject({ isStreaming: false, isFinal: true });
+});
+
+test('HISTORY-TEXT-01 recovers the full body through a bounded chat.message.get with identity checks', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const { adapter, session, turn, requests, sessionKey } = createHistoryTruncationHarness({
+    localText: `${full.slice(0, 8000)}`,
+    historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+    messageGet: () => ({
+      ok: true,
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: full }],
+        __openclaw: { id: 'transcript:assistant-1' },
+      },
+    }),
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  const getRequests = requests.filter((request) => request.method === 'chat.message.get');
+  expect(getRequests).toHaveLength(1);
+  expect(getRequests[0].params).toEqual({
+    sessionKey,
+    messageId: 'transcript:assistant-1',
+    maxChars: 500_000,
+  });
+  expect(bodyDigest(session.messages.find((message) => message.id === 'msg-2')?.content)).toBe(bodyDigest(full));
+});
+
+test('HISTORY-TEXT-01 keeps delivered content when the original body cannot be fetched or fails identity checks', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  // A one-character streaming boundary difference defeats the local prefix recovery, so the
+  // bounded chat.message.get really runs in every case below.
+  const delivered = `${full.slice(0, 100)}\u200b${full.slice(100)}`;
+  const cases: Array<{ name: string; messageGet?: () => unknown }> = [
+    { name: 'request throws' },
+    { name: 'oversized', messageGet: () => ({ ok: false, unavailableReason: 'oversized' }) },
+    {
+      name: 'different message id',
+      messageGet: () => ({
+        ok: true,
+        message: { role: 'assistant', content: [{ type: 'text', text: 'someone else' }], __openclaw: { id: 'transcript:other' } },
+      }),
+    },
+    {
+      name: 'wrong role',
+      messageGet: () => ({
+        ok: true,
+        message: { role: 'user', content: [{ type: 'text', text: 'someone else' }], __openclaw: { id: 'transcript:assistant-1' } },
+      }),
+    },
+    { name: 'still truncated', messageGet: () => ({ ok: true, message: cappedAssistantHistory(full) }) },
+  ];
+  for (const testCase of cases) {
+    const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+      localText: delivered,
+      historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+      messageGet: testCase.messageGet,
+    });
+    await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+    // chat.history is retried (4 attempts) while no canonical text is found; each attempt does one bounded read.
+    expect(requests.filter((request) => request.method === 'chat.message.get').length, testCase.name).toBeGreaterThanOrEqual(1);
+    const assistant = session.messages.find((message) => message.id === 'msg-2');
+    expect(bodyDigest(assistant?.content), testCase.name).toBe(bodyDigest(delivered));
+  }
+});
+
+test('HISTORY-TEXT-01 treats the literal marker in ordinary text as content, not as a truncation signal', async () => {
+  const literal = `The tool prints ...(truncated)... when output is long.${'x'.repeat(9000)}`;
+  const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+    localText: 'draft body',
+    historyMessages: [
+      { role: 'user', content: 'explain' },
+      { role: 'assistant', content: [{ type: 'text', text: literal }] },
+    ],
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  expect(requests.some((request) => request.method === 'chat.message.get')).toBe(false);
+  expect(bodyDigest(session.messages.find((message) => message.id === 'msg-2')?.content)).toBe(bodyDigest(literal));
+});
+
+test('HISTORY-TEXT-01 still applies a legitimate shorter history revision without a truncation flag', async () => {
+  const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+    localText: `Long streamed draft ${'y'.repeat(9000)}`,
+    historyMessages: [
+      { role: 'user', content: 'explain' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Shorter final answer.' }], __openclaw: { id: 'transcript:assistant-1' } },
+    ],
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  expect(requests.some((request) => request.method === 'chat.message.get')).toBe(false);
+  expect(bodyDigest(session.messages.find((message) => message.id === 'msg-2')?.content)).toBe(bodyDigest('Shorter final answer.'));
+});
+
+test('HISTORY-TEXT-01 does not treat a structurally truncated projection as authoritative when local text is unrelated', async () => {
+  const full = `START-${'z'.repeat(20000)}-END`;
+  const { adapter, session, turn } = createHistoryTruncationHarness({
+    localText: 'A different locally streamed answer',
+    historyMessages: [{ role: 'user', content: 'write' }, cappedAssistantHistory(full)],
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  // No trusted full body exists, so the known-incomplete projection must not replace delivered text.
+  expect(session.messages.find((message) => message.id === 'msg-2')?.content).toBe('A different locally streamed answer');
+});
+
+test('HISTORY-TEXT-01 drops a recovered body when the turn is stopped during chat.message.get', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  let stopTurn: () => void = () => {};
+  const { adapter, session, turn } = createHistoryTruncationHarness({
+    localText: full.slice(0, 8000),
+    historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+    messageGet: () => {
+      stopTurn();
+      return {
+        ok: true,
+        message: { role: 'assistant', content: [{ type: 'text', text: full }], __openclaw: { id: 'transcript:assistant-1' } },
+      };
+    },
+  });
+  stopTurn = () => { turn.stopRequested = true; };
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  const assistant = session.messages.find((message) => message.id === 'msg-2');
+  expect(bodyDigest(assistant?.content)).toBe(bodyDigest(full.slice(0, 8000)));
+  expect(assistant?.metadata).toMatchObject({ isStreaming: true, isFinal: false });
+});
+
+test('HISTORY-TEXT-01 only touches the capped final segment when tool work precedes it', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+    localText: full,
+    historyMessages: [
+      { role: 'user', content: 'write a long manual' },
+      {
+        role: 'assistant',
+        content: [{ type: 'toolCall', id: 'call-1', name: 'read', arguments: { path: 'a.md' } }],
+        __openclaw: { id: 'transcript:assistant-0' },
+      },
+      { role: 'toolResult', toolCallId: 'call-1', toolName: 'read', content: 'file text' },
+      cappedAssistantHistory(full),
+    ],
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  // The delivered body already equals the capped message's full text, so no extra read is needed.
+  expect(requests.filter((request) => request.method === 'chat.message.get')).toHaveLength(0);
+  expect(bodyDigest(session.messages.find((message) => message.id === 'msg-2')?.content)).toBe(bodyDigest(full));
+  // Existing local entries keep their order; only the final assistant segment is touched.
+  expect(session.messages.map((message) => [message.id, message.type])).toEqual([['msg-1', 'user'], ['msg-2', 'assistant']]);
+});
+
+const oversizedPlaceholderHistory = () => ({
+  role: 'assistant',
+  content: [{ type: 'text', text: '[chat.history omitted: message too large]' }],
+  __openclaw: { id: 'transcript:assistant-1', truncated: true, reason: 'oversized' },
+});
+
+test('HISTORY-TEXT-01 an oversized placeholder never replaces the delivered body', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const { adapter, session, turn } = createHistoryTruncationHarness({
+    localText: full,
+    historyMessages: [{ role: 'user', content: 'write a long manual' }, oversizedPlaceholderHistory()],
+    messageGet: () => ({ ok: false, unavailableReason: 'oversized' }),
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  const assistant = session.messages.find((message) => message.id === 'msg-2');
+  expect(bodyDigest(assistant?.content)).toBe(bodyDigest(full));
+});
+
+test('HISTORY-TEXT-01 a failed recovery of a display-capped body keeps the delivered text, not the projection', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const delivered = `${full.slice(0, 100)}\u200b${full.slice(100)}`;
+  const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+    localText: delivered,
+    historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+    messageGet: () => ({ ok: false, unavailableReason: 'oversized' }),
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn, { requireActiveTurn: true, runId: 'run-history-cap' });
+
+  expect(requests.filter((request) => request.method === 'chat.message.get').length).toBeGreaterThanOrEqual(1);
+  expect(bodyDigest(session.messages.find((message) => message.id === 'msg-2')?.content)).toBe(bodyDigest(delivered));
+});
+
+test('HISTORY-TEXT-01 default options still drop a recovered body when stop, run swap or turn replacement lands during chat.message.get', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  const scenarios: Array<{ name: string; interfere: (ctx: { adapter: any; session: any; turn: any }) => void }> = [
+    { name: 'stop', interfere: ({ adapter, session, turn }) => { turn.stopRequested = true; adapter.activeTurns.delete(session.id); } },
+    { name: 'run swap', interfere: ({ turn }) => { turn.knownRunIds.add('run-retry'); } },
+    {
+      name: 'turn replaced',
+      interfere: ({ adapter, session, turn }) => { adapter.activeTurns.set(session.id, { ...turn, turnToken: turn.turnToken + 1 }); },
+    },
+  ];
+  for (const scenario of scenarios) {
+    let interfere: () => void = () => {};
+    const harness = createHistoryTruncationHarness({
+      localText: full.slice(0, 8000),
+      historyMessages: [{ role: 'user', content: 'write a long manual' }, cappedAssistantHistory(full)],
+      messageGet: () => {
+        interfere();
+        return {
+          ok: true,
+          message: { role: 'assistant', content: [{ type: 'text', text: full }], __openclaw: { id: 'transcript:assistant-1' } },
+        };
+      },
+    });
+    interfere = () => scenario.interfere(harness);
+    // Default options: the normal handleChatFinal call passes neither requireActiveTurn nor runId.
+    await harness.adapter.syncFinalAssistantWithHistory(harness.session.id, harness.turn);
+    const assistant = harness.session.messages.find((message: { id: string }) => message.id === 'msg-2');
+    expect(bodyDigest(assistant?.content), scenario.name).toBe(bodyDigest(full.slice(0, 8000)));
+  }
+});
+
+const preToolNoteHistory = (finalMessage: unknown) => [
+  { role: 'user', content: 'write a long manual' },
+  {
+    role: 'assistant',
+    content: [
+      { type: 'text', text: 'Let me read the source first.' },
+      { type: 'toolCall', id: 'call-1', name: 'read', arguments: { path: 'a.md' } },
+    ],
+    __openclaw: { id: 'transcript:assistant-0' },
+  },
+  { role: 'toolResult', toolCallId: 'call-1', toolName: 'read', content: 'file text' },
+  finalMessage,
+];
+
+test('HISTORY-TEXT-01 an earlier pre-tool note never replaces an unrecoverable final body', async () => {
+  const full = `START-${'长回答正文。'.repeat(8000)}-END`;
+  // One boundary-character difference defeats local prefix recovery so the fetch really runs.
+  const delivered = `${full.slice(0, 100)}\u200b${full.slice(100)}`;
+  const finals: Array<{ name: string; message: unknown; messageGet: () => unknown }> = [
+    { name: 'display-cap, fetch oversized', message: cappedAssistantHistory(full), messageGet: () => ({ ok: false, unavailableReason: 'oversized' }) },
+    { name: 'display-cap, fetch throws', message: cappedAssistantHistory(full), messageGet: () => { throw new Error('boom'); } },
+    { name: 'oversized placeholder', message: oversizedPlaceholderHistory(), messageGet: () => ({ ok: false, unavailableReason: 'oversized' }) },
+  ];
+  for (const scenario of finals) {
+    const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+      localText: delivered,
+      historyMessages: preToolNoteHistory(scenario.message),
+      messageGet: scenario.messageGet,
+    });
+    // Default options, as the normal handleChatFinal call uses.
+    await adapter.syncFinalAssistantWithHistory(session.id, turn);
+    expect(requests.filter((request) => request.method === 'chat.message.get').length, scenario.name).toBeGreaterThanOrEqual(1);
+    const assistant = session.messages.find((message) => message.id === 'msg-2');
+    expect(bodyDigest(assistant?.content), scenario.name).toBe(bodyDigest(delivered));
+    expect(assistant?.metadata, scenario.name).toMatchObject({ isStreaming: false, isFinal: true });
+    // The earlier note must not have been written anywhere as the final text.
+    expect(session.messages.filter((message) => message.type === 'assistant' && message.content === 'Let me read the source first.'), scenario.name).toHaveLength(0);
+  }
+});
+
+test('HISTORY-TEXT-01 an unrecoverable final target still lets a legitimate earlier-note history sync stay intact when the final is not capped', async () => {
+  const { adapter, session, turn, requests } = createHistoryTruncationHarness({
+    localText: `Long streamed draft ${'y'.repeat(9000)}`,
+    historyMessages: preToolNoteHistory({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Shorter final answer.' }],
+      __openclaw: { id: 'transcript:assistant-1' },
+    }),
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn);
+
+  expect(requests.some((request) => request.method === 'chat.message.get')).toBe(false);
+  expect(session.messages.find((message) => message.id === 'msg-2')?.content).toBe('Shorter final answer.');
+});
+
+test('HISTORY-TEXT-01 a capped earlier message that cannot be recovered does not block a legitimate final revision', async () => {
+  const full = `START-${'z'.repeat(20000)}-END`;
+  const { adapter, session, turn } = createHistoryTruncationHarness({
+    localText: `Long streamed draft ${'y'.repeat(9000)}`,
+    historyMessages: [
+      { role: 'user', content: 'write' },
+      { ...cappedAssistantHistory(full), __openclaw: { id: 'transcript:assistant-0', truncated: true, reason: 'display-cap' } },
+      { role: 'toolResult', toolCallId: 'call-1', toolName: 'read', content: 'file text' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Revised final answer.' }], __openclaw: { id: 'transcript:assistant-1' } },
+    ],
+    messageGet: () => ({ ok: false, unavailableReason: 'oversized' }),
+  });
+
+  await adapter.syncFinalAssistantWithHistory(session.id, turn);
+
+  // Only the capped earlier message is dropped; the last assistant is intact, so it is applied.
+  expect(session.messages.find((message) => message.id === 'msg-2')?.content).toBe('Revised final answer.');
 });
