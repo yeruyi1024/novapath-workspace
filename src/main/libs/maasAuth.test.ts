@@ -12,7 +12,7 @@ const state = vi.hoisted(() => ({
   directory: '', secure: true, host: {},
   handlers: new Map<string, (...args: unknown[]) => Promise<MaasResult>>(),
   sessions: new Map<string, any>(), windows: [] as any[], requests: [] as any[],
-  responses: [] as { status: number; body: object; cookie?: string; network?: boolean }[],
+  responses: [] as { status: number; body: object; rawBody?: string; cookie?: string; network?: boolean; retryAfter?: string }[],
 }));
 
 vi.mock('electron', () => ({
@@ -54,9 +54,10 @@ vi.mock('electron', () => ({
         queueMicrotask(() => {
           if (planned.network) { req.emit('error', new Error('offline')); return; }
           if (planned.cookie) options.session.cookies.value = planned.cookie;
-          const response = Object.assign(new EventEmitter(), { statusCode: planned.status });
+          const response = Object.assign(new EventEmitter(), { statusCode: planned.status,
+            headers: planned.retryAfter ? { 'retry-after': planned.retryAfter } : {} });
           req.emit('response', response);
-          response.emit('data', Buffer.from(JSON.stringify(planned.body)));
+          response.emit('data', Buffer.from(planned.rawBody ?? JSON.stringify(planned.body)));
           response.emit('end');
         });
       } });
@@ -65,11 +66,76 @@ vi.mock('electron', () => ({
   } },
 }));
 
-import { registerMaasAuth } from './maasAuth';
+import { maasSessionFileName, registerMaasAuth } from './maasAuth';
 
 const bundle = { success: true, data: { access_token: 'access-must-not-leak',
   session: { sid: 'session-1' }, user: { id: 12, username: 'demo', display_name: 'Demo', quota: 1000, used_quota: 20 } } };
 const invoke = (channel: string, ...args: unknown[]) => state.handlers.get(channel)!({ sender: state.host }, ...args);
+
+const freshBundle = () => ({ ...bundle, data: { ...bundle.data, access_expires_at: Math.floor(Date.now() / 1000) + 900 } });
+
+test.each([undefined, '120', 'Tue, 20 Oct 2026 12:02:00 GMT'])('refresh 429 cools queued reads until Retry-After %s', async retryAfter => {
+  const now = Date.parse('2026-10-20T12:00:00Z');
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+  try {
+    state.responses.push({ status: 200, body: { ...bundle, data: { ...bundle.data, access_expires_at: 1 } }, cookie: 'expired-access-cookie' });
+    await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+    const file = path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN));
+    const saved = fs.readFileSync(file, 'utf8');
+    state.responses.push({ status: 429, body: {}, rawBody: '', retryAfter }, { status: 429, body: {}, rawBody: '', retryAfter });
+    const results = await Promise.all([invoke(MaasIpc.Billing), invoke(MaasIpc.Subscriptions)]);
+    results.forEach(result => expect(result).toMatchObject({ success: false, error: 'network', snapshot: { account: { id: 12 } } }));
+    expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(1);
+    expect(fs.readFileSync(file, 'utf8')).toBe(saved);
+    const delay = retryAfter ? 120_000 : 60_000;
+    clock.mockReturnValue(now + delay - 1);
+    expect((await invoke(MaasIpc.Snapshot)).success).toBe(false);
+    expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(1);
+    state.responses.length = 0;
+    clock.mockReturnValue(now + delay + 1);
+    state.responses.push({ status: 200, body: freshBundle(), cookie: 'recovered-cookie' });
+    expect((await invoke(MaasIpc.Snapshot)).success).toBe(true);
+    expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(2);
+  } finally { clock.mockRestore(); }
+});
+
+test('valid dashboard access reuses the JWT for wallet and snapshot reads without rotating refresh cookies', async () => {
+  state.responses.push({ status: 200, body: freshBundle(), cookie: 'fresh-cookie' });
+  await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+  const user = { ...bundle.data.user, request_count: 1 };
+  const status = { quota_display_type: 'USD', quota_per_unit: 500000 };
+  for (let i = 0; i < 2; i += 1) {
+    state.responses.push({ status: 200, body: { success: true, data: user } },
+      { status: 200, body: { success: true, data: status } });
+    expect((await invoke(MaasIpc.Billing)).success).toBe(true);
+  }
+  state.responses.push({ status: 200, body: { success: true, data: user } });
+  expect((await invoke(MaasIpc.Snapshot)).success).toBe(true);
+  expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(0);
+  expect(state.requests.filter(r => r.options.url.endsWith('/user/self'))).toHaveLength(3);
+});
+
+test('expired access metadata still refreshes before an authenticated wallet read', async () => {
+  state.responses.push({ status: 200, body: { ...bundle, data: { ...bundle.data, access_expires_at: Math.floor(Date.now() / 1000) - 1 } }, cookie: 'expired-access-cookie' });
+  await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+  state.responses.push({ status: 200, body: freshBundle(), cookie: 'renewed-cookie' },
+    { status: 200, body: { success: true, data: { ...bundle.data.user, request_count: 0 } } },
+    { status: 200, body: { success: true, data: { quota_display_type: 'USD', quota_per_unit: 500000 } } });
+  expect((await invoke(MaasIpc.Billing)).success).toBe(true);
+  expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(1);
+});
+
+test('a rejected fresh access token renews once and retries only the wallet GET', async () => {
+  state.responses.push({ status: 200, body: freshBundle(), cookie: 'fresh-cookie' });
+  await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+  state.responses.push({ status: 401, body: {} }, { status: 200, body: freshBundle(), cookie: 'renewed-cookie' },
+    { status: 200, body: { success: true, data: { ...bundle.data.user, request_count: 0 } } },
+    { status: 200, body: { success: true, data: { quota_display_type: 'USD', quota_per_unit: 500000 } } });
+  expect((await invoke(MaasIpc.Billing)).success).toBe(true);
+  expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(1);
+  expect(state.requests.filter(r => r.options.url.endsWith('/user/self'))).toHaveLength(2);
+  expect(state.requests.some(r => r.options.url.endsWith('/balance/pay'))).toBe(false);
+});
 
 async function login() {
   state.responses.push({ status: 200, body: bundle, cookie: 'rotated-refresh-secret' });
@@ -89,6 +155,56 @@ beforeEach(() => {
   registerMaasAuth(() => ({ webContents: state.host }) as BrowserWindow);
 });
 afterEach(() => { fs.rmSync(state.directory, { recursive: true, force: true }); });
+
+describe('profile IPC', () => {
+  const login = async () => {
+    state.responses.push({ status: 200, body: freshBundle(), cookie: 'profile-cookie' });
+    await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+  };
+  test('allows only trusted sender and matching account; name saves through self and reads back', async () => {
+    await login();
+    expect(() => state.handlers.get(MaasIpc.Profile)!({ sender: {} }, { accountId: 12, action: 'updateName', displayName: 'New' })).toThrow('IPC sender');
+    expect((await invoke(MaasIpc.Profile, { accountId: 99, action: 'updateName', displayName: 'New' })).profileError).toBe('accountChanged');
+    state.responses.push({ status: 200, body: { success: true, data: { ...bundle.data.user, username: 'current-name' } } },
+      { status: 200, body: { success: true } },
+      { status: 200, body: { success: true, data: { ...bundle.data.user, username: 'current-name', display_name: '新昵称', email: 'member@example.test', phone: '+8613800000000' } } });
+    const result = await invoke(MaasIpc.Profile, { accountId: 12, action: 'updateName', displayName: '新昵称', role: 100 });
+    expect(result.profile?.saved).toBe(true);
+    expect(result.snapshot.account).toMatchObject({ username: 'current-name', displayName: '新昵称', email: 'member@example.test', phone: '+8613800000000' });
+    const update = state.requests.find(request => request.options.method === 'PUT');
+    expect(new URL(update.options.url).pathname).toBe('/api/user/self');
+    expect(JSON.parse(update.req.body)).toEqual({ username: 'current-name', display_name: '新昵称' });
+  });
+  test('phone rotation persists the encrypted cookie and uses the new access token for readback', async () => {
+    await login();
+    state.responses.push({ status: 200, body: { success: true, data: { phone: '', verified: null, sms_enabled: true } } });
+    const flowId = (await invoke(MaasIpc.Profile, { accountId: 12, action: 'begin', field: 'phone' })).profile!.flowId;
+    state.responses.push({ status: 200, body: { success: true, data: { proof_token: 'private-proof', expires_at: Math.floor(Date.now() / 1000) + 300 } } });
+    await invoke(MaasIpc.Profile, { accountId: 12, action: 'phoneVerify', flowId, method: 'password', password: 'test', twoFactorCode: '' });
+    state.responses.push({ status: 200, body: { success: true, data: { challenge_token: 'private-challenge', retry_after: 60, expires_in: 300 } } });
+    await invoke(MaasIpc.Profile, { accountId: 12, action: 'phoneCode', flowId, phone: '13900000000' });
+    state.responses.push({ status: 200, body: { success: true, data: { access_token: 'private-rotated-access', session: { sid: 'session-1' }, access_expires_at: Math.floor(Date.now() / 1000) + 900 } }, cookie: 'private-rotated-cookie' },
+      { status: 200, body: { success: true, data: { ...bundle.data.user, phone: '+8613900000000' } } });
+    const result = await invoke(MaasIpc.Profile, { accountId: 12, action: 'bindPhone', flowId, phone: '13900000000', code: '123456' });
+    expect(result.success).toBe(true);
+    expect(result.snapshot.account?.phone).toBe('+8613900000000');
+    expect(state.requests.at(-1).req.headers.Authorization).toBe('Bearer private-rotated-access');
+    expect(state.requests.at(-2).req.headers['X-Security-Proof']).toBe('private-proof');
+    const saved = fs.readFileSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)), 'utf8');
+    expect(saved).not.toContain('private-rotated-cookie');
+    expect(JSON.stringify(result)).not.toMatch(/private-proof|private-challenge|private-rotated/);
+    expect((await invoke(MaasIpc.Profile, { accountId: 12, action: 'bindPhone', flowId, phone: '13900000000', code: '123456' })).profileError).toBe('expired');
+  });
+  test('queued profile writes are rejected as soon as logout is requested', async () => {
+    await login();
+    state.responses.push({ status: 200, body: { success: true } });
+    const write = invoke(MaasIpc.Profile, { accountId: 12, action: 'updateName', displayName: 'New' });
+    const logout = invoke(MaasIpc.Logout);
+    expect((await write).profileError).toBe('accountChanged');
+    await logout;
+    expect(state.requests.some(request => request.options.method === 'PUT')).toBe(false);
+  });
+});
 
 describe('maas desktop login lifecycle', () => {
   const walletUser = { id: 12, username: 'demo', display_name: 'Demo', quota: 4285772, used_quota: 2953408, request_count: 612 };
@@ -113,7 +229,7 @@ describe('maas desktop login lifecycle', () => {
     expect(self.req.headers['X-Auth-Session']).toBe('session-1');
     expect(state.requests.at(-1).req.headers.Authorization).toBeUndefined();
     expect(JSON.stringify(result)).not.toContain('access-must-not-leak');
-    expect(fs.readFileSync(path.join(state.directory, 'maas-session.json'), 'utf8')).not.toContain('access-must-not-leak');
+    expect(fs.readFileSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)), 'utf8')).not.toContain('access-must-not-leak');
   });
 
   test('billing requires the trusted renderer and never queries an unsigned account', async () => {
@@ -150,7 +266,7 @@ describe('maas desktop login lifecycle', () => {
     state.responses.push({ status: 401, body: { success: false } });
     expect(await invoke(MaasIpc.Billing)).toEqual({ success: true, snapshot: { origin: DEFAULT_MAAS_ORIGIN, account: null } });
     expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ snapshot: { account: null } });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
   });
 
   test('retries an expired dashboard JWT through refresh without exposing it', async () => {
@@ -176,14 +292,14 @@ describe('maas desktop login lifecycle', () => {
     expect(JSON.parse(state.requests[0].req.body)).toEqual({ username: 'demo', password: 'invalid-test-password' });
     expect(state.windows).toHaveLength(0);
     expect(JSON.stringify(result)).not.toContain('access-must-not-leak');
-    expect(fs.readFileSync(path.join(state.directory, 'maas-session.json'), 'utf8')).not.toContain('invalid-test-password');
+    expect(fs.readFileSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)), 'utf8')).not.toContain('invalid-test-password');
   });
 
   test('keeps 2FA pending until the second factor succeeds and never saves a password-only flow', async () => {
     state.responses.push({ status: 200, body: { success: true, data: { require_2fa: true, flow_token: 'pending-twofa' } } });
     const pending = await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'invalid-test-password' });
     expect(pending).toMatchObject({ success: true, twoFactorFlow: 'pending-twofa', snapshot: { account: null } });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
     state.responses.push({ status: 200, body: bundle, cookie: 'twofa-refresh' });
     expect(await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'twofa', flowToken: pending.twoFactorFlow, code: '123456' }))
       .toMatchObject({ success: true, snapshot: { account: { id: 12 } } });
@@ -208,7 +324,38 @@ describe('maas desktop login lifecycle', () => {
     state.responses.push({ status: 429, body: { success: false, code: 'PHONE_RATE_LIMITED' } });
     expect(await invoke(MaasIpc.SendSMS, { origin: DEFAULT_MAAS_ORIGIN, phone: '13800000000' }))
       .toMatchObject({ success: false, error: 'rateLimited' });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
+  });
+
+  test('classifies empty HTTP rate limits without treating them as an incompatible platform', async () => {
+    state.responses.push({ status: 429, body: {}, rawBody: '' });
+    expect(await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'invalid-test-password' }))
+      .toMatchObject({ success: false, error: 'rateLimited', snapshot: { account: null } });
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
+  });
+
+  test('preserves account and encrypted storage when refresh returns an empty 429 or HTML outage', async () => {
+    await login();
+    const file = path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN));
+    const saved = fs.readFileSync(file, 'utf8');
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    try {
+      for (const [index, response] of [{ status: 429, rawBody: '' }, { status: 503, rawBody: '<html>Unavailable</html>' }].entries()) {
+        clock.mockReturnValue(now + index * 60_001);
+        const before = state.requests.length;
+        state.responses.push({ ...response, body: {} });
+        expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: false, error: 'network', snapshot: { account: { id: 12 } } });
+        expect(state.requests).toHaveLength(before + 1);
+        expect(fs.readFileSync(file, 'utf8')).toBe(saved);
+      }
+    } finally { clock.mockRestore(); }
+  });
+
+  test('still rejects a malformed successful login response', async () => {
+    state.responses.push({ status: 200, body: {}, rawBody: '<html>Unexpected</html>' });
+    expect(await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'invalid-test-password' }))
+      .toMatchObject({ success: false, error: 'invalidResponse', snapshot: { account: null } });
   });
 
   test('returns only available sign-in methods without exposing registration', async () => {
@@ -228,7 +375,7 @@ describe('maas desktop login lifecycle', () => {
     expect(state.windows[0].options.webPreferences).toMatchObject({ sandbox: true, contextIsolation: true, nodeIntegration: false });
     expect([...state.sessions.keys()][0]).not.toContain('persist:');
     expect(state.requests[0].req.headers.Origin).toBe(DEFAULT_MAAS_ORIGIN);
-    const saved = fs.readFileSync(path.join(state.directory, 'maas-session.json'), 'utf8');
+    const saved = fs.readFileSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)), 'utf8');
     expect(saved).not.toContain('rotated-refresh-secret');
     expect(saved).not.toContain('access-must-not-leak');
     state.sessions.clear();
@@ -244,7 +391,7 @@ describe('maas desktop login lifecycle', () => {
     expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: false, error: 'network', snapshot: { account: { id: 12 } } });
     state.responses.push({ status: 401, body: { success: false, code: 'AUTH_UNAUTHORIZED' } });
     expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: true, snapshot: { account: null } });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
   });
 
   test('resolves SID mismatch without a stale header then revokes the current session on logout', async () => {
@@ -254,7 +401,7 @@ describe('maas desktop login lifecycle', () => {
     expect(await invoke(MaasIpc.Logout)).toMatchObject({ success: true, snapshot: { account: null } });
     expect(state.requests.at(-2).req.headers['X-Auth-Session']).toBeUndefined();
     expect(state.requests.at(-1).req.headers['X-Auth-Session']).toBe('session-1');
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
   });
 
   test('does not open a login window without secure storage', async () => {
@@ -269,7 +416,7 @@ describe('maas desktop login lifecycle', () => {
     expect(await invoke(MaasIpc.Logout)).toMatchObject({ success: true, logoutRemoteFailed: true, snapshot: { account: null } });
     expect([...state.sessions.values()][0].cookies.value).toBe('');
     expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: true, snapshot: { account: null } });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
   });
 
   test('never transmits credentials or opens a browser for an unapproved platform origin', async () => {
@@ -282,7 +429,7 @@ describe('maas desktop login lifecycle', () => {
 
   test('a saved session from another origin is never sent there during startup restoration', async () => {
     await login();
-    const file = path.join(state.directory, 'maas-session.json');
+    const file = path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN));
     const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
     fs.writeFileSync(file, JSON.stringify({ ...saved, origin: 'https://other.example' }));
     state.sessions.clear(); state.requests.length = 0;
@@ -296,7 +443,7 @@ describe('maas desktop login lifecycle', () => {
     await vi.waitFor(() => expect(state.windows).toHaveLength(1));
     state.windows[0].close();
     expect(await result).toMatchObject({ success: false, error: 'cancelled', snapshot: { account: null } });
-    expect(fs.existsSync(path.join(state.directory, 'maas-session.json'))).toBe(false);
+    expect(fs.existsSync(path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN)))).toBe(false);
   });
 });
 
@@ -352,4 +499,28 @@ test('subscription reads do not publish data after an authentication retry chang
   state.responses.push({ status: 200, body: bundle, cookie: 'rotated-refresh-secret' },
     { status: 401, body: {} }, { status: 200, body: { ...bundle, data: { ...bundle.data, user: { ...bundle.data.user, id: 13 } } }, cookie: 'rotated-refresh-secret' });
   expect(await invoke(MaasIpc.Subscriptions)).toMatchObject({ success: false, error: 'invalidResponse' });
+});
+
+test('local startup ignores and preserves the old online session', async () => {
+  const legacy = path.join(state.directory, 'maas-session.json');
+  const content = JSON.stringify({ origin: 'https://gateway.ai.shilijia.xyz', ciphertext: 'foreign-encrypted-cookie' });
+  fs.writeFileSync(legacy, content);
+  state.sessions.clear();
+  registerMaasAuth(() => ({ webContents: state.host }) as BrowserWindow);
+  expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: true, snapshot: { origin: DEFAULT_MAAS_ORIGIN, account: null } });
+  expect(state.requests).toHaveLength(0);
+  expect(fs.readFileSync(legacy, 'utf8')).toBe(content);
+});
+
+test('a matching legacy session is migrated by refresh without deleting the original', async () => {
+  await login();
+  const current = path.join(state.directory, maasSessionFileName(DEFAULT_MAAS_ORIGIN));
+  const content = fs.readFileSync(current, 'utf8');
+  const legacy = path.join(state.directory, 'maas-session.json');
+  fs.writeFileSync(legacy, content); fs.unlinkSync(current); state.sessions.clear();
+  registerMaasAuth(() => ({ webContents: state.host }) as BrowserWindow);
+  state.responses.push({ status: 200, body: bundle, cookie: 'new-local-refresh' });
+  expect(await invoke(MaasIpc.Snapshot)).toMatchObject({ success: true, snapshot: { account: { id: 12 } } });
+  expect(fs.existsSync(current)).toBe(true);
+  expect(fs.readFileSync(legacy, 'utf8')).toBe(content);
 });

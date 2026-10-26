@@ -36,3 +36,8 @@ export function formatPlanDuration(plan: MaasPlan, locale: string, t: (key: stri
   if (!['year', 'month', 'day', 'hour'].includes(plan.durationUnit)) return t('maasDuration_unspecified');
   return `${plan.durationValue} ${t(`maasDuration_${plan.durationUnit}`)}`;
 }
+
+export const PlatformAccountSection = { Profile: "profile", Usage: "usage", Subscriptions: "subscriptions" } as const;
+export type PlatformAccountSection = typeof PlatformAccountSection[keyof typeof PlatformAccountSection];
+
+export const AccountWorkspaceView = { Main: 'account' } as const;

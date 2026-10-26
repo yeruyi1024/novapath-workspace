@@ -74,7 +74,7 @@ test('getProviderDisplayName: custom provider with undefined displayName uses de
 });
 
 test('defaultConfig routes exclusively through the company gateway while retaining inactive legacy metadata', () => {
-  expect(defaultConfig.api.baseUrl).toBe('https://gateway.ai.shilijia.xyz/v1');
+  expect(defaultConfig.api.baseUrl).toBe('http://127.0.0.1:3303/v1');
   expect(defaultConfig.api.key).toBe('');
   expect(defaultConfig.model.availableModels).toEqual([]);
   expect(defaultConfig.model.defaultModel).toBe('');

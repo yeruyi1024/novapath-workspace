@@ -57,9 +57,13 @@ export type PlatformFetch = (options: {
 
 /** Keep an existing managed connection, or allocate a genuinely unused slot. */
 export function resolvePlatformProviderId(providers: PlatformProvidersConfig, configuredId?: string): PlatformProviderId {
-  if (configuredId && PLATFORM_PROVIDER_ID_PATTERN.test(configuredId) && providers[configuredId]) {
+  if (configuredId && PLATFORM_PROVIDER_ID_PATTERN.test(configuredId)
+    && providers[configuredId]?.baseUrl?.replace(/\/+$/, '') === PLATFORM_MODEL_BASE_URL) {
     return configuredId as PlatformProviderId;
   }
+  const existing = Object.keys(providers).find(id => PLATFORM_PROVIDER_ID_PATTERN.test(id)
+    && providers[id].baseUrl?.replace(/\/+$/, '') === PLATFORM_MODEL_BASE_URL);
+  if (existing) return existing as PlatformProviderId;
   let index = 0;
   while (providers[`custom_${index}`]) index += 1;
   return `custom_${index}`;

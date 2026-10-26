@@ -28,3 +28,21 @@ describe('safe account IPC projection', () => {
     'rejects malformed users', input => expect(() => parseMaasAccount(input)).toThrow(),
   );
 });
+
+test('projects only validated profile fields and never forwards security data', () => {
+  const user = { id: 3, username: 'profile-user', quota: 0, used_quota: 0,
+    email: ' member@example.test ', group: ' team ', role: 10, status: 2,
+    access_token: 'private-token', setting: '{"secret":"private-setting"}' };
+  const profile = parseMaasAccount(user);
+  expect(profile).toMatchObject({ email: 'member@example.test', group: 'team', role: 10, status: 2 });
+  expect(JSON.stringify(profile)).not.toMatch(/private-token|private-setting/);
+  expect(parseMaasAccount({ ...user, email: {}, group: 'x'.repeat(129), role: '100', status: Infinity }))
+    .toEqual({ id: 3, username: 'profile-user', displayName: 'profile-user', quota: 0, usedQuota: 0 });
+});
+
+test('projects bounded phone data for synchronization without forwarding identity claims', () => {
+  const user = { id: 3, username: 'member', quota: 0, used_quota: 0, phone: ' +8613800000000 ', verified: { proof_token: 'private' } };
+  expect(parseMaasAccount(user).phone).toBe('+8613800000000');
+  expect(JSON.stringify(parseMaasAccount(user))).not.toContain('private');
+  expect(parseMaasAccount({ ...user, phone: 'x'.repeat(33) }).phone).toBeUndefined();
+});

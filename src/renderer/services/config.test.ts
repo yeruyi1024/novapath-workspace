@@ -174,7 +174,7 @@ test('persists the StarPath connection and provider-specific default across unre
     platformProviderId: 'custom_3',
     providers: {
       ...configService.getConfig().providers,
-      custom_3: { enabled: true, displayName: 'StarPath', baseUrl: 'https://gateway.example/v1', apiKey: 'test-key', apiFormat: 'openai', models: [gatewayModel] },
+      custom_3: { enabled: true, displayName: 'StarPath', baseUrl: 'http://127.0.0.1:3303/v1', apiKey: 'test-key', apiFormat: 'openai', models: [gatewayModel] },
     },
     model: { ...defaultConfig.model, defaultModel: gatewayModel.id, defaultModelProvider: 'custom_3' },
   });
@@ -208,7 +208,7 @@ test('platform-only settings survive reload without reactivating retained legacy
   await reloaded.configService.init();
   expect(reloaded.configService.getConfig()).toMatchObject({
     platformProviderId: 'custom_30',
-    api: { key: 'platform-key', baseUrl: 'https://gateway.ai.shilijia.xyz/v1' },
+    api: { key: 'platform-key', baseUrl: 'http://127.0.0.1:3303/v1' },
     model: { defaultModel: 'platform-model', defaultModelProvider: 'custom_30' },
     providers: {
       openai: { enabled: false, apiKey: legacy.apiKey },

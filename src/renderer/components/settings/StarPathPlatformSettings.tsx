@@ -1,4 +1,4 @@
-import { EyeIcon, EyeSlashIcon, KeyIcon } from '@heroicons/react/24/outline';
+import { ClipboardDocumentIcon, EyeIcon, EyeSlashIcon, KeyIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -6,13 +6,29 @@ import type { PlatformProviderConfig } from '../../services/starpathPlatform';
 
 interface Props {
   provider: PlatformProviderConfig;
-  onChange: (provider: PlatformProviderConfig) => void;
   disabled?: boolean;
 }
 
-export default function StarPathPlatformSettings({ provider, onChange, disabled }: Props) {
-  const [showKey, setShowKey] = useState(false);
+/**
+ * The platform registers this key for the account as soon as the user signs in,
+ * so there is nothing to configure here. It stays hidden until the user asks for
+ * it, because most people never need to read or copy it.
+ */
+export default function StarPathPlatformSettings({ provider, disabled }: Props) {
+  const [revealed, setRevealed] = useState(false);
+  const [copied, setCopied] = useState(false);
   const t = (key: string) => i18nService.t(key);
+
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(provider.apiKey);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   return <section className="settings-platform-page" aria-label={t('starpathPlatformTitle')}>
     <div className="settings-platform-summary">
       <div className="flex items-center gap-3">
@@ -22,20 +38,25 @@ export default function StarPathPlatformSettings({ provider, onChange, disabled 
       </div>
     </div>
     <div className="settings-platform-fields">
-      <div>
-      <label htmlFor="starpath-api-key" className="settings-field-label">{t('starpathApiKey')}</label>
-      <div className="relative">
-        <input id="starpath-api-key" type={showKey ? 'text' : 'password'} value={provider.apiKey}
-          disabled={disabled} placeholder={t('starpathKeyPlaceholder')} autoComplete="off" spellCheck={false}
-          onChange={event => onChange({ ...provider, apiKey: event.target.value })} className="settings-field w-full pr-11" />
-        <button type="button" onClick={() => setShowKey(value => !value)} aria-label={t(showKey ? 'starpathHideKey' : 'starpathShowKey')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded text-secondary hover:text-foreground focus-visible:outline focus-visible:outline-2">
-          {showKey ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+      <p className="text-xs leading-5 text-secondary">
+        {provider.apiKey ? t('starpathManagedKeyReady') : t('starpathManagedKeyPending')}
+      </p>
+      {provider.apiKey && <div className="flex flex-wrap items-center gap-2">
+        <button type="button" disabled={disabled} onClick={() => setRevealed(value => !value)}
+          aria-expanded={revealed} className="settings-platform-key-toggle">
+          {revealed ? <EyeSlashIcon className="h-4 w-4" aria-hidden="true" /> : <EyeIcon className="h-4 w-4" aria-hidden="true" />}
+          {t(revealed ? 'starpathManagedKeyHide' : 'starpathManagedKeyShow')}
         </button>
-      </div>
-      </div>
-      <p className="text-xs leading-5 text-secondary">{t('starpathKeySetupHint')}</p>
+        {revealed && <button type="button" disabled={disabled} onClick={() => void copyKey()}
+          className="settings-platform-key-toggle">
+          <ClipboardDocumentIcon className="h-4 w-4" aria-hidden="true" />
+          {t(copied ? 'starpathManagedKeyCopied' : 'starpathManagedKeyCopy')}
+        </button>}
+      </div>}
+      {revealed && <input id="starpath-api-key" type="text" value={provider.apiKey} readOnly
+        aria-label={t('starpathApiKey')} autoComplete="off" spellCheck={false}
+        className="settings-field w-full" onFocus={event => event.currentTarget.select()} />}
     </div>
-    <p className="mt-6 border-t border-border pt-4 text-xs leading-5 text-secondary">{t('starpathSaveKeyHint')}</p>
+    <p className="mt-6 border-t border-border pt-4 text-xs leading-5 text-secondary">{t('starpathManagedKeyHint')}</p>
   </section>;
 }

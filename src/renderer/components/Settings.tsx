@@ -63,9 +63,10 @@ import MemoryEntriesSettings from './settings/MemoryEntriesSettings';
 import PlatformAccountSettings from './settings/PlatformAccountSettings';
 import { resolveSettingsEscapeAction, SettingsEscapeAction } from './settings/settingsEscape';
 import { SettingsListRow, SettingsSection } from './settings/SettingsLayout';
-import SettingsNavigation, { SettingsTab } from './settings/SettingsNavigation';
+import SettingsNavigation from './settings/SettingsNavigation';
 import SettingsNavigationIcon from './settings/SettingsNavigationIcon';
 import SettingsNotice from './settings/SettingsNotice';
+import { hiddenSettingsTabs, resolveVisibleSettingsTab, SettingsTab, settingsTabsWithoutSave } from './settings/settingsTabs';
 import StarPathPlatformSettings from './settings/StarPathPlatformSettings';
 import EmailSkillConfig from './skills/EmailSkillConfig';
 import ThemedSelect from './ui/ThemedSelect';
@@ -927,7 +928,7 @@ const Settings: React.FC<SettingsProps> = ({
     selectThemeMode,
   } = useSkin();
   // 状态
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
+  const [activeTab, setActiveTab] = useState<TabType>(resolveVisibleSettingsTab(initialTab));
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [themeId, setThemeId] = useState<string>(themeService.getDefaultThemeId());
   const [uiFontSize, setUiFontSize] = useState<number>(FontPreferences.UiFontSizeDefault);
@@ -997,11 +998,6 @@ const Settings: React.FC<SettingsProps> = ({
   const platformProvider: ProviderConfig = providers[platformId] || {
     displayName: PRODUCT.name, enabled: false, apiKey: '', baseUrl: '', apiFormat: 'openai', models: [],
   };
-  const updatePlatformProvider = (provider: ProviderConfig) => {
-    setPlatformProviderId(platformId);
-    setProviders(previous => ({ ...previous, [platformId]: provider }));
-  };
-
 
   // 创建引用来确保内容区域的滚动
   const contentRef = useRef<HTMLDivElement>(null);
@@ -1555,7 +1551,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      setActiveTab(resolveVisibleSettingsTab(initialTab));
     }
   }, [initialTab, initialTabRequestId]);
 
@@ -2443,11 +2439,16 @@ const Settings: React.FC<SettingsProps> = ({
     // Filter out tabs with 'hide' action in enterprise config
     // e.g., ui: { "settings.im": "hide" } → hide the 'im' tab
     const ui = enterpriseConfig?.ui;
+    const visibleTabs = allTabs.filter(tab => !hiddenSettingsTabs.includes(tab.key));
     if (ui) {
-      return allTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide');
+      return visibleTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide');
     }
-    return allTabs;
+    return visibleTabs;
   })();
+
+  useEffect(() => {
+    if (sidebarTabs.length && !sidebarTabs.some(tab => tab.key === activeTab)) setActiveTab(sidebarTabs[0].key);
+  }, [activeTab, sidebarTabs]);
 
   const activeTabLabel = useMemo(() => {
     return sidebarTabs.find(t => t.key === activeTab)?.label ?? '';
@@ -3198,9 +3199,7 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'model':
         return (
-          <StarPathPlatformSettings provider={platformProvider}
-            disabled={isSaving}
-            onChange={updatePlatformProvider} />
+          <StarPathPlatformSettings provider={platformProvider} disabled={isSaving} />
         );
 
       case 'shortcuts':
@@ -3519,7 +3518,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="relative shrink-0">
+            {!settingsTabsWithoutSave.includes(activeTab) && <div className="relative shrink-0">
               <div
                 aria-hidden="true"
                 className={`pointer-events-none absolute inset-x-0 bottom-full h-10 bg-gradient-to-t from-background to-transparent transition-opacity duration-200 ${
@@ -3543,7 +3542,7 @@ const Settings: React.FC<SettingsProps> = ({
                   {isSaving ? i18nService.t('saving') : i18nService.t('save')}
                 </button>
               </div>
-            </div>
+            </div>}
           </form>
 
         </div>

@@ -39,13 +39,16 @@ import EngineStartupOverlay from './components/cowork/EngineStartupOverlay';
 import KitsView from './components/kits/KitsView';
 import LibraryView from './components/library/LibraryView';
 import FirstRunLoginIntroduction from './components/login/FirstRunLoginIntroduction';
+import PlatformAccountPage, { PlatformAccountSection } from './components/login/PlatformAccountPage';
+import { AccountWorkspaceView } from './components/login/platformAccountPresentation';
 import NewUserOnboardingOverlay, {
   NewUserOnboardingStep,
   type NewUserOnboardingStep as NewUserOnboardingStepType,
 } from './components/NewUserOnboardingOverlay';
 import { ScheduledTasksView } from './components/scheduledTasks';
 import Settings, { type SettingsOpenOptions } from './components/Settings';
-import Sidebar from './components/Sidebar';
+import { hiddenSettingsTabs } from './components/settings/settingsTabs';
+import Sidebar, { type WorkspaceView } from './components/Sidebar';
 import { SIDEBAR_TASK_FILTER_ENABLED } from './components/sidebar/SidebarTaskFilterButton';
 import { SkillsAndConnectorsView, SkillsConnectorsSection } from './components/skillsAndConnectors';
 import SkinBackdrop, { SkinBackdropVariant } from './components/skin/SkinBackdrop';
@@ -235,7 +238,9 @@ const App: React.FC = () => {
   const hasPromptedPlatformKeyRef = useRef(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions & { requestId: number }>({ requestId: 0 });
-  const [mainView, setMainView] = useState<'cowork' | 'skills' | 'scheduledTasks' | 'kits' | 'mcp' | 'library'>('cowork');
+  const [mainView, setMainView] = useState<WorkspaceView>('cowork');
+  const [accountSection, setAccountSection] = useState<PlatformAccountSection>(PlatformAccountSection.Usage);
+  const [accountReturnView, setAccountReturnView] = useState<Exclude<WorkspaceView, 'account'>>('cowork');
   const [libraryNavigationRequest, setLibraryNavigationRequest] = useState<{
     source: LibrarySourceFilter;
     requestId: number;
@@ -773,7 +778,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isInitialized || initError || hasPromptedPlatformKeyRef.current) return;
+    if (hiddenSettingsTabs.includes('model') || !isInitialized || initError || hasPromptedPlatformKeyRef.current) return;
     hasPromptedPlatformKeyRef.current = true;
     if (!configService.getConfig().api.key.trim()) handleShowSettings({ initialTab: 'model' });
   }, [handleShowSettings, initError, isInitialized]);
@@ -2150,6 +2155,10 @@ const App: React.FC = () => {
         <Sidebar
           onShowSettings={handleShowSettings}
           activeView={mainView}
+          onOpenAccount={section => {
+            if (mainView !== AccountWorkspaceView.Main) setAccountReturnView(mainView);
+            setAccountSection(section); setMainView(AccountWorkspaceView.Main);
+          }}
           onShowSkills={handleShowSkills}
           onShowCowork={handleShowCowork}
           onShowScheduledTasks={handleShowScheduledTasks}
@@ -2171,7 +2180,14 @@ const App: React.FC = () => {
               <SkinBackdrop variant={SkinBackdropVariant.Management} />
             )}
             <EngineStartupOverlay />
-            {mainView === 'skills' || mainView === 'mcp' ? (
+            {mainView === AccountWorkspaceView.Main ? (
+              <PlatformAccountPage section={accountSection} onSectionChange={setAccountSection}
+                collapsed={isSidebarCollapsed} onToggleSidebar={handleToggleSidebar}
+                onBack={() => {
+                  setMainView(accountReturnView);
+                  requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-platform-account-entry] > button')?.focus());
+                }} />
+            ) : mainView === 'skills' || mainView === 'mcp' ? (
               <SkillsAndConnectorsView
                 activeSection={mainView === 'mcp' ? SkillsConnectorsSection.Connectors : SkillsConnectorsSection.Skills}
                 onSectionChange={handleSkillsConnectorsSectionChange}

@@ -28,7 +28,7 @@ describe('fixed platform model routing', () => {
 
   test('clamps every managed config write and disables alternate routes including OAuth', () => {
     const result = lockPlatformConfig({ platformProviderId: 'custom_0',
-      providers: { custom_0: { enabled: true, apiKey: 'platform-key', baseUrl: 'https://other.example', apiFormat: 'anthropic' as const,
+      providers: { custom_0: { enabled: true, apiKey: 'platform-key', baseUrl: PLATFORM_MODEL_BASE_URL, apiFormat: 'anthropic' as const,
         codingPlanEnabled: true, oauthBaseUrl: 'https://oauth.example', oauthAccessToken: 'old-token', models: [{ id: 'model', name: 'Model' }] },
       openai: { enabled: true, apiKey: 'legacy-key', baseUrl: 'https://other.example' } },
       api: { key: 'wrong-key', baseUrl: 'https://other.example' }, model: { defaultModel: 'missing' } });
@@ -47,4 +47,25 @@ describe('fixed platform model routing', () => {
     expect(result.model).toMatchObject({ availableModels: [], defaultModel: '' });
     expect(result.api).toEqual({ key: '', baseUrl: PLATFORM_MODEL_BASE_URL });
   });
+});
+
+
+test('an explicitly selected online slot cannot carry its key into local MaaS', () => {
+  const online = { enabled: true, apiKey: 'online-only-key', baseUrl: 'https://gateway.ai.shilijia.xyz/v1', models: [{ id: 'online-model', name: 'Online' }] };
+  const result = lockPlatformConfig({ platformProviderId: 'custom_0', providers: { custom_0: online }, model: { defaultModel: 'online-model' } });
+  expect(result.platformProviderId).toBe('custom_1');
+  expect(result.providers.custom_0).toEqual({ ...online, enabled: false });
+  expect(result.providers.custom_1).toMatchObject({ apiKey: '', enabled: false, baseUrl: PLATFORM_MODEL_BASE_URL });
+  expect(result.api.key).toBe('');
+  expect(result.model.defaultModel).toBe('');
+});
+
+test('switching local databases preserves the old key and selects only the new environment', () => {
+  const old = { enabled: true, apiKey: 'old-local-only', baseUrl: 'http://127.0.0.1:3000/v1', models: [{ id: 'old-model', name: 'Old' }] };
+  const current = { enabled: false, apiKey: 'pc-image-only', baseUrl: PLATFORM_MODEL_BASE_URL, models: [{ id: 'deepseek-flash', name: 'DeepSeek' }] };
+  const result = lockPlatformConfig({ platformProviderId: 'custom_0', providers: { custom_0: old, custom_1: current }, model: { defaultModel: 'old-model' } });
+  expect(result.platformProviderId).toBe('custom_1');
+  expect(result.providers.custom_0).toEqual({ ...old, enabled: false });
+  expect(result.api).toEqual({ key: 'pc-image-only', baseUrl: 'http://127.0.0.1:3303/v1' });
+  expect(result.model.defaultModel).toBe('deepseek-flash');
 });
