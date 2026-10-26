@@ -1,6 +1,7 @@
 import localEnvironment from './localMaasEnvironment.json';
 import type { MaasBillingSnapshot } from './maasBilling';
 import type { MaasProfileError, MaasProfileInput, MaasProfileProgress } from './maasProfile';
+import type { MaasPurchaseResult } from './maasSubscriptionPurchase';
 import type { MaasSubscriptions } from './maasSubscriptions';
 
 export const MaasIpc = {
@@ -8,6 +9,10 @@ export const MaasIpc = {
   Billing: 'maas:billing',
   Subscriptions: 'maas:subscriptions',
   ManagedKey: 'maas:managedKey',
+  SubscriptionOverview: 'maas:subscriptionOverview',
+  PrepareSubscriptionPurchase: 'maas:prepareSubscriptionPurchase',
+  PurchaseSubscriptionWithBalance: 'maas:purchaseSubscriptionWithBalance',
+  ClearPendingSubscriptionPurchase: 'maas:clearPendingSubscriptionPurchase',
   Login: 'maas:login',
   OpenLogin: 'maas:openLogin',
   Status: 'maas:status',
@@ -48,6 +53,7 @@ export interface MaasResult {
   smsChallenge?: { token: string; retryAfter: number; expiresIn: number };
   logoutRemoteFailed?: boolean;
   subscriptions?: MaasSubscriptions;
+  purchase?: MaasPurchaseResult;
   managedKey?: { accountId: number; key: string };
   profile?: MaasProfileProgress;
   profileError?: MaasProfileError;
@@ -64,6 +70,10 @@ export interface MaasAPI {
   billing: () => Promise<MaasResult>;
   subscriptions: () => Promise<MaasResult>;
   managedKey: (accountId: number) => Promise<MaasResult>;
+  subscriptionOverview: (accountId: number) => Promise<MaasResult>;
+  prepareSubscriptionPurchase: (input: { accountId: number; planId: number }) => Promise<MaasResult>;
+  purchaseSubscriptionWithBalance: (input: { accountId: number; confirmationId: string }) => Promise<MaasResult>;
+  clearPendingSubscriptionPurchase: (accountId: number) => Promise<MaasResult>;
   login: (input: MaasLoginInput) => Promise<MaasResult>;
   openLogin: (origin: string) => Promise<MaasResult>;
   status: (origin: string) => Promise<MaasResult>;

@@ -1,4 +1,5 @@
 import './platformAccountWorkspace.css';
+import './platformSubscription.css';
 
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -9,6 +10,7 @@ import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import PlatformAccountDetails from './PlatformAccountDetails';
 import { PlatformAccountSection } from './platformAccountPresentation';
 import PlatformLoginDialog from './PlatformLoginDialog';
+import PlatformSubscriptions from './PlatformSubscriptions';
 
 export { PlatformAccountSection } from './platformAccountPresentation';
 
@@ -30,7 +32,7 @@ export default function PlatformAccountPage({ section, onSectionChange, onBack, 
     if (element) element.scrollTop = savedPositions[section];
     return () => { if (element) savedPositions[section] = element.scrollTop; };
   }, [section]);
-  const profile = true;
+  const profile = section === PlatformAccountSection.Profile;
   return <main className="platform-account-workspace" onKeyDown={event => {
     if (event.key !== 'Escape' || event.defaultPrevented || (event.target instanceof HTMLElement && event.target.closest('[data-app-modal], input, textarea, select'))) return;
     event.preventDefault(); onBack();
@@ -40,6 +42,8 @@ export default function PlatformAccountPage({ section, onSectionChange, onBack, 
         <button type="button" onClick={onBack}><ArrowLeftIcon aria-hidden="true" className="h-4 w-4" />{t('accountWorkspaceBack')}</button></div>
       <nav className="non-draggable" aria-label={t('accountIdentity')}>
         <button type="button" aria-current={profile ? 'page' : undefined} onClick={() => onSectionChange(PlatformAccountSection.Profile)}>{t('maasProfileTitle')}</button>
+        <button type="button" aria-current={section === PlatformAccountSection.Usage ? 'page' : undefined} onClick={() => onSectionChange(PlatformAccountSection.Usage)}>{t('accountUsage')}</button>
+        <button type="button" aria-current={section === PlatformAccountSection.Subscriptions ? 'page' : undefined} onClick={() => onSectionChange(PlatformAccountSection.Subscriptions)}>{t('accountSubscriptions')}</button>
       </nav>
     </header>
     <div ref={scroll} className="platform-account-workspace-scroll">
@@ -48,7 +52,7 @@ export default function PlatformAccountPage({ section, onSectionChange, onBack, 
           <h1 ref={heading} tabIndex={-1}>{t(profile ? 'maasProfileTitle' : section === PlatformAccountSection.Usage ? 'accountUsage' : 'accountSubscriptions')}</h1>
           <p>{t(profile ? 'profilePageDescription' : section === PlatformAccountSection.Usage ? 'accountUsageDescription' : 'accountSubscriptionsDescription')}</p>
         </div>
-        {snapshot.account ? <PlatformAccountDetails key={`${snapshot.origin}:${snapshot.account.id}`} account={snapshot.account} />
+        {snapshot.account ? profile ? <PlatformAccountDetails key={`${snapshot.origin}:${snapshot.account.id}`} account={snapshot.account} /> : <PlatformSubscriptions key={`${snapshot.origin}:${snapshot.account.id}`} account={snapshot.account} origin={snapshot.origin} view={section} onViewChange={onSectionChange} />
           : <div className="platform-account-empty"><h2>{t('accountLoginRequired')}</h2><button type="button" className="platform-account-button" onClick={() => setLoginOpen(true)}>{t('accountLoginAction')}</button></div>}
       </div>
     </div>

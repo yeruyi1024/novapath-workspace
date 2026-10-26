@@ -1,7 +1,7 @@
 import './platformAccount.css';
 import './platformAccountWorkspace.css';
 
-import { ArrowRightStartOnRectangleIcon, ChevronUpDownIcon, Cog6ToothIcon, UserCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowRightStartOnRectangleIcon, ChartPieIcon, ChevronUpDownIcon, Cog6ToothIcon, SparklesIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -48,6 +48,8 @@ export default function PlatformAccountButton({ onShowSettings, onOpenSection }:
         ...(!snapshot.account ? [{ key: 'login', label: t('maasLoginTitle'), icon: <UserCircleIcon aria-hidden="true" className="h-4 w-4" />, onSelect: () => setLoginOpen(true) }] : []),
         ...(snapshot.account ? [
           { key: 'profile', label: t('maasProfileTitle'), icon: <UserCircleIcon aria-hidden="true" className="h-4 w-4" />, disabled: pending, onSelect: () => onOpenSection(PlatformAccountSection.Profile) },
+          { key: 'usage', label: t('accountUsage'), icon: <ChartPieIcon aria-hidden="true" className="h-4 w-4" />, disabled: pending, onSelect: () => onOpenSection(PlatformAccountSection.Usage) },
+          { key: 'subscriptions', label: t('accountSubscriptions'), icon: <SparklesIcon aria-hidden="true" className="h-4 w-4" />, disabled: pending, onSelect: () => onOpenSection(PlatformAccountSection.Subscriptions) },
         ] : []),
         { key: 'settings', label: t('settings'), icon: <Cog6ToothIcon aria-hidden="true" className="h-4 w-4" />, separatorBefore: true, disabled: pending, onSelect: onShowSettings },
         ...(snapshot.account ? [{ key: 'logout', label: t('authLogout'), icon: <ArrowRightStartOnRectangleIcon aria-hidden="true" className="h-4 w-4" />, disabled: pending, onSelect: () => { void logout(); } }] : []),

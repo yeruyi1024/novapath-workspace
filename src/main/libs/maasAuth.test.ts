@@ -137,6 +137,22 @@ test('a rejected fresh access token renews once and retries only the wallet GET'
   expect(state.requests.some(r => r.options.url.endsWith('/balance/pay'))).toBe(false);
 });
 
+test('simultaneous unauthorized subscription reads share a single renewal', async () => {
+  state.responses.push({ status: 200, body: freshBundle(), cookie: 'fresh-cookie' });
+  await invoke(MaasIpc.Login, { origin: DEFAULT_MAAS_ORIGIN, method: 'password', username: 'demo', password: 'test' });
+  state.responses.push({ status: 401, body: {} }, { status: 401, body: {} },
+    { status: 200, body: { success: true, data: { ...bundle.data.user, request_count: 0 } } },
+    { status: 200, body: { success: true, data: { quota_display_type: 'USD', quota_per_unit: 500000 } } },
+    { status: 200, body: { success: true, data: { payment_compliance_confirmed: true } } },
+    { status: 200, body: freshBundle(), cookie: 'renewed-cookie' },
+    { status: 200, body: { success: true, data: [] } },
+    { status: 200, body: { success: true, data: { billing_preference: 'subscription_first', subscriptions: [], all_subscriptions: [] } } });
+  const result = await invoke(MaasIpc.SubscriptionOverview, 12);
+  expect(result.subscriptions?.historyComplete, JSON.stringify(result.subscriptions)).toBe(true);
+  expect(result.subscriptions?.errors).toEqual({});
+  expect(state.requests.filter(r => r.options.url.endsWith('/auth/refresh'))).toHaveLength(1);
+});
+
 async function login() {
   state.responses.push({ status: 200, body: bundle, cookie: 'rotated-refresh-secret' });
   const result = invoke(MaasIpc.OpenLogin, DEFAULT_MAAS_ORIGIN);
@@ -499,6 +515,53 @@ test('subscription reads do not publish data after an authentication retry chang
   state.responses.push({ status: 200, body: bundle, cookie: 'rotated-refresh-secret' },
     { status: 401, body: {} }, { status: 200, body: { ...bundle, data: { ...bundle.data, user: { ...bundle.data.user, id: 13 } } }, cookie: 'rotated-refresh-secret' });
   expect(await invoke(MaasIpc.Subscriptions)).toMatchObject({ success: false, error: 'invalidResponse' });
+});
+
+describe('subscription wallet adapter IPC', () => {
+  const queueOverview = (price = 1) => state.responses.push(
+    { status: 200, body: bundle, cookie: 'overview-refresh' },
+    { status: 200, body: { success: true, data: [{ plan: { id: 7, title: 'Plan', subtitle: '', price_amount: price, currency: 'USD', duration_unit: 'month', duration_value: 1, total_amount: 500000, quota_reset_period: 'daily', allow_balance_pay: true, max_purchase_per_user: 0 } }] } },
+    { status: 200, body: { success: true, data: { billing_preference: 'subscription_first', subscriptions: [], all_subscriptions: [] } } },
+    { status: 200, body: { success: true, data: { id: 12, username: 'demo', quota: 2000000, used_quota: 0, request_count: 0 } } },
+    { status: 200, body: { success: true, data: { quota_display_type: 'USD', quota_per_unit: 500000 } } },
+    { status: 200, body: { success: true, data: { payment_compliance_confirmed: true } } },
+  );
+  test('reads independent sections through the account JWT without leaking credentials', async () => {
+    await login(); queueOverview();
+    const result = await invoke(MaasIpc.SubscriptionOverview, 12);
+    expect(result).toMatchObject({ success: true, subscriptions: { paymentCompliance: true, historyComplete: true, wallet: { quota: 2000000 }, errors: {} } });
+    const request = state.requests.find(item => item.options.url.endsWith('/api/user/topup/info'));
+    expect(request.options.method).toBe('GET');
+    expect(request.req.headers.Authorization).toBe('Bearer access-must-not-leak');
+    expect(JSON.stringify(result)).not.toContain('access-must-not-leak');
+  });
+  test('records a successful wallet purchase with exactly one authenticated POST', async () => {
+    await login(); queueOverview();
+    const prepared = await invoke(MaasIpc.PrepareSubscriptionPurchase, { accountId: 12, planId: 7 });
+    expect(prepared.purchase?.confirmation?.chargedQuota).toBe(500000);
+    queueOverview(); state.responses.push({ status: 200, body: { success: true, data: null } });
+    const paid = await invoke(MaasIpc.PurchaseSubscriptionWithBalance, { accountId: 12, confirmationId: prepared.purchase!.confirmation!.confirmationId });
+    expect(paid.purchase?.state).toBe('succeeded');
+    const requests = state.requests.filter(item => item.options.url.endsWith('/api/subscription/balance/pay'));
+    expect(requests).toHaveLength(1);
+    expect(requests[0].options.method).toBe('POST');
+    expect(requests[0].req.body).toBe('{"plan_id":7}');
+    expect(requests[0].req.headers.Authorization).toBe('Bearer access-must-not-leak');
+    const replay = await invoke(MaasIpc.PurchaseSubscriptionWithBalance, { accountId: 12, confirmationId: prepared.purchase!.confirmation!.confirmationId });
+    expect(replay.purchase?.state).toBe('rejected');
+  });
+  test('rejects another renderer and an old account before loading or buying', async () => {
+    expect(() => state.handlers.get(MaasIpc.PrepareSubscriptionPurchase)!({ sender: {} }, { accountId: 12, planId: 7 })).toThrow();
+    await login(); const before = state.requests.length;
+    expect((await invoke(MaasIpc.PrepareSubscriptionPurchase, { accountId: 13, planId: 7 })).success).toBe(false);
+    expect(state.requests).toHaveLength(before);
+  });
+  test('a failed catalog does not discard successfully read subscriptions or wallet', async () => {
+    await login(); queueOverview();
+    state.responses[1] = { status: 503, body: { success: false } };
+    const result = await invoke(MaasIpc.SubscriptionOverview, 12);
+    expect(result).toMatchObject({ success: true, subscriptions: { errors: { plans: true }, wallet: { quota: 2000000 }, historyComplete: true } });
+  });
 });
 
 test('local startup ignores and preserves the old online session', async () => {

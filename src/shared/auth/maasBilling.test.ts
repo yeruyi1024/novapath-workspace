@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatMaasQuota, parseMaasBillingDisplay, parseMaasBillingSnapshot } from './maasBilling';
+import { formatMaasPoints, formatMaasQuota, maasQuotaToPoints, parseMaasBillingDisplay, parseMaasBillingSnapshot } from './maasBilling';
 
 const status = { quota_display_type: 'CNY', quota_per_unit: 500000, usd_exchange_rate: 7, price: 1 };
 const user = { id: 12, quota: 4285772, used_quota: 2953408, request_count: 612 };
@@ -41,4 +41,27 @@ describe('platform wallet conversion contract', () => {
     { ...user, id: 13 }, { ...user, request_count: undefined }, { ...user, request_count: -1 },
     { ...user, quota: Number.MAX_SAFE_INTEGER + 1 }, { ...user, used_quota: NaN },
   ])('rejects another account or malformed usage', data => expect(() => parseMaasBillingSnapshot(data, status, 12)).toThrow('invalidResponse'));
+});
+
+
+describe('points use the approved wallet-money ratio of 1:1000', () => {
+  test('uses the platform display exchange rate, before money formatting rounds', () => {
+    const cny = parseMaasBillingDisplay(status);
+    expect(maasQuotaToPoints(500000, cny)).toBe(7000);
+    expect(maasQuotaToPoints(500000, { ...cny, type: 'USD', exchangeRate: 1, symbol: '$' })).toBe(1000);
+    expect(maasQuotaToPoints(0, cny)).toBe(0);
+    expect(formatMaasPoints(maasQuotaToPoints(1, cny)!, 'en-US')).toBe('0.01');
+    expect(formatMaasPoints(0.002, 'en-US')).toBe('<0.01');
+    expect(formatMaasPoints(38250, 'en-US')).toBe('38,250');
+  });
+
+  test('does not multiply custom points or tokens again, or invent missing conversion', () => {
+    const cny = parseMaasBillingDisplay(status);
+    expect(maasQuotaToPoints(500000)).toBeNull();
+    expect(maasQuotaToPoints(500000, { ...cny, type: 'CUSTOM', symbol: '积分' })).toBeNull();
+    expect(maasQuotaToPoints(500000, { ...cny, type: 'TOKENS' })).toBeNull();
+    expect(maasQuotaToPoints(500000, { ...cny, exchangeRate: 0 })).toBeNull();
+    expect(maasQuotaToPoints(-1, cny)).toBeNull();
+    expect(maasQuotaToPoints(Infinity, cny)).toBeNull();
+  });
 });
