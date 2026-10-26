@@ -2,6 +2,7 @@ import { formatProductText } from '../../shared/product';
 import { accountWorkspaceMessages } from './accountWorkspaceMessages';
 import { configService } from './config';
 import { profileMessages } from './profileMessages';
+import { subscriptionMessages } from './subscriptionMessages';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -9,6 +10,7 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    ...subscriptionMessages.zh,
     ...accountWorkspaceMessages.zh,
     ...profileMessages.zh,
     profileUsername: '用户名',
@@ -4325,6 +4327,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workspaceDiffIncomplete: '部分文件超出读取限额，行数统计不完整。',
   },
   en: {
+    ...subscriptionMessages.en,
     ...accountWorkspaceMessages.en,
     ...profileMessages.en,
     profileUsername: 'Username',

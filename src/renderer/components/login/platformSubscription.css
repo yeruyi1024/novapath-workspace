@@ -17,13 +17,13 @@
   outline: none;
 }
 
-.platform-subscription-dialog-header { position: relative; flex-shrink: 0; padding: 26px 56px 24px; text-align: center; }
-.platform-subscription-dialog-header h2 { font-size: 20px; font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; text-wrap: balance; }
-.platform-subscription-dialog-hint { margin-top: 6px; color: var(--lobster-text-secondary); font-size: 13px; line-height: 1.6; text-wrap: balance; }
+.platform-subscription-dialog-header { position: relative; flex-shrink: 0; padding: 26px 64px 22px 28px; text-align: left; }
+.platform-subscription-dialog-header h2 { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 5px)); font-weight: 600; line-height: 1.4; letter-spacing: -0.01em; text-wrap: balance; }
+.platform-subscription-dialog-hint { margin-top: 6px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.7; }
 .platform-subscription-close { position: absolute; right: 14px; top: 14px; }
 .platform-subscription-dialog-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 28px 24px; scrollbar-gutter: stable; }
-.platform-plan-periods { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 3px; margin: 0 auto 20px; padding: 3px; border: 1px solid var(--lobster-border-subtle); border-radius: 999px; background: var(--lobster-surface-raised); }
-.platform-plan-periods button { min-width: 0; padding: 6px 16px; border-radius: 999px; color: var(--lobster-text-secondary); font-size: 12px; font-weight: 500; line-height: 1.5; }
+.platform-plan-periods { display: flex; width: fit-content; max-width: 100%; align-items: stretch; gap: 3px; margin: 0 0 20px; padding: 3px; border: 1px solid var(--lobster-border-subtle); border-radius: 999px; background: var(--lobster-surface-raised); }
+.platform-plan-periods button { min-width: 0; padding: 6px 16px; border-radius: 999px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); font-weight: 500; line-height: 1.5; }
 .platform-plan-periods button[aria-pressed="true"] { background: var(--lobster-surface); color: var(--lobster-foreground); box-shadow: 0 1px 4px rgb(0 0 0 / 7%); }
 .platform-plan-periods button:hover { color: var(--lobster-foreground); }
 
@@ -32,34 +32,35 @@
 .platform-subscription-dialog .platform-plan-grid[data-plan-count="2"] { max-width: 640px; margin: 0 auto; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .platform-subscription-dialog .platform-plan-card { min-height: 0; padding: 20px; border-radius: 12px; transition: border-color 150ms ease, box-shadow 150ms ease; }
 .platform-subscription-dialog .platform-plan-card:hover { border-color: var(--lobster-border); box-shadow: 0 4px 16px rgb(0 0 0 / 6%); }
-.platform-subscription-dialog .platform-plan-card[data-subscribed] { border-color: var(--lobster-primary); background: color-mix(in srgb, var(--lobster-primary) 4%, var(--lobster-surface)); box-shadow: 0 0 0 1px var(--lobster-primary); }
-.platform-subscription-dialog .platform-plan-card-heading { align-items: center; gap: 8px; }
-.platform-subscription-dialog .platform-plan-card-heading h3 { min-width: 0; overflow-wrap: anywhere; font-size: 15px; font-weight: 600; line-height: 1.5; }
-.platform-subscription-dialog .platform-plan-description { min-height: 0; flex: 1; margin-top: 8px; font-size: 12.5px; line-height: 1.7; }
-.platform-plan-purchase { width: 100%; padding-top: 20px; }
-.platform-subscription-dialog .platform-plan-price { margin-top: 0; align-items: baseline; gap: 4px; font-size: 28px; font-weight: 600; letter-spacing: -0.02em; }
-.platform-subscription-dialog .platform-plan-currency { color: var(--lobster-text-secondary); font-size: 12px; font-weight: 400; letter-spacing: normal; }
+.platform-subscription-dialog .platform-plan-card[data-subscribed] { border-color: color-mix(in srgb, var(--lobster-primary) 38%, var(--lobster-border-subtle)); background: var(--lobster-surface); }
+.platform-subscription-dialog .platform-plan-card-heading { min-height: 24px; align-items: center; gap: 8px; }
+.platform-subscription-dialog .platform-plan-card-heading h3 { min-width: 0; overflow-wrap: anywhere; font-size: var(--np-text-title); font-weight: 600; line-height: 1.5; }
+.platform-subscription-dialog .platform-plan-description { min-height: 40px; flex: none; margin-top: 8px; font-size: var(--np-text-meta); line-height: 1.7; }
+.platform-plan-purchase { width: 100%; margin-top: auto; padding-top: 16px; }
+.platform-subscription-dialog .platform-plan-price { margin-top: 12px; align-items: baseline; gap: 4px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 15px)); font-weight: 600; letter-spacing: -0.03em; }
+.platform-subscription-dialog .platform-plan-currency { color: var(--lobster-text-secondary); font-size: var(--np-text-meta); font-weight: 400; letter-spacing: normal; }
 .platform-subscription-dialog .platform-plan-card[data-recommended] { border-color: color-mix(in srgb, var(--lobster-primary) 55%, var(--lobster-border-subtle)); box-shadow: 0 6px 20px color-mix(in srgb, var(--lobster-primary) 10%, transparent); }
-.platform-plan-badge { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; background: var(--lobster-primary); color: var(--lobster-primary-foreground); font-size: 11px; font-weight: 500; line-height: 1.5; }
-.platform-plan-highlights { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: var(--lobster-text-secondary); font-size: 12.5px; line-height: 1.5; list-style: none; }
+.platform-plan-badge { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; background: var(--lobster-primary); color: var(--lobster-primary-foreground); font-size: var(--np-text-caption); font-weight: 500; line-height: 1.5; }
+.platform-plan-highlights { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; color: var(--lobster-text-secondary); font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 2.5px)); line-height: 1.5; list-style: none; }
 .platform-plan-highlights li { display: flex; align-items: flex-start; gap: 6px; }
 .platform-plan-highlights svg { margin-top: 3px; color: var(--lobster-primary); }
-.platform-plan-state { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--lobster-border-subtle); }
-.platform-plan-hint { color: var(--lobster-text-muted); font-size: 11.5px; line-height: 1.5; }
-.platform-subscribe-button { display: inline-flex; width: 100%; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--lobster-border); border-radius: 8px; background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); font-size: 13px; font-weight: 500; line-height: 1.5; cursor: default; }
+.platform-plan-state { display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid var(--lobster-border-subtle); }
+.platform-plan-state .platform-plan-hint { min-height: 35px; }
+.platform-plan-hint { color: var(--lobster-text-muted); font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); line-height: 1.5; }
+.platform-subscribe-button { display: inline-flex; width: 100%; min-height: 36px; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--lobster-border); border-radius: 8px; background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); font-size: var(--np-text-body); font-weight: 500; line-height: 1.5; cursor: default; }
 .platform-subscribe-button-current { border-color: color-mix(in srgb, var(--lobster-primary) 30%, transparent); background: var(--lobster-primary-muted); color: var(--lobster-primary); }
 .platform-subscription-dialog .platform-plan-skeleton { min-height: 200px; padding: 20px; border-radius: 12px; }
 .platform-subscription-no-plans { display: flex; min-height: 280px; flex-direction: column; align-items: center; justify-content: center; padding: 32px; border: 1px dashed var(--lobster-border-subtle); border-radius: 12px; text-align: center; }
 
 .platform-subscription-records { margin-top: 24px; border-top: 1px solid var(--lobster-border-subtle); border-bottom: 1px solid var(--lobster-border-subtle); }
-.platform-subscription-records summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 4px; border-radius: 4px; color: var(--lobster-text-secondary); font-size: 13px; cursor: pointer; list-style: none; }
+.platform-subscription-records summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 17px 4px; border-radius: 4px; color: var(--lobster-text-secondary); font-size: var(--np-text-body); cursor: pointer; list-style: none; }
 .platform-subscription-records summary::-webkit-details-marker { display: none; }
 .platform-subscription-records[open] summary > svg { transform: rotate(180deg); }
 .platform-subscription-records[open] { padding-bottom: 20px; }
 .platform-subscription-record-history { margin-top: 22px; }
 .platform-subscription-sync-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
-.platform-subscription-sync-row p { min-width: 0; color: var(--lobster-text-muted); font-size: 11px; line-height: 1.7; }
-.platform-subscription-account-note { max-width: 720px; margin: 14px auto 0; color: var(--lobster-text-muted); font-size: 11px; line-height: 1.8; text-align: center; text-wrap: pretty; }
+.platform-subscription-sync-row p { min-width: 0; color: var(--lobster-text-muted); font-size: var(--np-text-caption); line-height: 1.7; }
+.platform-subscription-account-note { max-width: 720px; margin: 14px auto 0; color: var(--lobster-text-muted); font-size: var(--np-text-caption); line-height: 1.8; text-align: center; text-wrap: pretty; }
 .platform-subscription-dialog button:focus-visible,
 .platform-subscription-dialog summary:focus-visible { outline: 2px solid var(--lobster-primary); outline-offset: 3px; }
 
@@ -70,15 +71,82 @@
 @media (max-width: 679px) {
   .platform-subscription-dialog, .platform-subscription-dialog-content { max-height: calc(100dvh - 24px); }
   .platform-subscription-dialog { border-radius: 14px; }
-  .platform-subscription-dialog-header { padding: 26px 46px 20px; }
-  .platform-subscription-dialog-header h2 { font-size: 18px; }
-  .platform-subscription-dialog-hint { font-size: 12px; }
+  .platform-subscription-dialog-header { padding: 24px 46px 20px 18px; }
+  .platform-subscription-dialog-header h2 { font-size: var(--np-page-title-size); }
+  .platform-subscription-dialog-hint { font-size: var(--np-text-meta); }
   .platform-subscription-close { right: 12px; top: 12px; }
   .platform-subscription-dialog-body { padding: 0 18px 20px; }
   .platform-plan-periods { width: 100%; margin-bottom: 20px; }
-  .platform-plan-periods button { flex: 1; padding: 8px 10px; font-size: 11px; }
+  .platform-plan-periods button { flex: 1; padding: 8px 10px; font-size: var(--np-text-caption); }
   .platform-subscription-dialog .platform-plan-grid,
   .platform-subscription-dialog .platform-plan-grid[data-plan-count="2"] { grid-template-columns: minmax(0, 1fr); }
   .platform-subscription-dialog .platform-plan-card { padding: 18px; }
     .platform-subscription-sync-row { flex-wrap: wrap; gap: 6px; }
 }
+
+/* Wallet purchases share the account dialog's surfaces and focus treatment. */
+.platform-subscription-dialog:has(.platform-wallet-confirm) { max-width: 480px; background: var(--lobster-surface); }
+.platform-subscription-dialog:has(.platform-wallet-confirm) .platform-subscription-dialog-header { height: 0; padding: 0; }
+.platform-subscription-dialog:has(.platform-wallet-confirm) .platform-subscription-dialog-header h2,
+.platform-subscription-dialog:has(.platform-wallet-confirm) .platform-subscription-dialog-hint { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.platform-subscription-dialog:has(.platform-wallet-confirm) .platform-subscription-dialog-body { padding-top: 22px; }
+.platform-subscription-list:has(> article:only-child) { grid-template-columns: minmax(0, 1fr); }
+.platform-wallet-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 22px; padding: 0 0 20px; border-bottom: 1px solid var(--lobster-border-subtle); }
+.platform-wallet-summary-account { display: flex; min-width: 0; align-items: center; gap: 12px; }
+.platform-wallet-summary-account > svg { box-sizing: content-box; padding: 9px; border: 1px solid var(--lobster-border-subtle); border-radius: 10px; background: var(--lobster-surface); color: var(--lobster-text-secondary); }
+.platform-wallet-summary-account p { overflow-wrap: anywhere; font-size: var(--np-text-body); font-weight: 500; }
+.platform-wallet-summary-account p span, .platform-wallet-summary small { color: var(--lobster-text-muted); font-size: var(--np-text-caption); font-weight: 400; }
+.platform-wallet-summary-value { min-width: 0; text-align: right; }
+.platform-wallet-summary-value > span { display: block; color: var(--lobster-text-secondary); font-size: var(--np-text-caption); }
+.platform-wallet-summary-value strong { display: block; margin-top: 3px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 7px)); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.platform-plan-allowance { display: grid; width: 100%; gap: 12px; margin: 20px 0 8px; font-size: var(--np-text-meta); }
+.platform-plan-allowance > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 10px; }
+.platform-plan-allowance dt { color: var(--lobster-text-muted); font-size: var(--np-text-caption); }
+.platform-plan-allowance dd { overflow-wrap: anywhere; font-weight: 500; }
+.platform-plan-allowance > div:first-child dd { font-size: var(--np-text-title); }
+.platform-subscribe-button:not(:disabled) { border-color: var(--lobster-primary); background: var(--lobster-primary); color: var(--lobster-primary-foreground); cursor: pointer; }
+.platform-subscribe-button:not(:disabled):hover { filter: brightness(1.08); }
+.platform-subscribe-button:disabled { cursor: not-allowed; }
+.platform-records-title { display: flex; gap: 8px; align-items: baseline; padding: 20px 2px 14px; font-size: var(--np-text-label); font-weight: 600; }
+.platform-records-title span, .platform-record-id { color: var(--lobster-text-muted); font-size: var(--np-text-caption); font-weight: 400; }
+.platform-record-id { margin-top: 3px; }
+.platform-subscription-records > .platform-subscription-list { padding-bottom: 18px; }
+.platform-quota-overview { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 20px; }
+.platform-quota-overview > span { color: var(--lobster-text-secondary); font-size: var(--np-text-meta); }
+.platform-quota-overview strong { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 8px)); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.platform-quota-track { height: 5px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: var(--lobster-surface-raised); }
+.platform-quota-track span { display: block; height: 100%; border-radius: inherit; background: var(--lobster-primary); }
+.platform-quota-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 14px; font-size: var(--np-text-meta); }
+.platform-quota-details dt { color: var(--lobster-text-muted); font-size: var(--np-text-caption); }
+.platform-quota-details dd { margin-top: 4px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.platform-subscription-reset { grid-column: 1 / -1; }
+.platform-subscription-attention { margin-top: 10px; color: var(--lobster-primary); font-size: var(--np-text-meta); }
+.platform-purchase-notice { margin: 0 0 20px; padding: 14px 16px; border: 1px solid var(--lobster-border); border-radius: 10px; background: var(--lobster-surface-raised); font-size: var(--np-text-body); line-height: 1.8; overflow-wrap: anywhere; }
+.platform-purchase-success { border-color: color-mix(in srgb, var(--lobster-primary) 30%, var(--lobster-border)); }
+.platform-wallet-verify { display: flex; align-items: center; gap: 8px; margin-top: 12px; cursor: pointer; }
+.platform-wallet-verify input { accent-color: var(--lobster-primary); }
+.platform-wallet-confirm { max-width: 100%; margin: 0 auto; padding: 0; }
+.platform-wallet-confirm-title { margin: 16px 0 0; }
+.platform-wallet-confirm-title h3 { font-size: var(--np-text-heading); font-weight: 600; letter-spacing: -0.02em; outline: none; }
+.platform-wallet-amount { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: 4px; margin: 16px 0 18px; }
+.platform-wallet-amount span { color: var(--lobster-text-secondary); font-size: var(--np-text-meta); }
+.platform-wallet-amount strong { max-width: 100%; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 13px)); font-weight: 600; line-height: 1.25; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.platform-wallet-order { padding: 14px; border: 1px solid var(--lobster-border-subtle); border-radius: 10px; background: var(--lobster-background); }
+.platform-wallet-order-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; }
+.platform-wallet-order-heading > span { color: var(--lobster-text-secondary); font-size: var(--np-text-meta); overflow-wrap: anywhere; }
+.platform-wallet-order-allowance { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.platform-wallet-order-allowance dt { color: var(--lobster-text-secondary); font-size: var(--np-text-caption); }
+.platform-wallet-order-allowance dd { margin-top: 2px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 2.5px)); font-weight: 500; overflow-wrap: anywhere; }
+.platform-wallet-order h4 { overflow-wrap: anywhere; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 1.5px)); font-weight: 600; }
+.platform-wallet-review-details { display: grid; gap: 10px; margin: 16px 0; font-size: var(--np-text-meta); }
+.platform-wallet-review-details > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.platform-wallet-review-details dt { color: var(--lobster-text-secondary); }
+.platform-wallet-review-details dd { min-width: 0; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 2.5px)); font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.platform-wallet-review-details > div:last-child { padding-top: 10px; border-top: 1px solid var(--lobster-border-subtle); }
+.platform-wallet-policy { color: var(--lobster-text-secondary); font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); line-height: 1.65; }
+.platform-wallet-confirm-actions { display: grid; gap: 8px; margin-top: 14px; }
+.platform-wallet-confirm-actions .platform-subscribe-button { min-height: 36px; border-radius: 8px; }
+.platform-wallet-settlement { margin-top: 10px; color: var(--lobster-text-muted); font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 4.5px)); line-height: 1.7; text-align: center; }
+@media (min-width: 800px) { .platform-subscription-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 479px) { .platform-wallet-summary-value { width: 100%; text-align: left; } .platform-quota-overview strong { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 5px)); } }
+@media (prefers-reduced-motion: reduce) { .platform-subscription-dialog .platform-plan-card { transition: none; } }

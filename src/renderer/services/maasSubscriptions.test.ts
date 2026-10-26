@@ -57,3 +57,23 @@ test('a signed-out response from another origin cannot revoke the current accoun
   expect(signedOut).not.toHaveBeenCalled();
   expect(store.getState()).toEqual({ loading: false, error: 'invalidResponse' });
 });
+
+test('partial reads retain each section with its own successful timestamp', async () => {
+  const base = { ...result.subscriptions!, errors: {}, plans: [{ id: 7, title: 'Plan', subtitle: '', price: 1, currency: 'USD', durationUnit: 'month', durationValue: 1, customSeconds: 0, totalAmount: 100, resetPeriod: 'never', resetSeconds: 0 }], subscriptions: [{ id: 1, planId: 7, status: 'active', amountTotal: 100, amountUsed: 10, startTime: 1, endTime: 2000000000, nextResetTime: 0 }], historyComplete: true };
+  const fetch = vi.fn().mockResolvedValueOnce({ ...result, subscriptions: base }).mockResolvedValueOnce({ ...result, subscriptions: { ...base, syncedAt: 20, plans: [], errors: { plans: true }, subscriptions: [{ ...base.subscriptions[0], amountUsed: 25 }] } });
+  const store = createMaasSubscriptionsStore(12, result.snapshot.origin, fetch, vi.fn());
+  await store.refresh(); await store.refresh();
+  expect(store.getState().data?.plans).toEqual(base.plans);
+  expect(store.getState().data?.subscriptions[0].amountUsed).toBe(25);
+  expect(store.getState().data?.sectionSyncedAt).toMatchObject({ plans: 1, subscriptions: 20 });
+  expect(store.getState().error).toBe('network');
+});
+
+test('a sudden empty success keeps earlier subscription evidence marked stale', async () => {
+  const subscriptions = [{ id: 1, planId: 7, status: 'active', amountTotal: 100, amountUsed: 10, startTime: 1, endTime: 2000000000, nextResetTime: 0 }];
+  const fetch = vi.fn().mockResolvedValueOnce({ ...result, subscriptions: { ...result.subscriptions, errors: {}, subscriptions } }).mockResolvedValueOnce({ ...result, subscriptions: { ...result.subscriptions, errors: {}, subscriptions: [], syncedAt: 20 } });
+  const store = createMaasSubscriptionsStore(12, result.snapshot.origin, fetch, vi.fn());
+  await store.refresh(); await store.refresh();
+  expect(store.getState().data?.subscriptions).toEqual(subscriptions);
+  expect(store.getState().data?.errors?.subscriptions).toBe(true);
+});

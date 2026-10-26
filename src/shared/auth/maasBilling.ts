@@ -59,3 +59,21 @@ export function formatMaasQuota(quota: number, display: MaasBillingDisplay, loca
   const number = new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: digits }).format(visible);
   return `${display.symbol} ${number}`;
 }
+
+/** User-approved display ratio: one unit of wallet money equals 1,000 points.
+ * Uses unrounded wallet value; never changes raw quota or settlement.
+ * CUSTOM may already be points and TOKENS is not money: neither is converted again.
+ */
+export const MAAS_POINTS_PER_WALLET_UNIT = 1000;
+export function maasQuotaToPoints(quota: number, display?: MaasBillingDisplay): number | null {
+  if (!display || !['USD', 'CNY'].includes(display.type) || !Number.isFinite(quota) || quota < 0
+    || !Number.isFinite(display.quotaPerUnit) || display.quotaPerUnit <= 0
+    || !Number.isFinite(display.exchangeRate) || display.exchangeRate <= 0) return null;
+  const points = quota / display.quotaPerUnit * display.exchangeRate * MAAS_POINTS_PER_WALLET_UNIT;
+  return Number.isFinite(points) ? points : null;
+}
+
+export function formatMaasPoints(points: number, locale: string): string {
+  if (points > 0 && points < 0.01) return '<' + (0.01).toLocaleString(locale);
+  return points.toLocaleString(locale, { maximumFractionDigits: 2 });
+}
