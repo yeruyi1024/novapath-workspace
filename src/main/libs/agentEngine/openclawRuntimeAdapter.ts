@@ -248,6 +248,11 @@ const GATEWAY_READY_TIMEOUT_MS = 60_000;
 const BROWSER_GATEWAY_REQUEST_TIMEOUT_MS = 30_000;
 const BROWSER_GATEWAY_REQUEST_TIMEOUT_SLACK_MS = 5_000;
 const FINAL_HISTORY_SYNC_LIMIT = 50;
+// chat.message.get accepts 1..2,000,000 characters. One bounded read recovers a reply that
+// chat.history projected down to its 8,000-character display cap.
+const HISTORY_CAPPED_MESSAGE_FETCH_MAX_CHARS = 500_000;
+const HISTORY_CAPPED_MESSAGE_FETCH_TIMEOUT_MS = 10_000;
+const HISTORY_DISPLAY_CAP_MARKER = '\n...(truncated)...';
 const CHANNEL_SESSION_DISCOVERY_LIMIT = 200;
 export const OPENCLAW_CHAT_SEND_PAYLOAD_LIMIT_BYTES = 30 * 1000 * 1000;
 export const OPENCLAW_CHAT_SEND_PAYLOAD_SAFETY_MARGIN_BYTES = 500 * 1000;
@@ -2090,6 +2095,64 @@ const extractLastAssistantSegmentInTurn = (messages: unknown[]): string => {
     }
   }
   return lastAssistantText;
+};
+
+/**
+ * The gateway marks a history message it shortened for display with
+ * `__openclaw.truncated` and a reason (`display-cap` / `oversized`). Only that
+ * structured marker counts: a literal "...(truncated)..." in ordinary text does not.
+ */
+const readGatewayHistoryTruncation = (
+  message: unknown,
+): { messageId: string; reason: string } | null => {
+  if (!isRecord(message) || !isRecord(message.__openclaw)) return null;
+  const meta = message.__openclaw;
+  if (meta.truncated !== true) return null;
+  const messageId = typeof meta.id === 'string' ? meta.id.trim() : '';
+  if (!messageId) return null;
+  return { messageId, reason: typeof meta.reason === 'string' ? meta.reason : '' };
+};
+
+/**
+ * Locate the last visible assistant message of the current turn together with its
+ * extracted text, mirroring extractLastAssistantSegmentInTurn / extractCurrentTurnAssistantText.
+ */
+const findLastCurrentTurnAssistantMessage = (
+  messages: unknown[],
+): { index: number; message: Record<string, unknown>; text: string } | null => {
+  let lastUserIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (isRecord(msg) && msg.role === 'user') {
+      lastUserIdx = i;
+      break;
+    }
+  }
+  let found: { index: number; message: Record<string, unknown>; text: string } | null = null;
+  for (let i = lastUserIdx >= 0 ? lastUserIdx + 1 : 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (!isRecord(msg)) continue;
+    const role = typeof msg.role === 'string' ? msg.role.trim().toLowerCase() : '';
+    if (role !== 'assistant') continue;
+    const text = stripTrailingSilentReplyToken(extractMessageText(msg).trim());
+    if (text && !shouldSuppressHeartbeatText('assistant', text)) {
+      found = { index: i, message: msg, text };
+    }
+  }
+  return found;
+};
+
+/**
+ * True when the capped projection is a display-shortened view of `deliveredText`:
+ * the projection minus the gateway marker must be a prefix of the delivered body.
+ * A legitimately revised (even shorter) final answer does not satisfy this.
+ */
+const isDisplayCappedPrefixOf = (projectionText: string, deliveredText: string): boolean => {
+  const deliveredTrimmed = deliveredText.trim();
+  const markerAt = projectionText.lastIndexOf(HISTORY_DISPLAY_CAP_MARKER);
+  if (markerAt < 0 || markerAt + HISTORY_DISPLAY_CAP_MARKER.length !== projectionText.length) return false;
+  const head = projectionText.slice(0, markerAt);
+  return head.length > 0 && deliveredTrimmed.length > head.length && deliveredTrimmed.startsWith(head);
 };
 
 const inspectCurrentTurnToolWork = (
@@ -11377,6 +11440,152 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     );
   }
 
+  /**
+   * chat.history shortens long replies to a display cap and flags them with
+   * `__openclaw.truncated`. Such a projection must never replace a body that was
+   * already delivered for the same message. Recover the full text from the
+   * delivered body when the projection is its capped prefix, otherwise from one
+   * bounded chat.message.get with identity checks. Returns the history with the
+   * recovered text swapped in (unrecoverable capped messages removed), plus
+   * `finalUnrecovered` when the turn's LAST assistant message was one of them, so the
+   * caller can stop an earlier message from standing in for it; null when the turn
+   * went inactive while fetching.
+   */
+  private async restoreDisplayCappedHistory(
+    sessionId: string,
+    turn: ActiveTurn,
+    historyMessages: unknown[],
+    options: { requireActiveTurn?: boolean; runId?: string },
+  ): Promise<{ messages: unknown[]; finalUnrecovered: boolean } | null> {
+    const client = this.gatewayClient;
+    // The fetch is a new async boundary, so cancellation and turn/run identity are checked
+    // regardless of requireActiveTurn: the default final-sync call must not be written back late.
+    const runAtStart = options.runId ?? [...turn.knownRunIds].at(-1) ?? turn.runId;
+    const turnIsInactive = () => (
+      this.activeTurns.get(sessionId) !== turn
+      || turn.stopRequested
+      || ([...turn.knownRunIds].at(-1) ?? turn.runId) !== runAtStart
+      || !this.isCurrentTurnToken(sessionId, turn.turnToken)
+    );
+
+    const lastAssistant = findLastCurrentTurnAssistantMessage(historyMessages);
+    const localDelivered = [
+      this.store.getSession(sessionId)?.messages.find((message) => message.id === turn.assistantMessageId)?.content,
+      turn.currentAssistantSegmentText,
+      turn.currentText,
+    ].map((text) => text?.trim() ?? '').filter(Boolean);
+
+    let lastUserIdx = -1;
+    for (let i = historyMessages.length - 1; i >= 0; i--) {
+      const msg = historyMessages[i];
+      if (isRecord(msg) && msg.role === 'user') {
+        lastUserIdx = i;
+        break;
+      }
+    }
+
+    let patched: unknown[] | null = null;
+    let dropped: Set<number> | null = null;
+    let finalUnrecovered = false;
+    let fetchCount = 0;
+    for (let i = lastUserIdx >= 0 ? lastUserIdx + 1 : 0; i < historyMessages.length; i++) {
+      const message = historyMessages[i];
+      const marker = readGatewayHistoryTruncation(message);
+      if (!marker || !isRecord(message)) continue;
+      const role = typeof message.role === 'string' ? message.role.trim().toLowerCase() : '';
+      if (role !== 'assistant') continue;
+      const projectionText = stripTrailingSilentReplyToken(extractMessageText(message).trim());
+      const markerAt = projectionText.lastIndexOf(HISTORY_DISPLAY_CAP_MARKER);
+      // `oversized` placeholders carry no display-cap suffix and have no recoverable head.
+      const hasCapSuffix = markerAt > 0 && markerAt + HISTORY_DISPLAY_CAP_MARKER.length === projectionText.length;
+      const head = hasCapSuffix ? projectionText.slice(0, markerAt) : '';
+
+      let recovered = '';
+      if (hasCapSuffix && lastAssistant?.index === i) {
+        recovered = localDelivered.find((text) => isDisplayCappedPrefixOf(projectionText, text)) ?? '';
+      }
+      if (!recovered && client && fetchCount < 4) {
+        fetchCount += 1;
+        try {
+          const response = await client.request<{
+            ok?: boolean;
+            message?: unknown;
+            unavailableReason?: string;
+          }>('chat.message.get', {
+            sessionKey: turn.sessionKey,
+            messageId: marker.messageId,
+            maxChars: HISTORY_CAPPED_MESSAGE_FETCH_MAX_CHARS,
+          }, { timeoutMs: HISTORY_CAPPED_MESSAGE_FETCH_TIMEOUT_MS });
+          if (turnIsInactive()) {
+            console.debug('[OpenClawRuntime] syncFinalAssistant — turn stopped during chat.message.get');
+            return null;
+          }
+          const fetched = response?.ok === true ? response.message : undefined;
+          const fetchedMeta = isRecord(fetched) && isRecord(fetched.__openclaw) ? fetched.__openclaw : undefined;
+          const fetchedRole = isRecord(fetched) && typeof fetched.role === 'string'
+            ? fetched.role.trim().toLowerCase()
+            : '';
+          const fetchedText = isRecord(fetched)
+            ? stripTrailingSilentReplyToken(extractMessageText(fetched).trim())
+            : '';
+          if (
+            fetchedRole === 'assistant'
+            && fetchedMeta?.id === marker.messageId
+            && readGatewayHistoryTruncation(fetched) === null
+            && fetchedText.length > head.length
+            && fetchedText.startsWith(head)
+            && fetchedText.length >= (hasCapSuffix ? 0 : projectionText.length)
+          ) {
+            recovered = fetchedText;
+          } else {
+            console.warn(
+              '[OpenClawRuntime] chat.message.get did not return a verified full body; keeping delivered text.',
+              'reason:', response?.unavailableReason ?? 'identity-or-content-mismatch',
+            );
+          }
+        } catch (error) {
+          if (turnIsInactive()) return null;
+          console.warn('[OpenClawRuntime] chat.message.get for display-capped history failed; keeping delivered text:', error);
+        }
+      }
+      if (!recovered) {
+        // Known-incomplete projection with no trusted full body: never let it become the
+        // authoritative final text. Remove it so the delivered body stays untouched.
+        dropped ??= new Set<number>();
+        dropped.add(i);
+        if (lastAssistant?.index === i) finalUnrecovered = true;
+        continue;
+      }
+
+      const content = message.content;
+      const textBlock = { type: 'text', text: recovered };
+      const recoveredContent = Array.isArray(content)
+        ? (() => {
+          let replaced = false;
+          return (content as unknown[]).flatMap((block) => {
+            if (!isRecord(block) || (block.type !== 'text' && block.type !== 'output_text')) return [block];
+            if (replaced) return [];
+            replaced = true;
+            return [{ ...block, text: recovered }];
+          });
+        })()
+        : [textBlock];
+      const { text: _cappedText, ...messageWithoutText } = message as Record<string, unknown> & { text?: unknown };
+      void _cappedText;
+      patched ??= [...historyMessages];
+      patched[i] = {
+        ...messageWithoutText,
+        content: recoveredContent,
+        __openclaw: { ...(message.__openclaw as Record<string, unknown>), truncated: false, recoveredFromDisplayCap: true },
+      };
+    }
+    const result = patched ?? historyMessages;
+    return {
+      messages: dropped ? result.filter((_, index) => !dropped!.has(index)) : result,
+      finalUnrecovered,
+    };
+  }
+
   private async syncFinalAssistantWithHistory(
     sessionId: string,
     turn: ActiveTurn,
@@ -11398,6 +11607,8 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       let historyMessages: unknown[] | null = null;
       let canonicalText = '';
       let isChannel = false;
+      // Set when the turn's final assistant body is known to be incomplete and could not be recovered.
+      let finalTargetUnrecovered = false;
 
       for (const delayMs of retryDelaysMs) {
         if (
@@ -11437,17 +11648,28 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           continue;
         }
 
-        historyMessages = history.messages;
+        // A display-capped projection (`__openclaw.truncated`) must not replace a body that
+        // was already delivered; recover it before any text extraction below.
+        let currentHistory: unknown[] = history.messages;
+        finalTargetUnrecovered = false;
+        if (currentHistory.some((message) => readGatewayHistoryTruncation(message) !== null)) {
+          const restored = await this.restoreDisplayCappedHistory(sessionId, turn, currentHistory, options);
+          if (!restored) return;
+          currentHistory = restored.messages;
+          finalTargetUnrecovered = restored.finalUnrecovered;
+        }
+
+        historyMessages = currentHistory;
         logThinkingDiagnostic(
           'history-final-reconcile',
           `sessionId=${sessionId}`,
           `attemptDelayMs=${delayMs}`,
-          `messages=${history.messages.length}`,
-          summarizeCurrentTurnThinkingHistoryForDiagnostics(history.messages),
+          `messages=${currentHistory.length}`,
+          summarizeCurrentTurnThinkingHistoryForDiagnostics(currentHistory),
         );
         const previousHistoryCountKnown = this.gatewayHistoryCountBySession.has(sessionId);
         const previousHistoryCount = this.gatewayHistoryCountBySession.get(sessionId) ?? 0;
-        this.syncSystemMessagesFromHistory(sessionId, history.messages, {
+        this.syncSystemMessagesFromHistory(sessionId, currentHistory, {
           previousCountKnown: previousHistoryCountKnown,
           previousCount: previousHistoryCount,
         });
@@ -11459,7 +11681,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         );
         if (isChannel) {
           const latestOnly = this.reCreatedChannelSessionIds.has(sessionId);
-          this.syncChannelUserMessages(sessionId, history.messages, latestOnly, turn.sessionKey.includes(':discord:'), turn.sessionKey.includes(':qqbot:'), turn.sessionKey.includes(':moltbot-popo:'), turn.sessionKey.includes(':feishu:'));
+          this.syncChannelUserMessages(sessionId, currentHistory, latestOnly, turn.sessionKey.includes(':discord:'), turn.sessionKey.includes(':qqbot:'), turn.sessionKey.includes(':moltbot-popo:'), turn.sessionKey.includes(':feishu:'));
         }
 
         if (!this.isCurrentTurnToken(sessionId, turn.turnToken)) {
@@ -11467,17 +11689,17 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
           return;
         }
 
-        this.syncToolResultsFromHistory(sessionId, turn, history.messages);
-        const historyToolWork = inspectCurrentTurnToolWork(history.messages);
+        this.syncToolResultsFromHistory(sessionId, turn, currentHistory);
+        const historyToolWork = inspectCurrentTurnToolWork(currentHistory);
         turn.lastHistoryHadToolWork = historyToolWork.hasToolWork;
         turn.lastHistoryToolResultCharCount = historyToolWork.toolResultChars;
 
         // Use turn-aware extraction for ALL session types.
         // The previous non-channel backward scan could return stale assistant text
         // from a prior turn when the gateway rejected the current run (empty final).
-        canonicalText = extractCurrentTurnAssistantText(history.messages);
+        canonicalText = extractCurrentTurnAssistantText(currentHistory);
 
-        if (!canonicalText && historyTailLooksLikeContextMaintenance(history.messages)) {
+        if (!canonicalText && historyTailLooksLikeContextMaintenance(currentHistory)) {
           turn.hasContextMaintenanceTool = true;
           console.debug('[OpenClawRuntime] detected context maintenance from final history tail.');
           break;
@@ -11527,6 +11749,22 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         : this.resolveAssistantSegmentText(turn, canonicalText);
       if (turn.planMode && !options.suppressPlanModeWrapping) {
         canonicalSegmentText = ensurePlanModeProposedPlanBlock(canonicalSegmentText);
+      }
+      if (finalTargetUnrecovered) {
+        // The final body is known-incomplete and unrecoverable. Whatever earlier text remains
+        // (for example a pre-tool note) belongs to a different message and must not overwrite
+        // the body already delivered for this one; keep it and finish its streaming state.
+        console.warn('[OpenClawRuntime] syncFinalAssistant — final body unrecoverable from display-capped history; keeping delivered text.');
+        const keptId = turn.assistantMessageId;
+        const keptMessage = keptId
+          ? this.store.getSession(sessionId)?.messages.find((message) => message.id === keptId)
+          : undefined;
+        if (keptId && keptMessage) {
+          const keptMetadata = { isStreaming: false, isFinal: true };
+          this.store.updateMessage(sessionId, keptId, { metadata: keptMetadata });
+          this.emit('messageUpdate', sessionId, keptId, keptMessage.content, keptMetadata);
+        }
+        return;
       }
       console.debug('[Debug:syncFinal] canonicalSegmentText length:', canonicalSegmentText.length,
         'committed.length:', turn.committedAssistantText.length,

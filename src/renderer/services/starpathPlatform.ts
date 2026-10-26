@@ -1,4 +1,5 @@
 import { PLATFORM_MODEL_BASE_URL } from '../../shared/auth/platformConfig';
+import { applyConfirmedPlatformModelCapabilities } from '../../shared/auth/platformModelCapabilities';
 import { PRODUCT } from '../../shared/product';
 import { ApiFormat, ProviderAuthType } from '../../shared/providers';
 import type { AppConfig } from '../config';
@@ -77,7 +78,7 @@ export function buildPlatformConfigUpdate(
   const provider = providers[configuredId];
   const apiKey = provider.apiKey.trim();
   const baseUrl = PLATFORM_MODEL_BASE_URL;
-  const models = provider.models ?? [];
+  const models = applyConfirmedPlatformModelCapabilities(PLATFORM_MODEL_BASE_URL, provider.models ?? []);
   if (provider.enabled && !apiKey) throw new PlatformError(PlatformErrorCode.MissingKey);
   if (provider.enabled && !models.length) throw new PlatformError(PlatformErrorCode.EmptyCatalog);
   const selectedModel = models.find(model => model.id === defaultModel) ?? models[0];
@@ -85,6 +86,7 @@ export function buildPlatformConfigUpdate(
     platformProviderId: configuredId,
     providers: Object.fromEntries(Object.entries(providers).map(([id, config]) => [id, id === configuredId ? {
       ...config,
+      models,
       displayName: PRODUCT.name,
       apiKey,
       baseUrl,
@@ -116,7 +118,7 @@ export function normalizePlatformBaseUrl(value: string): string {
   return url.toString().replace(/\/+$/, '');
 }
 
-export function parsePlatformModels(data: unknown, previous: Model[] = []): Model[] {
+export function parsePlatformModels(data: unknown, previous: Model[] = [], baseUrl?: string): Model[] {
   if (!data || typeof data !== 'object' || !('data' in data) || !Array.isArray(data.data)) {
     throw new PlatformError(PlatformErrorCode.InvalidCatalog);
   }
@@ -134,7 +136,7 @@ export function parsePlatformModels(data: unknown, previous: Model[] = []): Mode
     models.push(existing ? { ...existing, id } : { id, name: id, supportsImage: false });
   }
   if (models.length === 0) throw new PlatformError(PlatformErrorCode.EmptyCatalog);
-  return models;
+  return baseUrl ? applyConfirmedPlatformModelCapabilities(baseUrl, models) : models;
 }
 
 async function requestPlatform(fetchApi: PlatformFetch, baseUrl: string, apiKey: string, suffix: string, body?: string): Promise<unknown> {
@@ -157,7 +159,7 @@ async function requestPlatform(fetchApi: PlatformFetch, baseUrl: string, apiKey:
 }
 
 export async function syncPlatformModels(fetchApi: PlatformFetch, baseUrl: string, apiKey: string, previous: Model[]): Promise<Model[]> {
-  return parsePlatformModels(await requestPlatform(fetchApi, baseUrl, apiKey, 'models'), previous);
+  return parsePlatformModels(await requestPlatform(fetchApi, baseUrl, apiKey, 'models'), previous, normalizePlatformBaseUrl(baseUrl));
 }
 
 /** Saving a key is the only setup step: discover models before committing routing. */

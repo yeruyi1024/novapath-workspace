@@ -2525,6 +2525,67 @@ describe('OpenClawConfigSync runtime config output', () => {
     );
   });
 
+  test('writes only the confirmed company alias reasoning gate and internal default without upstream effort controls', async () => {
+    mockRuntimeState.rawApiConfig = {
+      config: { baseURL: 'http://127.0.0.1:3303/v1', apiKey: 'test-key', model: 'deepseek-flash', apiType: 'openai' },
+      providerMetadata: { providerName: 'custom_0', codingPlanEnabled: false, supportsImage: false, modelName: 'Saved alias' },
+    };
+    mockRuntimeState.enabledProviders = [{
+      providerName: 'custom_0', baseURL: 'http://127.0.0.1:3303/v1', apiKey: 'test-key', apiType: 'openai', codingPlanEnabled: false,
+      models: [{ id: 'deepseek-flash', name: 'Saved alias', customParams: { temperature: 0.2 } }, { id: 'deepseek-other', name: 'Unknown' }],
+    }];
+    const sync = await createSync();
+    expect(sync.sync('MODEL-CAP-02')).toMatchObject({ ok: true });
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    expect(config.models.providers.custom_0.models[0]).toMatchObject({
+      id: 'deepseek-flash', name: 'Saved alias', reasoning: true,
+      thinkingLevelMap: { off: 'off', high: 'high' }, compat: { supportsReasoningEffort: false, supportedReasoningEfforts: [] },
+    });
+    const profile = config.plugins.entries['lobsterai-model-compat'].config.thinkingProfiles['custom_0/deepseek-flash'];
+    expect(profile).toEqual({ options: [{ level: 'off', openclawLevel: 'off' }, { level: 'high', openclawLevel: 'high' }], defaultLevel: 'high' });
+    expect(profile).not.toHaveProperty('requestOptionsVersion');
+    expect(config.models.providers.custom_0.models[1]).not.toHaveProperty('thinkingLevelMap');
+    expect(config.agents.defaults.models['custom_0/deepseek-flash'].params).toEqual({ extra_body: { temperature: 0.2 } });
+    if (process.env.MODEL_CAP_02_EVIDENCE_DIR) {
+      fs.writeFileSync(path.join(process.env.MODEL_CAP_02_EVIDENCE_DIR, 'effective-model.json'), JSON.stringify({
+        model: config.models.providers.custom_0.models[0], profile,
+      }));
+    }
+    expect(sync.sync('MODEL-CAP-02-repeat')).toMatchObject({ ok: true, changed: false });
+  });
+
+  test('keeps an explicit saved manual thinking opt-out for the same company alias', async () => {
+    mockRuntimeState.rawApiConfig = {
+      config: { baseURL: 'http://127.0.0.1:3303/v1', apiKey: 'test-key', model: 'deepseek-flash', apiType: 'openai' },
+      providerMetadata: { providerName: 'custom_0', codingPlanEnabled: false, supportsImage: false, supportsThinking: false },
+    };
+    const sync = await createSync();
+    expect(sync.sync('MODEL-CAP-02-manual-off')).toMatchObject({ ok: true });
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    expect(config.models.providers.custom_0.models[0].reasoning).not.toBe(true);
+    expect(config.models.providers.custom_0.models[0]).not.toHaveProperty('thinkingLevelMap');
+    expect(config.plugins?.entries?.['lobsterai-model-compat']?.config?.thinkingProfiles?.['custom_0/deepseek-flash']).toBeUndefined();
+  });
+
+  test('registers a non-selected confirmed alias without changing other models or manual thinking configuration', async () => {
+    mockRuntimeState.enabledProviders = [{
+      providerName: 'custom_0', baseURL: 'http://127.0.0.1:3303/v1', apiKey: 'test-key', apiType: 'openai', codingPlanEnabled: false,
+      models: [{ id: 'deepseek-flash', name: 'Confirmed alias' }],
+    }];
+    const sync = await createSync();
+    expect(sync.sync('MODEL-CAP-02-unselected')).toMatchObject({ ok: true });
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    expect(config.plugins.entries['lobsterai-model-compat'].config.thinkingProfiles['custom_0/deepseek-flash'].defaultLevel).toBe('high');
+    expect(config.agents.defaults.model.primary).toBe('openai/gpt-test');
+    const { buildProviderSelection } = await import('./openclawConfigSync');
+    const manual = { options: [{ level: 'off', openclawLevel: 'off' }, { level: 'low', openclawLevel: 'low' }], defaultLevel: 'off' } as const;
+    const selected = buildProviderSelection({ apiKey: 'test-key', baseURL: 'http://127.0.0.1:3303/v1', modelId: 'deepseek-flash',
+      providerName: 'custom_0', apiType: 'openai', supportsThinking: true,
+      thinkingConfig: { options: [...manual.options], defaultLevel: manual.defaultLevel } });
+    expect(selected.thinkingConfig).toEqual(manual);
+    expect(selected.providerConfig.models[0].compat?.supportsReasoningEffort).toBe(true);
+  });
+
   test('writes server thinking profiles without taking over the provider transport', async () => {
     mockRuntimeState.proxyPort = 56646;
     mockRuntimeState.serverModels = [{

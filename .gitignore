@@ -63,3 +63,6 @@ openspec/
 .ci-artifacts/
 /artifacts/
 logs/
+
+# Local platform test evidence; never commit credentials or database extracts
+.local-tests/

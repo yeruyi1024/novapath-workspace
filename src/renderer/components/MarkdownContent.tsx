@@ -676,6 +676,7 @@ interface MarkdownContentProps {
   spacing?: MarkdownSpacing;
   resolveLocalFilePath?: (href: string, text: string) => string | null;
   enableLargePreview?: boolean;
+  defaultExpanded?: boolean;
   forceExpanded?: boolean;
   onImageClick?: (image: { src: string; alt?: string | null }) => void;
 }
@@ -686,10 +687,11 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
   spacing = 'normal',
   resolveLocalFilePath,
   enableLargePreview = true,
+  defaultExpanded = false,
   forceExpanded = false,
   onImageClick,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const canUseLargePreview = enableLargePreview && shouldUseLargeMarkdownPreview(content);
   const useLargePreview = canUseLargePreview && !isExpanded && !forceExpanded;
   const components = useMemo(
