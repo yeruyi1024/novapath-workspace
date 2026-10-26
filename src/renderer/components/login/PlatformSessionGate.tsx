@@ -5,6 +5,7 @@ import { configService } from '../../services/config';
 import { i18nService } from '../../services/i18n';
 import { refreshMaasAccount, refreshMaasBilling, useMaasSession } from '../../services/maasAccount';
 import { MaasSessionPhase } from '../../services/maasSession';
+import { createManagedModelRefresh } from '../../services/managedModelRefresh';
 import { clearManagedPlatformKey, hasActivePlatformConversation, managedModelSyncContext, syncManagedPlatformKey } from '../../services/managedPlatformKey';
 import { themeService } from '../../services/theme';
 import { type RootState,store } from '../../store';
@@ -16,7 +17,7 @@ export default function PlatformSessionGate({ children }: { children: ReactNode 
   const session = useMaasSession();
   const [preferencesReady, setPreferencesReady] = useState(false);
   const [accountRefreshRevision, setAccountRefreshRevision] = useState(0);
-  const completedModelContext = useRef<string>();
+  const modelRefresh = useRef<ReturnType<typeof createManagedModelRefresh>>();
   const conversationActive = useSelector((state: RootState) => hasActivePlatformConversation(state.cowork));
   useSyncExternalStore(listener => i18nService.subscribe(listener), () => i18nService.getLanguage());
   useEffect(() => {
@@ -35,46 +36,47 @@ export default function PlatformSessionGate({ children }: { children: ReactNode 
   const accountId = session.snapshot.account?.id;
   const modelContext = managedModelSyncContext(session.snapshot.origin, accountId, session.snapshot.account?.group);
   useEffect(() => {
-    if (!preferencesReady) return;
-    // Cleanup runs on sign-out, account switch, re-login and unmount: whatever this run still has in
-    // flight must then stop writing, while the sign-out cleanup below always runs.
-    let active = true;
-    const deps = {
-      fetchManagedKey: (id: number) => window.electron.maas.managedKey(id),
+    const scheduler = createManagedModelRefresh((id, isCurrent) => syncManagedPlatformKey(id, {
+      fetchManagedKey: account => window.electron.maas.managedKey(account),
       getConfig: () => configService.getConfig(),
-      updateConfig: (update: Parameters<typeof configService.updateConfig>[0]) => configService.updateConfig(update),
+      updateConfig: update => configService.updateConfig(update),
       fetchApi: window.electron.api.fetch,
-      isCurrent: () => active,
+      isCurrent,
       refreshModels: true,
       canWriteConfig: () => !hasActivePlatformConversation(store.getState().cowork),
-    };
-    if (session.phase !== MaasSessionPhase.SignedIn) completedModelContext.current = undefined;
-    if (session.phase === MaasSessionPhase.SignedIn && accountId) {
-      // Signing in is the opt-in: the platform registers this account's key the
-      // first time StarPath asks for it, and never reuses it for another account.
-      // Group changes alter the catalog without rotating the key. Apply only the
-      // latest account/group after every running conversation has finished.
-      if (!conversationActive && completedModelContext.current !== modelContext) {
-        void syncManagedPlatformKey(accountId, deps).then(completed => {
-          if (completed && active) completedModelContext.current = modelContext;
-        }).catch(error => console.warn('[PlatformSessionGate] Managed key sync failed:', error));
-      }
-    } else if (session.phase === MaasSessionPhase.SignedOut) {
-      void clearManagedPlatformKey(deps).catch(error => console.warn('[PlatformSessionGate] Managed key cleanup failed:', error));
-    }
-    return () => { active = false; };
+    }), error => console.warn('[PlatformSessionGate] Managed model refresh failed:', error));
+    modelRefresh.current = scheduler;
+    return () => { scheduler.dispose(); modelRefresh.current = undefined; };
+  }, []);
+  useEffect(() => {
+    if (!preferencesReady) return;
+    modelRefresh.current?.update(session.phase === MaasSessionPhase.SignedIn && accountId
+      ? { key: modelContext, accountId, busy: conversationActive, revision: accountRefreshRevision }
+      : null);
   }, [preferencesReady, session.phase, accountId, modelContext, conversationActive, accountRefreshRevision]);
+  useEffect(() => {
+    if (preferencesReady && session.phase === MaasSessionPhase.SignedOut) {
+      void clearManagedPlatformKey({ getConfig: () => configService.getConfig(), updateConfig: update => configService.updateConfig(update) })
+        .catch(error => console.warn('[PlatformSessionGate] Managed key cleanup failed:', error));
+    }
+  }, [preferencesReady, session.phase]);
   useEffect(() => {
     if (session.phase !== MaasSessionPhase.SignedIn) return;
     let active = true;
+    let checkInFlight = false;
+    let lastCheck = 0;
     const check = () => {
-      if (!document.hidden) void refreshMaasAccount().then(() => {
+      const now = Date.now();
+      if (document.hidden || checkInFlight || now - lastCheck < 5_000) return;
+      lastCheck = now;
+      checkInFlight = true;
+      void refreshMaasAccount().then(() => {
         if (!active) return;
-        // Retry failed model syncs through the existing account-refresh cadence.
-        // Completed contexts skip rediscovery, including ordinary billing updates.
+        // Recheck even when the account's group name is unchanged: global
+        // managed-key policy and models within the same group can change.
         setAccountRefreshRevision(revision => revision + 1);
         return refreshMaasBilling();
-      });
+      }).finally(() => { checkInFlight = false; });
     };
     void refreshMaasBilling();
     const timer = window.setInterval(check, 5 * 60_000);
