@@ -208,7 +208,9 @@
     "dsh:runtime:verify-urls": "node scripts/verify-dsh-runtime-urls.cjs",
     "dsh:e2e": "node scripts/e2e-dsh-foundation.cjs",
     "regenerate:icon": "bash scripts/regenerate-mac-icon.sh",
-    "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh"
+    "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh",
+    "test:maas:local": "node scripts/local-maas.cjs",
+    "seed:maas:local": "node scripts/local-maas-fixtures.cjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.3",

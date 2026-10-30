@@ -5,9 +5,10 @@ import path from 'path';
 
 import { DEFAULT_MAAS_ORIGIN, MaasIpc, type MaasResult, type MaasSnapshot, normalizeMaasOrigin, parseMaasAccount, parseMaasLoginInput } from '../../shared/auth/maas';
 import { parseMaasBillingSnapshot } from '../../shared/auth/maasBilling';
-import { parseMaasSubscriptions } from '../../shared/auth/maasSubscriptions';
+import { type MaasSubscriptions, parseMaasPlans, parseMaasSubscriptionRecords, parseMaasSubscriptions } from '../../shared/auth/maasSubscriptions';
 import { PRODUCT } from '../../shared/product';
 import { createMaasProfileEditor, profileEndpoints, type ProfileOwner } from './maasProfile';
+import { createMaasSubscriptionPurchaser, type MaasPurchaseContext } from './maasSubscriptionPurchase';
 
 const COOKIE = 'new_api_refresh';
 const AUTH_PATH = '/api/user/auth';
@@ -22,6 +23,8 @@ const ENDPOINTS = {
   self: { path: '/api/user/self', method: 'GET', bearer: true },
   plans: { path: '/api/subscription/plans', method: 'GET', bearer: true },
   subscriptions: { path: '/api/subscription/self', method: 'GET', bearer: true },
+  paymentInfo: { path: '/api/user/topup/info', method: 'GET', bearer: true },
+  purchase: { path: '/api/subscription/balance/pay', method: 'POST', bearer: true },
   managedKey: { path: '/api/apps/starpath/managed-key', method: 'POST', bearer: true },
   ...profileEndpoints,
 } as const;
@@ -308,6 +311,82 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
       });
     });
   });
+
+  const overview = async (expectedAccountId: number): Promise<MaasPurchaseContext> => {
+    if (!Number.isSafeInteger(expectedAccountId) || expectedAccountId <= 0) throw new Error('invalidResponse');
+    await restore();
+    if (snapshot.account && snapshot.account.id !== expectedAccountId) throw new Error('invalidResponse');
+    const origin = snapshot.origin;
+    const cookies = await getSession(origin).cookies.get({ url: origin + AUTH_PATH + '/refresh', name: COOKIE });
+    if (!cookies.length) {
+      snapshot = { origin, account: null }; sid = null; accessToken = null;
+      fs.rmSync(file, { force: true });
+      throw new Error('loginRejected');
+    }
+    if (!await ensureAccess(origin, sid)) throw new Error('loginRejected');
+    if (snapshot.account?.id !== expectedAccountId || !sid) throw new Error('invalidResponse');
+    const expectedSessionId = sid;
+    const data: MaasSubscriptions = { accountId: expectedAccountId, origin, syncedAt: Date.now(), plans: [], subscriptions: [], billingPreference: '', errors: {} };
+    let renewal: Promise<boolean> | undefined;
+    const readData = async (endpoint: 'plans' | 'subscriptions' | 'self' | 'status' | 'paymentInfo') => {
+      let response = await request(origin, endpoint, sid);
+      if (response.status === 401 && endpoint !== 'status') {
+        renewal ??= refresh(origin, sid);
+        if (!await renewal) throw new Error('loginRejected');
+        if (snapshot.account?.id !== expectedAccountId || sid !== expectedSessionId) throw new Error('invalidResponse');
+        response = await request(origin, endpoint, sid);
+      }
+      if (response.status !== 200 || response.body.success !== true) throw new Error('network');
+      return response.body.data;
+    };
+    const results = await Promise.allSettled([
+      readData('plans').then(value => { data.plans = parseMaasPlans(value); }),
+      readData('subscriptions').then(value => { Object.assign(data, parseMaasSubscriptionRecords(value, expectedAccountId)); }),
+      Promise.all([readData('self'), readData('status')]).then(([user, status]) => {
+        if (snapshot.account?.id !== expectedAccountId || sid !== expectedSessionId) throw new Error('invalidResponse');
+        data.wallet = parseMaasBillingSnapshot(user, status, expectedAccountId);
+        snapshot = { origin, account: parseMaasAccount(user), billing: data.wallet };
+      }),
+      readData('paymentInfo').then(value => {
+        const info = value as { payment_compliance_confirmed?: unknown } | null;
+        if (typeof info?.payment_compliance_confirmed !== 'boolean') throw new Error('invalidResponse');
+        data.paymentCompliance = info.payment_compliance_confirmed;
+      }),
+    ]);
+    const sections = ['plans', 'subscriptions', 'wallet', 'payment'] as const;
+    if (snapshot.account?.id !== expectedAccountId || sid !== expectedSessionId) throw new Error('invalidResponse');
+    results.forEach((result, i) => { if (result.status === 'rejected') data.errors![sections[i]] = true; });
+    try { data.pendingPurchase = purchaser.pending(origin, expectedAccountId); } catch { data.errors!.payment = true; }
+    return { accountId: expectedAccountId, origin, sessionId: sid, data, wallet: data.wallet! };
+  };
+  const purchaser = createMaasSubscriptionPurchaser({ file: path.join(app.getPath('userData'), 'maas-wallet-purchases.json'),
+    context: overview, pay: planId => request(snapshot.origin, 'purchase', sid, { plan_id: planId }) });
+  const purchaseInput = (value: unknown) => {
+    if (!value || typeof value !== 'object') throw new Error('invalidResponse');
+    const input = value as { accountId?: unknown; planId?: unknown; confirmationId?: unknown };
+    if (!Number.isSafeInteger(input.accountId) || Number(input.accountId) <= 0) throw new Error('invalidResponse');
+    return { ...input, accountId: Number(input.accountId) };
+  };
+  handle(MaasIpc.SubscriptionOverview, input => run(async () => {
+    const ctx = await overview(Number(input));
+    return { success: true, snapshot, subscriptions: ctx.data };
+  }));
+  handle(MaasIpc.PrepareSubscriptionPurchase, value => run(async () => {
+    const input = purchaseInput(value);
+    if (!Number.isSafeInteger(input.planId) || Number(input.planId) <= 0) throw new Error('invalidResponse');
+    const purchase = await purchaser.prepare(input.accountId, Number(input.planId));
+    return { success: true, snapshot, purchase };
+  }));
+  handle(MaasIpc.PurchaseSubscriptionWithBalance, value => run(async () => {
+    const input = purchaseInput(value);
+    if (typeof input.confirmationId !== 'string' || input.confirmationId.length > 100) throw new Error('invalidResponse');
+    const purchase = await purchaser.purchase(input.accountId, input.confirmationId);
+    return { success: true, snapshot, purchase };
+  }));
+  handle(MaasIpc.ClearPendingSubscriptionPurchase, input => run(async () => {
+    const purchase = await purchaser.clear(Number(input));
+    return { success: true, snapshot, purchase };
+  }));
 
   handle(MaasIpc.Snapshot, () => run(async () => {
     await restore();

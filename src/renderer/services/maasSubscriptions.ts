@@ -32,9 +32,9 @@ export function createMaasSubscriptionsStore(
         if (disposed || generation !== startedGeneration) return;
         if (result.snapshot.origin !== origin) {
           publish({ loading: false, error: 'invalidResponse' });
-        } else if (result.success && !result.snapshot.account) {
+        } else if (!result.snapshot.account && (result.success || result.error === 'loginRejected')) {
           publish({ loading: false });
-          onSignedOut(result);
+          onSignedOut({ ...result, success: true });
         } else if (result.snapshot.account?.id !== accountId) {
           publish({ loading: false, error: 'invalidResponse' });
         } else if (!result.success) {
@@ -42,7 +42,28 @@ export function createMaasSubscriptionsStore(
         } else if (result.subscriptions?.accountId !== accountId || result.subscriptions.origin !== origin) {
           publish({ ...state, loading: false, error: 'invalidResponse' });
         } else {
-          publish({ data: result.subscriptions, loading: false });
+          const incoming = result.subscriptions;
+          if (!incoming.errors) { publish({ data: incoming, loading: false }); return; }
+          const previous = state.data;
+          const errors = { ...incoming.errors };
+          // The platform can mask a database failure as an empty success. Keep visible evidence for review.
+          if (previous?.subscriptions.length && !incoming.subscriptions.length) errors.subscriptions = true;
+          const data = { ...incoming, errors, sectionSyncedAt: { ...previous?.sectionSyncedAt } };
+          for (const section of ['plans', 'subscriptions', 'wallet', 'payment'] as const) {
+            if (!errors[section]) data.sectionSyncedAt[section] = incoming.syncedAt;
+          }
+          if (errors.plans && previous) data.plans = previous.plans;
+          if (errors.subscriptions && previous) {
+            data.subscriptions = previous.subscriptions;
+            data.billingPreference = previous.billingPreference;
+            data.historyComplete = previous.historyComplete;
+          }
+          if (errors.wallet && previous) data.wallet = previous.wallet;
+          if (errors.payment && previous) {
+            data.paymentCompliance = previous.paymentCompliance;
+            data.pendingPurchase = previous.pendingPurchase;
+          }
+          publish({ data, loading: false, ...(Object.values(errors).some(Boolean) ? { error: 'network' as const } : {}) });
         }
       } catch {
         if (generation === startedGeneration) publish({ ...state, loading: false, error: 'network' });
