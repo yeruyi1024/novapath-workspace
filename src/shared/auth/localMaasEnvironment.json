@@ -1,0 +1,7 @@
+{
+  "frontendOrigin": "http://127.0.0.1:5183",
+  "origin": "http://127.0.0.1:3303",
+  "database": "novamaas_pc_image",
+  "mysqlContainer": "newapi-mysql",
+  "worktreeName": "pc-image-studio-pro"
+}

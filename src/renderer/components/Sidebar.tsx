@@ -18,14 +18,18 @@ import CoworkSessionItem from './cowork/CoworkSessionItem';
 import ComposeIcon from './icons/ComposeIcon';
 import SidebarToggleIcon from './icons/SidebarToggleIcon';
 import PlatformAccountButton from './login/PlatformAccountButton';
+import type { PlatformAccountSection } from './login/PlatformAccountPage';
 import { ProjectCreateDialog } from './projects/ProjectControls';
 import { ProjectMoveDialog } from './projects/ProjectMoveDialog';
 import { useWorkspaceProjects } from './projects/useWorkspaceProjects';
 import { visibleSidebarChats } from './sidebar/visibleSidebarChats';
 
+export type WorkspaceView = 'cowork' | 'skills' | 'scheduledTasks' | 'kits' | 'mcp' | 'library' | 'account';
+
 interface SidebarProps {
   onShowSettings: () => void;
-  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'kits' | 'mcp' | 'library';
+  activeView: WorkspaceView;
+  onOpenAccount: (section: PlatformAccountSection) => void;
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowScheduledTasks: () => void;
@@ -40,7 +44,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSkills, onShowCowork,
   onShowScheduledTasks, onShowKits, onShowLibrary, onNewChat, isCollapsed, onToggleCollapse,
-  onWidthChange, updateNotice }) => {
+  onWidthChange, updateNotice, onOpenAccount }) => {
   const projectsState = useWorkspaceProjects();
   const currentSessionId = useSelector(selectCurrentSessionId);
   const liveSessions = useSelector(selectCoworkSessions);
@@ -182,7 +186,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onShowSettings, activeView, onShowSki
           {toolsOpen && <div id="workspace-tools" className="mb-2 mt-1 space-y-0.5">{tools.map(({ label, action, icon: Icon, active }) => <button key={label} type="button" onClick={action}
             aria-current={active ? 'page' : undefined} className={`flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-xs hover:bg-surface-raised ${active ? 'bg-surface-raised text-foreground' : 'text-secondary'}`}><Icon className="h-3.5 w-3.5" />{i18nService.t(label)}</button>)}</div>}
         </div>
-        <PlatformAccountButton onShowSettings={onShowSettings} />
+        <PlatformAccountButton onShowSettings={onShowSettings} onOpenSection={onOpenAccount} />
       </div>
     </aside>
     {editing && <ProjectCreateDialog project={editing} onClose={() => setEditing(null)} />}

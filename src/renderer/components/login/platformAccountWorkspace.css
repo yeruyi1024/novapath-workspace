@@ -1,0 +1,236 @@
+@import "../common/workspaceSurfaces.css";
+
+/* Account views use the workspace theme; no selectors reach conversation output. */
+.platform-account-workspace { position: relative; display: flex; height: 100%; min-height: 0; flex-direction: column; color: var(--lobster-text-primary); }
+.platform-account-workspace-topbar { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; }
+.platform-account-workspace-topbar > div, .platform-account-workspace-topbar nav { display: flex; align-items: center; gap: 6px; }
+.platform-account-workspace-topbar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; color: var(--lobster-text-secondary); line-height: 1.5; }
+.platform-account-workspace-topbar button:hover { color: var(--lobster-text-primary); background: var(--lobster-surface-raised); }
+.platform-account-workspace-topbar nav { border: 1px solid var(--lobster-border-subtle); }
+.platform-account-workspace-topbar nav button[aria-current] { color: var(--lobster-text-primary); background: var(--lobster-surface); box-shadow: 0 1px 4px rgb(0 0 0 / 5%); }
+.platform-account-workspace-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.platform-account-workspace-content { width: 100%; margin-inline: auto; }
+.platform-account-workspace-title > p:first-child { color: var(--lobster-text-muted); overflow-wrap: anywhere; }
+.platform-account-workspace-title h1 { outline: none; }
+.platform-account-workspace-title > p:last-child { color: var(--lobster-text-secondary); }
+.platform-account-workspace .platform-plan-periods { width: fit-content; }
+.platform-account-workspace .platform-plan-grid { display: grid; align-items: stretch; }
+.platform-account-workspace .platform-plan-grid[data-plan-count='1'] { max-width: 460px; margin-inline: auto; grid-template-columns: minmax(0, 1fr); }
+.platform-account-workspace .platform-plan-card { display: flex; min-width: 0; flex-direction: column; }
+.platform-account-workspace .platform-plan-card-heading { align-items: flex-start; gap: 10px; }
+.platform-account-workspace .platform-plan-card-heading h3 { overflow-wrap: anywhere; }
+.platform-account-workspace .platform-plan-description { color: var(--lobster-text-secondary); }
+.platform-account-workspace .platform-plan-equivalent-label { color: var(--lobster-text-muted); }
+.platform-account-workspace .platform-plan-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; font-weight: 600; }
+.platform-account-workspace .platform-plan-currency { color: var(--lobster-text-secondary); font-weight: 400; letter-spacing: normal; }
+.platform-plan-actual-price { margin-top: 8px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.6; overflow-wrap: anywhere; }
+.platform-plan-reset-warning { margin-top: 10px; padding-left: 10px; border-left: 2px solid var(--lobster-border); color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.7; }
+.platform-account-workspace .platform-subscription-no-plans, .platform-account-empty { min-height: 220px; border-radius: var(--np-panel-radius); background: var(--lobster-surface); }
+.platform-account-workspace .platform-subscription-no-plans h2 { font-size: var(--np-text-heading); font-weight: 600; }
+.platform-account-workspace .platform-subscription-no-plans p { max-width: 480px; margin-top: 10px; color: var(--lobster-text-secondary); font-size: var(--np-text-body); line-height: 1.7; }
+.platform-account-workspace .platform-subscription-account-note { max-width: 720px; font-size: var(--np-text-meta); line-height: 1.7; }
+.platform-account-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.platform-account-section-heading h2 { display: flex; align-items: center; gap: 8px; font-size: var(--np-text-title); font-weight: 600; line-height: 1.5; }
+.platform-account-section-heading h2 svg { width: 18px; height: 18px; color: var(--lobster-text-secondary); }
+.platform-account-section-heading p { margin-top: 5px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.6; }
+.platform-subscription-overview { margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--lobster-border-subtle); }
+.platform-subscription-overview-list { overflow: hidden; border: 1px solid var(--lobster-border-subtle); border-radius: 16px; background: var(--lobster-surface); }
+.platform-subscription-overview-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; }
+.platform-subscription-overview-row + .platform-subscription-overview-row { border-top: 1px solid var(--lobster-border-subtle); }
+.platform-subscription-overview-row h3 { font-size: var(--np-text-body); font-weight: 500; overflow-wrap: anywhere; }
+.platform-subscription-overview-row p { margin-top: 4px; color: var(--lobster-text-muted); font-size: var(--np-text-meta); }
+.platform-subscription-state { flex-shrink: 0; padding: 3px 9px; border-radius: 999px; background: var(--lobster-surface-raised); color: var(--lobster-text-secondary); font-size: var(--np-text-caption); }
+.platform-subscription-state[data-active] { color: var(--lobster-primary); background: var(--lobster-primary-muted); }
+.platform-account-scope { margin-bottom: 24px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.8; }
+.platform-usage-wallet { margin-bottom: 32px; padding: 22px; border: 1px solid var(--lobster-border); border-radius: var(--np-panel-radius); background: var(--lobster-surface); }
+.platform-usage-wallet-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.platform-usage-wallet-values > div { min-width: 0; }
+.platform-usage-wallet-values p { color: var(--lobster-text-secondary); font-size: var(--np-text-meta); }
+.platform-usage-wallet-values strong { display: block; margin-top: 8px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 13px)); font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.platform-usage-wallet-values small { display: block; margin-top: 7px; color: var(--lobster-text-muted); font-size: var(--np-text-meta); line-height: 1.6; }
+.platform-account-workspace .platform-subscription-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 286px), 1fr)); gap: 16px; }
+.platform-account-workspace .platform-subscription-card { min-width: 0; background: var(--lobster-surface); }
+.platform-account-workspace .platform-subscription-list:has(> article:only-child) { grid-template-columns: minmax(0, 1fr); }
+.platform-usage-empty { padding: 20px; border: 1px dashed var(--lobster-border); border-radius: 16px; color: var(--lobster-text-secondary); font-size: var(--np-text-body); line-height: 1.6; }
+.platform-usage-history { margin-top: 20px; }
+.platform-usage-history summary { display: flex; min-height: 40px; align-items: center; gap: 8px; padding-block: 8px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); cursor: pointer; list-style: none; }
+.platform-usage-history summary::-webkit-details-marker { display: none; }
+.platform-usage-history summary svg { width: 14px; height: 14px; margin-left: auto; }
+.platform-usage-history[open] summary svg { transform: rotate(180deg); }
+.platform-usage-records { display: flex; align-items: flex-start; gap: 14px; margin-top: 30px; padding: 20px; border: 1px solid var(--lobster-border-subtle); border-radius: 16px; }
+.platform-usage-records > svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--lobster-text-muted); }
+.platform-usage-records h2 { font-size: var(--np-text-body); font-weight: 600; }
+.platform-usage-records p { margin-top: 5px; color: var(--lobster-text-secondary); font-size: var(--np-text-meta); line-height: 1.8; }
+.platform-account-workspace .platform-wallet-confirm { max-width: 520px; border: 1px solid var(--lobster-border); background: var(--lobster-surface); }
+.platform-account-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; border: 1px dashed var(--lobster-border); font-size: var(--np-text-label); }
+.platform-account-workspace button:focus-visible, .platform-account-workspace summary:focus-visible { outline: 2px solid var(--lobster-primary); outline-offset: 3px; }
+.platform-sidebar-identity { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; text-align: left; }
+.platform-sidebar-identity strong { overflow: hidden; color: var(--lobster-text-primary); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.platform-sidebar-identity small { color: var(--lobster-text-muted); font-size: var(--np-text-caption); }
+.platform-account-menu-identity { display: flex; align-items: center; margin: 2px 4px 6px; border-bottom: 1px solid var(--lobster-border-subtle); }
+.platform-account-menu-identity > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.platform-account-menu-identity strong { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.platform-account-menu-identity span:not(.platform-account-avatar) { overflow: hidden; color: var(--lobster-text-muted); text-overflow: ellipsis; white-space: nowrap; }
+.platform-account-menu { max-width: calc(100vw - 16px); }
+.platform-sidebar-account-error { margin-top: 6px; color: var(--lobster-destructive); font-size: var(--np-text-caption); line-height: 1.5; }
+@media (max-width: 800px) {
+  .platform-account-workspace-topbar { flex-wrap: wrap; padding: 10px 18px; }
+  .platform-account-workspace-content { padding: 28px 20px 32px; }
+  .platform-account-workspace-title h1 { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 8px)); }
+  .platform-account-workspace .platform-plan-card { padding: 22px; border-radius: var(--np-panel-radius); }
+  .platform-usage-wallet-values { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .platform-usage-wallet-values > div + div { padding-top: 18px; border-top: 1px solid var(--lobster-border-subtle); }
+}
+@media (prefers-reduced-motion: reduce) { .platform-account-workspace *, .platform-account-menu * { scroll-behavior: auto; transition: none !important; } }
+
+/* Compact sidebar entry: full identity stays inside the opened menu. */
+.workspace-sidebar-footer .workspace-tools-trigger { height: 32px; font-size: var(--np-text-meta); }
+.platform-sidebar-account { padding-top: 5px; }
+.platform-sidebar-account .platform-sidebar-profile { min-height: 36px; padding: 5px 8px; gap: 8px; border-radius: var(--np-control-radius); }
+.platform-sidebar-profile .platform-account-avatar { width: 24px; height: 24px; flex-basis: 24px; font-size: var(--np-text-caption); }
+.platform-sidebar-identity strong { font-size: var(--np-text-meta); }
+.platform-account-menu { padding: 5px; border-radius: 16px; }
+.platform-account-menu button[role='menuitem'] { min-height: 34px; font-size: var(--np-text-meta); border-radius: var(--np-control-radius); }
+.platform-account-menu-identity { gap: 8px; padding: 7px 6px 10px; }
+.platform-account-menu-identity .platform-account-avatar { width: 28px; height: 28px; flex-basis: 28px; font-size: var(--np-text-meta); }
+.platform-account-menu-identity strong { font-size: var(--np-text-meta); }
+.platform-account-menu-identity span:not(.platform-account-avatar) { font-size: var(--np-text-caption); }
+
+.platform-account-workspace-topbar.platform-account-macos-collapsed { padding-left: 84px; }
+
+/* Account-only visual refinement: translucent surfaces with a clear reading hierarchy. */
+.platform-account-workspace {
+  --np-canvas: var(--lobster-background);
+  --np-card: var(--lobster-surface);
+  --np-card-tint: color-mix(in srgb, var(--np-card) 97%, var(--lobster-primary));
+  --np-hairline: color-mix(in srgb, var(--lobster-foreground) 9%, transparent);
+  background: radial-gradient(ellipse at 22% 16%, color-mix(in srgb, var(--lobster-primary) 4%, transparent), transparent 58%), radial-gradient(ellipse at 82% 75%, color-mix(in srgb, var(--lobster-accent) 3%, transparent), transparent 62%), var(--np-canvas);
+}
+.dark .platform-account-workspace {
+  --np-canvas: var(--lobster-background);
+  --np-card: color-mix(in srgb, var(--lobster-surface) 90%, var(--lobster-background));
+}
+.platform-account-workspace-topbar { min-height: 46px; padding: 6px 20px; border-bottom: 1px solid var(--np-hairline); }
+.platform-account-workspace-topbar button { min-height: 28px; padding: 4px 10px; border-radius: var(--np-control-radius); font-size: var(--np-text-meta); }
+.platform-account-workspace-topbar nav { padding: 2px; border-color: var(--np-hairline); background: var(--lobster-surface-raised); }
+.platform-account-workspace-topbar nav button { min-width: 68px; min-height: 26px; padding: 3px 10px; font-size: var(--np-text-meta); }
+.platform-account-workspace-content { max-width: 980px; padding: 20px 28px 32px; }
+.platform-account-workspace-content[data-account-view='usage'] { max-width: 920px; }
+.platform-account-workspace-content[data-account-view='profile'] { max-width: 680px; }
+.platform-account-workspace-title > p:first-child { font-size: var(--np-text-caption); font-weight: 500; letter-spacing: 0.01em; }
+.platform-account-workspace-title h1 { margin-top: 2px; font-size: var(--np-page-title-size); font-weight: 600; line-height: 1.3; letter-spacing: -0.02em; }
+.platform-account-workspace-title > p:last-child { max-width: 600px; margin-top: 4px; font-size: var(--np-text-meta); line-height: 1.5; }
+.platform-account-workspace-content[data-account-view='subscriptions'] .platform-account-workspace-title { margin-bottom: 14px; text-align: left; }
+.platform-account-workspace-content[data-account-view='subscriptions'] .platform-account-workspace-title h1 { margin-top: 2px; font-size: var(--np-page-title-size); }
+.platform-account-workspace-content[data-account-view='subscriptions'] .platform-account-workspace-title > p:last-child { margin-top: 4px; margin-inline: 0; font-size: var(--np-text-meta); line-height: 1.5; }
+
+.platform-plan-periods-bar { position: sticky; top: 0; z-index: 3; display: flex; justify-content: flex-start; width: fit-content; margin: 0 0 16px; padding: 0; border-radius: var(--np-control-radius); background: color-mix(in srgb, var(--np-canvas) 82%, transparent); backdrop-filter: blur(10px); }
+.platform-account-workspace .platform-plan-periods { min-height: 32px; margin: 0; padding: 2px; border: 1px solid var(--np-hairline); border-radius: var(--np-control-radius); background: var(--lobster-surface-raised); }
+.platform-account-workspace .platform-plan-periods button { min-width: 84px; min-height: 26px; padding: 3px 12px; border-radius: 6px; font-size: var(--np-text-meta); transition: background-color 140ms ease, color 140ms ease, box-shadow 140ms ease; }
+.platform-account-workspace .platform-plan-periods button[aria-pressed='true'] { background: var(--np-card); color: var(--lobster-text-primary); font-weight: 600; box-shadow: 0 1px 3px rgb(0 0 0 / 7%); }
+
+.platform-account-workspace .platform-plan-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 296px)); justify-content: flex-start; gap: 14px; }
+.platform-account-workspace .platform-plan-grid[data-plan-count] { max-width: none; margin-inline: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 296px)); justify-content: flex-start; }
+.platform-account-workspace .platform-plan-card { min-height: 0; padding: 18px; border: 1px solid color-mix(in srgb, var(--lobster-border) 65%, var(--lobster-surface)); border-radius: var(--np-panel-radius); background: color-mix(in srgb, var(--np-card) 92%, transparent); backdrop-filter: blur(var(--np-glass-blur)); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lobster-surface) 65%, transparent), 0 4px 16px -10px rgb(0 0 0 / 12%); transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease; }
+.platform-account-workspace .platform-plan-card:hover { border-color: color-mix(in srgb, var(--lobster-primary) 30%, var(--lobster-border)); box-shadow: 0 6px 20px -12px rgb(0 0 0 / 14%); }
+.platform-account-workspace .platform-plan-card[data-subscribed] { border-color: color-mix(in srgb, var(--lobster-primary) 50%, transparent); background: var(--np-card-tint); }
+.platform-account-workspace .platform-plan-card-heading h3 { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 0.5px)); font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; }
+.platform-account-workspace .platform-plan-description { min-height: 32px; margin-top: 4px; font-size: var(--np-text-meta); line-height: 1.5; }
+.platform-account-workspace .platform-plan-pricing { margin-top: 12px; }
+.platform-account-workspace .platform-plan-equivalent-label { margin-bottom: 2px; font-size: var(--np-text-caption); }
+.platform-account-workspace .platform-plan-price { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 9px)); line-height: 1.2; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+.platform-account-workspace .platform-plan-currency { font-size: var(--np-text-meta); }
+.platform-account-workspace .platform-plan-actual-price { margin-top: 4px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); line-height: 1.45; }
+.platform-account-workspace .platform-plan-purchase { margin-top: auto; padding-top: 16px; }
+.platform-account-workspace .platform-plan-state { padding-top: 0; border-top: 0; gap: 6px; }
+.platform-account-workspace .platform-subscribe-button { min-height: 34px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 2.5px)); font-weight: 500; transition: filter 140ms ease, transform 140ms ease; }
+.platform-account-workspace .platform-subscribe-button:not(:disabled):active { transform: scale(0.99); }
+.platform-account-workspace .platform-subscribe-button:disabled { border-color: transparent; background: var(--np-hairline); }
+.platform-account-workspace .platform-plan-state .platform-plan-hint { min-height: 24px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); color: var(--lobster-text-secondary); text-align: left; }
+.platform-account-workspace .platform-plan-allowance { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--np-hairline); gap: 6px; }
+.platform-account-workspace .platform-plan-allowance dt { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); }
+.platform-account-workspace .platform-plan-allowance dd { font-size: var(--np-text-meta); }
+.platform-account-workspace .platform-plan-allowance > div:first-child dd { font-size: var(--np-text-body); font-weight: 600; letter-spacing: -0.01em; }
+.platform-account-workspace .platform-plan-reset-warning { border-left-color: var(--np-hairline); }
+.platform-account-workspace .platform-plan-skeleton { min-height: 220px; border: 0; border-radius: var(--np-panel-radius); background: var(--np-card); }
+.platform-account-workspace .platform-subscription-no-plans { min-height: 160px; border: 1px dashed var(--np-hairline); border-radius: var(--np-panel-radius); background: var(--np-card); }
+.platform-account-workspace .platform-account-status { border-radius: 999px; }
+
+.platform-account-workspace .platform-subscription-overview-list { border: 0; border-radius: var(--np-panel-radius); background: var(--np-card); box-shadow: 0 0 0 1px var(--np-hairline); }
+.platform-account-workspace .platform-subscription-overview-row { padding: 12px 16px; }
+.platform-account-workspace .platform-subscription-overview-row + .platform-subscription-overview-row { border-top-color: var(--np-hairline); }
+.platform-account-workspace .platform-usage-empty { padding: 16px; border-radius: var(--np-panel-radius); border-color: var(--np-hairline); background: var(--np-card); font-size: var(--np-text-meta); }
+.platform-account-workspace .platform-usage-wallet, .platform-account-workspace .platform-subscription-card, .platform-account-workspace .platform-wallet-confirm { border: 0; background: var(--np-card); box-shadow: 0 0 0 1px var(--np-hairline); }
+.platform-account-workspace .platform-usage-wallet { border-radius: var(--np-panel-radius); padding: 18px; }
+.platform-account-workspace .platform-subscription-card { border-radius: var(--np-panel-radius); padding: 18px; }
+.platform-account-workspace .platform-wallet-confirm { border-radius: var(--np-panel-radius); padding: 18px; }
+.platform-account-workspace .platform-purchase-notice { border-radius: var(--np-panel-radius); border-color: var(--np-hairline); background: var(--np-card); }
+
+@media (max-width: 800px) {
+  .platform-account-workspace-content { padding: 14px 16px 28px; }
+  .platform-account-workspace-title h1 { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 2px)); }
+  .platform-account-workspace .platform-plan-grid[data-plan-count] { grid-template-columns: minmax(0, 320px); }
+  .platform-account-workspace .platform-plan-periods { width: 100%; }
+  .platform-account-workspace .platform-plan-periods button { flex: 1; min-width: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .platform-account-workspace .platform-plan-card:hover { transform: none; } }
+
+.platform-account-workspace-topbar nav { border-radius: var(--np-control-radius); }
+.platform-account-workspace-topbar nav button { border-radius: 6px; }
+.platform-account-workspace .platform-plan-reset-warning { margin-top: 8px; padding: 8px 10px; border: 0; border-radius: var(--np-control-radius); background: var(--lobster-surface-raised); font-size: var(--np-text-caption); line-height: 1.5; }
+.platform-account-workspace .platform-subscription-sync-row button { border-radius: var(--np-control-radius); }
+
+.platform-account-workspace .platform-plan-purchase .platform-subscribe-button:not(:disabled) { background: var(--lobster-foreground); color: var(--lobster-background); border-color: transparent; box-shadow: none; }
+.platform-account-workspace .platform-plan-purchase .platform-subscribe-button:not(:disabled):hover { opacity: .88; }
+@media (prefers-reduced-transparency: reduce) { .platform-account-workspace .platform-plan-card { background: var(--np-card); backdrop-filter: none; } }
+
+/* Real account data uses the same quiet hierarchy as the approved points design. */
+.platform-usage-overview { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr); gap: 16px; align-items: start; }
+.platform-usage-overview > section { min-width: 0; }
+.platform-usage-overview .platform-usage-wallet { margin: 0; padding: 18px; border-radius: var(--np-panel-radius); background: color-mix(in srgb, var(--np-card) 90%, transparent); backdrop-filter: blur(var(--np-glass-blur)); }
+.platform-usage-overview .platform-usage-wallet-values { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.platform-usage-overview .platform-usage-wallet-values > div + div { padding-top: 12px; border-top: 1px solid var(--np-hairline); }
+.platform-usage-overview .platform-usage-wallet-values strong { margin-top: 4px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 7px)); font-weight: 600; letter-spacing: -.02em; line-height: 1.25; }
+.platform-usage-overview .platform-usage-wallet-values > div + div strong { font-size: var(--np-text-heading); }
+.platform-usage-overview .platform-usage-wallet-values small { margin-top: 4px; font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); line-height: 1.5; }
+.platform-usage-overview .platform-subscription-list { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.platform-usage-overview .platform-subscription-card { padding: 18px; border-radius: var(--np-panel-radius); background: color-mix(in srgb, var(--np-card) 90%, transparent); backdrop-filter: blur(var(--np-glass-blur)); }
+.platform-usage-overview .platform-subscription-heading h4 { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 0.5px)); font-weight: 600; }
+.platform-usage-overview .platform-account-feature-icon { width: 32px; height: 32px; flex-basis: 32px; border-radius: 8px; }
+.platform-usage-overview .platform-quota-overview { margin-top: 16px; }
+.platform-usage-overview .platform-quota-overview strong { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 7px)); font-weight: 600; letter-spacing: -.02em; line-height: 1.25; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.platform-usage-overview .platform-quota-track { height: 4px; margin-top: 10px; }
+.platform-usage-overview .platform-quota-details { margin-top: 10px; gap: 12px; }
+.platform-usage-overview .platform-subscription-dates { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--np-hairline); }
+.platform-usage-explanation { margin-top: 16px; color: var(--lobster-text-secondary); font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3.5px)); line-height: 1.6; }
+.platform-usage-explanation summary { cursor: pointer; width: fit-content; }
+.platform-usage-explanation p { margin-top: 6px; max-width: 680px; }
+@media (max-width: 1050px) { .platform-usage-overview { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 650px) { .platform-usage-overview .platform-subscription-card, .platform-usage-overview .platform-usage-wallet { padding: 16px; } .platform-usage-overview .platform-quota-overview strong { font-size: max(10px, calc(var(--lobster-ui-font-size, 15px) + 5px)); } }
+@media (prefers-reduced-transparency: reduce) { .platform-usage-overview .platform-subscription-card, .platform-usage-overview .platform-usage-wallet { background: var(--np-card); backdrop-filter: none; } }
+
+/* Shared finishing details; keep motion brief and only on intentional interactions. */
+.platform-account-workspace-content { animation: account-content-enter 160ms ease-out; }
+.platform-account-workspace-title { margin-bottom: 16px; }
+.platform-account-workspace .platform-subscribe-button,
+.platform-account-workspace-topbar button,
+.platform-account-workspace .platform-account-text-button { transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 120ms ease; }
+.platform-account-workspace button:not(:disabled) { cursor: pointer; }
+.platform-account-workspace button:not(:disabled):active { transform: translateY(1px); }
+.platform-account-workspace .platform-subscribe-button { border-radius: var(--np-control-radius); }
+.platform-account-workspace .platform-subscription-card,
+.platform-account-workspace .platform-usage-wallet { box-shadow: inset 0 1px 0 color-mix(in srgb, var(--lobster-surface) 65%, transparent), 0 0 0 1px var(--np-hairline), 0 6px 22px -14px rgb(0 0 0 / 12%); }
+.platform-account-workspace .platform-subscription-dates { gap: 14px 24px; }
+.platform-account-workspace .platform-subscription-dates dd { white-space: normal; }
+.platform-subscription-more { margin-top: 16px; color: var(--lobster-text-secondary); font-size: var(--np-text-caption); line-height: 1.7; }
+.platform-subscription-more summary { width: fit-content; cursor: pointer; }
+.platform-subscription-more dl { display: grid; gap: 12px; padding-top: 10px; }
+.platform-subscription-more dd { margin-top: 3px; font-variant-numeric: tabular-nums; }
+.platform-account-timezone { margin: 14px 0; color: var(--lobster-text-muted); font-size: var(--np-text-caption); }
+.platform-account-workspace .platform-usage-explanation { margin-top: 12px; }
+@keyframes account-content-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 650px) { .platform-account-workspace .platform-subscription-dates { grid-template-columns: minmax(0, 1fr); gap: 14px; } }
+@media (prefers-reduced-motion: reduce) {
+  .platform-account-workspace-content { animation: none; }
+  .platform-account-workspace button:not(:disabled):active { transform: none; }
+}

@@ -28,6 +28,7 @@ import {
   type AuthSessionChangedEvent,
 } from '../shared/auth/constants';
 import { type MaasAPI, MaasIpc,type MaasLoginInput } from '../shared/auth/maas';
+import type { MaasProfileInput } from '../shared/auth/maasProfile';
 import {
   type BrowserCredentialAvailabilityResponse,
   type BrowserCredentialDeleteRequest,
@@ -1377,11 +1378,13 @@ contextBridge.exposeInMainWorld('electron', {
     snapshot: () => ipcRenderer.invoke(MaasIpc.Snapshot),
     billing: () => ipcRenderer.invoke(MaasIpc.Billing),
     subscriptions: () => ipcRenderer.invoke(MaasIpc.Subscriptions),
+    managedKey: (accountId: number) => ipcRenderer.invoke(MaasIpc.ManagedKey, accountId),
     login: (input: MaasLoginInput) => ipcRenderer.invoke(MaasIpc.Login, input),
     openLogin: (origin: string) => ipcRenderer.invoke(MaasIpc.OpenLogin, origin),
     status: (origin: string) => ipcRenderer.invoke(MaasIpc.Status, origin),
     sendSMS: (input: { origin: string; phone: string }) => ipcRenderer.invoke(MaasIpc.SendSMS, input),
     logout: () => ipcRenderer.invoke(MaasIpc.Logout),
+    profile: (input: MaasProfileInput) => ipcRenderer.invoke(MaasIpc.Profile, input),
   } satisfies MaasAPI,
   auth: {
     login: (loginUrl?: string) => ipcRenderer.invoke(AuthIpcChannel.Login, { loginUrl }),

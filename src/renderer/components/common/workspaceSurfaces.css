@@ -1,0 +1,14 @@
+/* Shared UI measurements for account, settings and extensions. No runtime behavior. */
+:root {
+  --np-panel-radius: 12px;
+  --np-control-radius: 8px;
+  --np-glass-blur: 10px;
+  --np-ui-duration: 140ms;
+  --np-text-caption: max(10px, calc(var(--lobster-ui-font-size, 15px) - 4px));
+  --np-text-meta: max(10px, calc(var(--lobster-ui-font-size, 15px) - 3px));
+  --np-text-body: max(10px, calc(var(--lobster-ui-font-size, 15px) - 2px));
+  --np-text-label: max(11px, calc(var(--lobster-ui-font-size, 15px) - 1px));
+  --np-text-title: max(11px, var(--lobster-ui-font-size, 15px));
+  --np-text-heading: max(12px, calc(var(--lobster-ui-font-size, 15px) + 1px));
+  --np-page-title-size: max(14px, calc(var(--lobster-ui-font-size, 15px) + 3px));
+}

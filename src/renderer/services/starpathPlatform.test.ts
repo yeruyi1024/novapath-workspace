@@ -22,14 +22,14 @@ describe('StarPath gateway configuration', () => {
 
   test('preserves managed provider identity and does not overwrite unrelated connections', () => {
     const config = { enabled: false, apiKey: '', baseUrl: '', models: [] };
-    const providers: ProvidersConfig = { custom_0: config, custom_2: config };
+    const providers: ProvidersConfig = { custom_0: config, custom_2: { ...config, baseUrl: PLATFORM_MODEL_BASE_URL } };
     expect(resolvePlatformProviderId(providers, 'custom_2')).toBe('custom_2');
-    expect(resolvePlatformProviderId(providers)).toBe('custom_1');
-    expect(resolvePlatformProviderId(providers, 'custom_9')).toBe('custom_1');
-    expect(resolvePlatformProviderId(providers, 'openai')).toBe('custom_1');
+    expect(resolvePlatformProviderId(providers)).toBe('custom_2');
+    expect(resolvePlatformProviderId(providers, 'custom_9')).toBe('custom_2');
+    expect(resolvePlatformProviderId(providers, 'openai')).toBe('custom_2');
     const full = Object.fromEntries(Array.from({ length: 30 }, (_, index) => [`custom_${index}`, config]));
     expect(resolvePlatformProviderId(full)).toBe('custom_30');
-    expect(resolvePlatformProviderId({ ...full, custom_30: config }, 'custom_30')).toBe('custom_30');
+    expect(resolvePlatformProviderId({ ...full, custom_30: { ...config, baseUrl: PLATFORM_MODEL_BASE_URL } }, 'custom_30')).toBe('custom_30');
   });
 
   test('activates only the platform gateway and retains legacy credentials and model records', () => {

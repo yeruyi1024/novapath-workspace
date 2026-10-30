@@ -19,7 +19,8 @@ interface PlatformAppConfig {
 export function lockPlatformConfig<T extends PlatformAppConfig>(config: T): T & Required<PlatformAppConfig> {
   const providers = config.providers ?? {};
   let id = config.platformProviderId;
-  if (!id || !/^custom_\d+$/.test(id) || !providers[id]) {
+  if (!id || !/^custom_\d+$/.test(id) || !providers[id]
+    || providers[id].baseUrl?.replace(/\/+$/, '') !== PLATFORM_MODEL_BASE_URL) {
     id = Object.keys(providers).find(key => /^custom_\d+$/.test(key)
       && providers[key].baseUrl?.replace(/\/+$/, '') === PLATFORM_MODEL_BASE_URL);
   }

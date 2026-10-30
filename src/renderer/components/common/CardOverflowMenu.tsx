@@ -50,6 +50,7 @@ interface CardOverflowMenuProps {
   triggerLabel?: string;
   /** Extra classes for the menu surface, e.g. account-specific styling. */
   menuClassName?: string;
+  menuHeader?: React.ReactNode;
 }
 
 /** Reusable overflow menu with an optional inline, one-level submenu. */
@@ -62,6 +63,7 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
   triggerClassName,
   triggerLabel,
   menuClassName = '',
+  menuHeader,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedItemKey, setExpandedItemKey] = useState<string>();
@@ -199,6 +201,7 @@ const CardOverflowMenu: React.FC<CardOverflowMenuProps> = ({
           style={{ top: position.top, left: position.left, width: menuWidthPx }}
           className={`fixed z-[9999] ${CARD_OVERFLOW_MENU_SURFACE_CLASSNAME} ${menuClassName}`}
         >
+          {menuHeader}
           {items.map(item => {
             const hasChildren = Boolean(item.children);
             const isExpanded = hasChildren && expandedItemKey === item.key;

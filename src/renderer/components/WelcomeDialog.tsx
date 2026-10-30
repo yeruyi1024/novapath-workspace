@@ -5,12 +5,13 @@ import { i18nService } from '../services/i18n';
 import PlatformLoginForm from './login/PlatformLoginForm';
 
 interface WelcomeDialogProps {
+  origin?: string;
   pending?: boolean;
   error?: string;
   onRetry?: () => void;
 }
 
-const WelcomeDialog: React.FC<WelcomeDialogProps> = ({ pending, error, onRetry }) => {
+const WelcomeDialog: React.FC<WelcomeDialogProps> = ({ origin, pending, error, onRetry }) => {
   const t = (key: string) => i18nService.t(key);
   return (
     <div className="draggable platform-welcome relative flex min-h-0 flex-1 flex-col items-center justify-center gap-5 overflow-y-auto p-6 text-foreground">
@@ -39,7 +40,7 @@ const WelcomeDialog: React.FC<WelcomeDialogProps> = ({ pending, error, onRetry }
                 </button>
               </div>
             )}
-            <PlatformLoginForm initialError={error} onSuccess={() => { /* The session store opens the workspace after validated login. */ }} />
+            <PlatformLoginForm origin={origin} initialError={error} onSuccess={() => { /* The session store opens the workspace after validated login. */ }} />
           </>
         )}
 

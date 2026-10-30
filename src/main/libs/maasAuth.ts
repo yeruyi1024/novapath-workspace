@@ -7,15 +7,28 @@ import { DEFAULT_MAAS_ORIGIN, MaasIpc, type MaasResult, type MaasSnapshot, norma
 import { parseMaasBillingSnapshot } from '../../shared/auth/maasBilling';
 import { parseMaasSubscriptions } from '../../shared/auth/maasSubscriptions';
 import { PRODUCT } from '../../shared/product';
+import { createMaasProfileEditor, profileEndpoints, type ProfileOwner } from './maasProfile';
 
 const COOKIE = 'new_api_refresh';
 const AUTH_PATH = '/api/user/auth';
 const ENDPOINTS = {
-  refresh: AUTH_PATH + '/refresh', logout: AUTH_PATH + '/logout',
-  status: '/api/status', password: '/api/user/login', twofa: '/api/user/login/2fa',
-  sms: '/api/user/login/sms', smsCode: '/api/user/login/sms/code',
-  self: '/api/user/self', plans: '/api/subscription/plans', subscriptions: '/api/subscription/self',
+  refresh: { path: AUTH_PATH + '/refresh', method: 'POST', bearer: false },
+  logout: { path: AUTH_PATH + '/logout', method: 'POST', bearer: false },
+  status: { path: '/api/status', method: 'GET', bearer: false },
+  password: { path: '/api/user/login', method: 'POST', bearer: false },
+  twofa: { path: '/api/user/login/2fa', method: 'POST', bearer: false },
+  sms: { path: '/api/user/login/sms', method: 'POST', bearer: false },
+  smsCode: { path: '/api/user/login/sms/code', method: 'POST', bearer: false },
+  self: { path: '/api/user/self', method: 'GET', bearer: true },
+  plans: { path: '/api/subscription/plans', method: 'GET', bearer: true },
+  subscriptions: { path: '/api/subscription/self', method: 'GET', bearer: true },
+  managedKey: { path: '/api/apps/starpath/managed-key', method: 'POST', bearer: true },
+  ...profileEndpoints,
 } as const;
+
+export function maasSessionFileName(origin: string): string {
+  return 'maas-session-' + crypto.createHash('sha256').update(normalizeMaasOrigin(origin)).digest('hex').slice(0, 16) + '.json';
+}
 
 export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedOrigin = DEFAULT_MAAS_ORIGIN): void {
   const platformOrigin = normalizeMaasOrigin(trustedOrigin);
@@ -24,17 +37,28 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     if (origin !== platformOrigin) throw new Error('invalidAddress');
     return origin;
   };
-  const file = path.join(app.getPath('userData'), 'maas-session.json');
+  const file = path.join(app.getPath('userData'), maasSessionFileName(platformOrigin));
+  const legacyFile = path.join(app.getPath('userData'), 'maas-session.json');
   let snapshot: MaasSnapshot = { origin: platformOrigin, account: null };
   let sid: string | null = null;
   let accessToken: string | null = null;
+  let accessExpiresAt = 0;
+  let refreshBlockedUntil = 0;
   let initialized = false;
   let queue = Promise.resolve();
+  let authEpoch = 0;
+  let identityChanges = 0;
+  const profileEditor = createMaasProfileEditor();
+  const notifyIdentity = () => { authEpoch += 1; profileEditor.clear(); };
 
   const handle = (channel: string, handler: (input: unknown) => Promise<MaasResult>) => {
     ipcMain.handle(channel, (event, input: unknown) => {
       if (event.sender !== getParent()?.webContents) throw new Error('Invalid platform account IPC sender');
-      return handler(input);
+      const identityChange = [MaasIpc.Login, MaasIpc.OpenLogin, MaasIpc.Logout].some(value => value === channel);
+      if (identityChange) { identityChanges += 1; notifyIdentity(); }
+      return handler(input).finally(() => {
+        if (identityChange) { identityChanges -= 1; notifyIdentity(); }
+      });
     });
   };
 
@@ -64,10 +88,17 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
 
   const restore = async () => {
     if (initialized) return;
-    if (fs.existsSync(file)) {
+    let restoreFile = fs.existsSync(file) ? file : undefined;
+    if (!restoreFile && fs.existsSync(legacyFile)) {
+      try {
+        // Import only a matching legacy environment. Preserve other environments and the original file.
+        if (JSON.parse(fs.readFileSync(legacyFile, 'utf8')).origin === platformOrigin) restoreFile = legacyFile;
+      } catch { /* A foreign/old session must not prevent local sign-in. */ }
+    }
+    if (restoreFile) {
       if (!secureStorageAvailable()) throw new Error('storage');
       try {
-        const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+        const saved = JSON.parse(fs.readFileSync(restoreFile, 'utf8'));
         const origin = resolveOrigin(saved.origin);
         const cookie = JSON.parse(safeStorage.decryptString(Buffer.from(saved.ciphertext, 'base64')));
         snapshot = { origin, account: null };
@@ -86,26 +117,41 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     initialized = true;
   };
 
-  const request = (origin: string, endpoint: keyof typeof ENDPOINTS, expectedSid?: string | null, payload?: object): Promise<{ status: number; body: Record<string, unknown> }> => new Promise((resolve, reject) => {
-    const req = net.request({ url: origin + ENDPOINTS[endpoint], method: ['status', 'self', 'plans', 'subscriptions'].includes(endpoint) ? 'GET' : 'POST',
+  const request = (origin: string, endpoint: keyof typeof ENDPOINTS, expectedSid?: string | null, payload?: object, query = '', proof?: string): Promise<{ status: number; body: Record<string, unknown>; retryAfterMs?: number }> => new Promise((resolve, reject) => {
+    const definition = ENDPOINTS[endpoint];
+    const req = net.request({ url: origin + definition.path + query, method: definition.method,
       session: getSession(origin), credentials: 'include', redirect: 'error' });
     req.setHeader('Origin', origin);
     req.setHeader('Accept', 'application/json');
     if (expectedSid) req.setHeader('X-Auth-Session', expectedSid);
-    if (['self', 'plans', 'subscriptions'].includes(endpoint) && accessToken) req.setHeader('Authorization', `Bearer ${accessToken}`);
+    if (definition.bearer && accessToken) req.setHeader('Authorization', `Bearer ${accessToken}`);
+    if (proof) req.setHeader('X-Security-Proof', proof);
     const timeout = setTimeout(() => { reject(new Error('network')); req.abort(); }, 20_000);
     req.on('error', () => { clearTimeout(timeout); reject(new Error('network')); });
     req.on('response', response => {
       let body = '';
+      let retryAfterMs: number | undefined;
+      if (response.statusCode === 429) {
+        const header = response.headers['retry-after'];
+        const value = (Array.isArray(header) ? header[0] : header)?.trim();
+        const delay = value && /^\d+$/.test(value) ? Number(value) * 1000 : value ? Date.parse(value) - Date.now() : NaN;
+        retryAfterMs = Number.isSafeInteger(delay) && delay >= 0 ? Math.max(1000, delay) : 60_000;
+      }
+      const result = (data: Record<string, unknown>) => ({ status: response.statusCode, body: data, ...(retryAfterMs !== undefined ? { retryAfterMs } : {}) });
       response.on('data', chunk => {
         body += chunk.toString();
-        if (body.length > 1_048_576) { reject(new Error('invalidResponse')); req.abort(); }
+        if (body.length > 1_048_576) { clearTimeout(timeout); reject(new Error('invalidResponse')); req.abort(); }
       });
       response.on('error', () => { clearTimeout(timeout); reject(new Error('network')); });
       response.on('end', () => {
         clearTimeout(timeout);
-        try { resolve({ status: response.statusCode, body: JSON.parse(body) }); }
-        catch { reject(new Error('invalidResponse')); }
+        try { resolve(result(JSON.parse(body))); }
+        catch {
+          // Middleware may reject before JSON handling (for example an empty 429).
+          // Let callers classify HTTP failures without losing an existing session.
+          if (response.statusCode >= 400) resolve(result({}));
+          else reject(new Error('invalidResponse'));
+        }
       });
     });
     if (payload) {
@@ -116,19 +162,26 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
   });
 
   const acceptBundle = async (origin: string, body: Record<string, unknown>) => {
-    const bundle = body.data as { session?: { sid?: unknown }; access_token?: unknown; user?: unknown } | undefined;
+    const bundle = body.data as { session?: { sid?: unknown }; access_token?: unknown; access_expires_at?: unknown; user?: unknown } | undefined;
     if (!body.success || !bundle || typeof bundle.access_token !== 'string'
       || typeof bundle.session?.sid !== 'string') throw new Error('invalidResponse');
     const account = parseMaasAccount(bundle.user);
     await persist(origin);
     const billing = snapshot.origin === origin && snapshot.account?.id === account.id && sid === bundle.session.sid
       ? snapshot.billing : undefined;
+    const identityChanged = snapshot.origin !== origin || snapshot.account?.id !== account.id || sid !== bundle.session.sid;
     snapshot = { origin, account, ...(billing ? { billing } : {}) };
     sid = bundle.session.sid;
     accessToken = bundle.access_token;
+    accessExpiresAt = typeof bundle.access_expires_at === 'number' && Number.isSafeInteger(bundle.access_expires_at * 1000)
+      ? bundle.access_expires_at * 1000 : 0;
+    if (identityChanged) notifyIdentity();
   };
 
   const refresh = async (origin: string, expectedSid?: string | null): Promise<boolean> => {
+    // A rejected renewal must not fan out through queued account consumers.
+    // There is no retry timer: a later caller may try after the server's window.
+    if (Date.now() < refreshBlockedUntil) throw new Error('network');
     let result = await request(origin, 'refresh', expectedSid);
     if (result.status === 409 && result.body.code === 'AUTH_SESSION_MISMATCH') {
       result = await request(origin, 'refresh');
@@ -138,15 +191,29 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
         snapshot = { origin, account: null };
         sid = null;
         accessToken = null;
+        notifyIdentity();
         fs.rmSync(file, { force: true });
         await getSession(origin).clearStorageData();
       }
       return false;
     }
-    if (result.status >= 500 || result.status === 429) throw new Error('network');
+    if (result.status === 429) {
+      refreshBlockedUntil = Date.now() + (result.retryAfterMs ?? 60_000);
+      throw new Error('network');
+    }
+    if (result.status >= 500) throw new Error('network');
     await acceptBundle(origin, result.body);
+    refreshBlockedUntil = 0;
     return true;
   };
+
+  const hasFreshAccess = (origin: string, expectedSid?: string | null) => snapshot.origin === origin
+    && Boolean(snapshot.account && sid && accessToken) && (!expectedSid || expectedSid === sid)
+    && accessExpiresAt > Date.now() + 30_000;
+  // Reads validate the existing JWT at the API. Rotate the refresh cookie only
+  // when needed, rather than spending a critical-operation slot on every read.
+  const ensureAccess = (origin: string, expectedSid?: string | null) => hasFreshAccess(origin, expectedSid)
+    ? Promise.resolve(true) : refresh(origin, expectedSid);
 
   const run = (work: () => Promise<MaasResult>): Promise<MaasResult> => {
     const pending = queue.then(work).catch((error: unknown): MaasResult => {
@@ -159,15 +226,115 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     return pending;
   };
 
+  handle(MaasIpc.Profile, value => {
+    const startedEpoch = authEpoch;
+    const input = value as { accountId?: unknown; action?: unknown } | null;
+    const work = run(async () => {
+      const changed = (): MaasResult => ({ success: false, snapshot, profileError: 'accountChanged' });
+      if (!Number.isSafeInteger(input?.accountId) || Number(input?.accountId) <= 0) {
+        return { success: false, snapshot, profileError: 'invalidInput' };
+      }
+      if (identityChanges || authEpoch !== startedEpoch) return changed();
+      await restore();
+      if (snapshot.account?.id !== input!.accountId) return changed();
+      const origin = snapshot.origin;
+      if (!await ensureAccess(origin, sid)) return changed();
+      if (identityChanges || snapshot.account?.id !== input!.accountId || !sid) return changed();
+      let owner: ProfileOwner = { origin, accountId: snapshot.account.id, sessionId: sid, epoch: authEpoch };
+      const assertCurrent = () => {
+        if (identityChanges || snapshot.origin !== owner.origin || snapshot.account?.id !== owner.accountId
+          || sid !== owner.sessionId || authEpoch !== owner.epoch) throw new Error('accountChanged');
+      };
+      if (input!.action === 'openPlatform') return { success: true, snapshot };
+      return profileEditor.execute(value, {
+        owner, snapshot: () => snapshot, assertCurrent,
+        request: (endpoint, payload, query, proof) => request(origin, endpoint, owner.sessionId, payload, query, proof),
+        sync: async () => {
+          assertCurrent();
+          const response = await request(origin, 'self', owner.sessionId);
+          assertCurrent();
+          if (response.status !== 200 || response.body.success !== true) throw new Error('network');
+          const account = parseMaasAccount(response.body.data);
+          if (account.id !== owner.accountId) throw new Error('accountChanged');
+          snapshot = { ...snapshot, account };
+          return account;
+        },
+        rotate: async body => {
+          assertCurrent();
+          const data = body.data as { access_token?: unknown; access_expires_at?: unknown; session?: { sid?: unknown } } | undefined;
+          if (typeof data?.access_token !== 'string' || !data.access_token || data.session?.sid !== owner.sessionId
+            || typeof data.access_expires_at !== 'number' || !Number.isSafeInteger(data.access_expires_at * 1000)
+            || data.access_expires_at * 1000 <= Date.now()) throw new Error('invalidResponse');
+          // Phone rotation has no user DTO: retain the JWT and encrypted cookie,
+          // then read self. Never reconstruct an AuthBundle from renderer data.
+          accessToken = data.access_token;
+          accessExpiresAt = data.access_expires_at * 1000;
+          notifyIdentity();
+          owner = { ...owner, epoch: authEpoch };
+          await persist(origin);
+          assertCurrent();
+        },
+      });
+    });
+    if (input?.action !== 'openPlatform') return work;
+    // CAPTCHA/passkey belongs to the platform. Do not hold the account queue
+    // while this separate sandboxed window is open.
+    return work.then(prepared => {
+      if (!prepared.success || identityChanges || snapshot.account?.id !== input.accountId) return prepared;
+      const origin = snapshot.origin;
+      const browserEpoch = authEpoch;
+      const window = new BrowserWindow({ width: 1000, height: 760, minWidth: 480, minHeight: 580,
+        parent: getParent() ?? undefined, title: PRODUCT.englishName, autoHideMenuBar: true,
+        webPreferences: { session: getSession(origin), nodeIntegration: false, contextIsolation: true, sandbox: true } });
+      window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+      window.webContents.on('will-navigate', (event, url) => {
+        try { if (new URL(url).origin !== origin) event.preventDefault(); } catch { event.preventDefault(); }
+      });
+      return new Promise<MaasResult>(resolve => {
+        let failed = false;
+        window.on('closed', () => {
+          void run(async () => {
+            if (failed) return { success: false, snapshot, error: 'network' };
+            if (identityChanges || snapshot.account?.id !== input.accountId || authEpoch !== browserEpoch) {
+              return { success: false, snapshot, profileError: 'accountChanged' };
+            }
+            if (!await refresh(origin, sid) || snapshot.account?.id !== input.accountId) {
+              return { success: false, snapshot, profileError: 'accountChanged' };
+            }
+            return { success: true, snapshot };
+          }).then(resolve);
+        });
+        void window.loadURL(origin + '/profile').catch(() => { failed = true; if (!window.isDestroyed()) window.close(); });
+      });
+    });
+  });
+
   handle(MaasIpc.Snapshot, () => run(async () => {
     await restore();
     const cookies = await getSession(snapshot.origin).cookies.get({ url: snapshot.origin + AUTH_PATH + '/refresh', name: COOKIE });
-    if (cookies.length) await refresh(snapshot.origin, sid);
+    if (cookies.length) {
+      const origin = snapshot.origin;
+      if (!hasFreshAccess(origin, sid)) await refresh(origin, sid);
+      else {
+        const accountId = snapshot.account!.id;
+        let self = await request(origin, 'self', sid);
+        if (self.status === 401) {
+          if (!await refresh(origin, sid)) return { success: true, snapshot };
+          if (snapshot.account?.id !== accountId) throw new Error('invalidResponse');
+          self = await request(origin, 'self', sid);
+        }
+        if (self.status !== 200 || self.body.success !== true) throw new Error('network');
+        const account = parseMaasAccount(self.body.data);
+        if (account.id !== accountId) throw new Error('invalidResponse');
+        snapshot = { ...snapshot, account };
+      }
+    }
     else {
       snapshot = { origin: snapshot.origin, account: null };
       sid = null;
       accessToken = null;
       fs.rmSync(file, { force: true });
+      notifyIdentity();
     }
     return { success: true, snapshot };
   }));
@@ -176,7 +343,7 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     await restore();
     const origin = snapshot.origin;
     const cookies = await getSession(origin).cookies.get({ url: origin + AUTH_PATH + '/refresh', name: COOKIE });
-    if (!cookies.length || !await refresh(origin, sid)) {
+    if (!cookies.length || !await ensureAccess(origin, sid)) {
       snapshot = { origin, account: null };
       sid = null;
       accessToken = null;
@@ -199,11 +366,29 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     return { success: true, snapshot };
   }));
 
+  handle(MaasIpc.ManagedKey, input => run(async () => {
+    const expectedAccountId = Number(input);
+    if (!Number.isSafeInteger(expectedAccountId) || expectedAccountId <= 0) throw new Error('invalidResponse');
+    await restore();
+    const origin = snapshot.origin;
+    if (snapshot.account?.id !== expectedAccountId || !await ensureAccess(origin, sid)) throw new Error('loginRejected');
+    let result = await request(origin, 'managedKey', sid, {});
+    if (result.status === 401) {
+      if (!await refresh(origin, sid)) throw new Error('loginRejected');
+      if (snapshot.account?.id !== expectedAccountId) throw new Error('invalidResponse');
+      result = await request(origin, 'managedKey', sid, {});
+    }
+    const data = result.body.data as { key?: unknown } | undefined;
+    if (result.status !== 200 || !result.body.success || typeof data?.key !== 'string' || !data.key || data.key.length > 256) throw new Error('network');
+    if (snapshot.account?.id !== expectedAccountId) throw new Error('invalidResponse');
+    return { success: true, snapshot, managedKey: { accountId: expectedAccountId, key: data.key } };
+  }));
+
   handle(MaasIpc.Subscriptions, () => run(async () => {
     await restore();
     const origin = snapshot.origin;
     const cookies = await getSession(origin).cookies.get({ url: origin + AUTH_PATH + '/refresh', name: COOKIE });
-    if (!cookies.length || !await refresh(origin, sid)) {
+    if (!cookies.length || !await ensureAccess(origin, sid)) {
       snapshot = { origin, account: null };
       sid = null;
       accessToken = null;
@@ -374,4 +559,5 @@ export function registerMaasAuth(getParent: () => BrowserWindow | null, trustedO
     initialized = true;
     return { success: true, snapshot, ...(logoutRemoteFailed ? { logoutRemoteFailed } : {}) };
   }));
+
 }
